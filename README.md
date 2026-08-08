@@ -127,7 +127,7 @@ properties cannot both hold for simultaneous starts, and fading up won.
 | `HELLO <ver> <keys>` | a host opened the data port |
 | `PONG <ver> <keys>` | reply to `P` |
 | `K <idx> <0\|1>` | key pressed (1) / released (0) |
-| `ERR <msg>` | command could not be handled |
+| `ERR <msg>` | command could not be handled, or the firmware died |
 
 `<ver>` is 1 for `C`/`B`/`P`/`R`, 2 once `S` exists, and 3 once `X`,
 crossfading, and phase-held colour changes exist. Accept anything `>= 1`:
@@ -150,6 +150,32 @@ Three behaviours the host depends on:
 **and a known verb with the wrong argument count** — `C 0` reports as an
 unknown `C`. Misleading, but stable; a host should not read it as "this
 firmware lacks that verb".
+
+### When the firmware itself dies
+
+An uncaught exception is the worst failure here and the quietest one:
+CircuitPython stops `code.py`, the data port goes silent, and the LEDs
+freeze at whatever they last showed. From the host that is exactly what a
+board that never booted looks like.
+
+So the loop has a last line of defence. On any escaped exception the
+device sends `ERR fatal <type>: <detail>`, paints every key red, and then:
+
+- **after the first minute of uptime** — waits two seconds and resets,
+  landing on the recovery path that already exists. The host sees a fresh
+  `HELLO` and re-pushes everything; nothing new has to be wired up.
+- **within the first minute** — stays halted and red instead. A fault
+  that fires on every boot would otherwise reset-loop, and a board whose
+  USB re-enumerates every few seconds is hard to write a new `code.py`
+  to. Red-and-halted is both the louder signal and the state you can
+  actually recover from.
+
+Painting red is best effort: if the fault *was* the I2C bus, it cannot
+work, which is precisely when the reset matters most.
+
+A host that wants to notice silent self-healing can watch for `HELLO`
+arriving repeatedly in a short window — that is a reset loop, and it is
+detectable entirely host-side.
 
 Debug output goes to the *console* port via plain `print`, never to data
 — unless `boot.py` did not take effect, in which case there is no data

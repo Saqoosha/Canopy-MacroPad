@@ -53,6 +53,7 @@ import math
 import time
 
 import board
+import microcontroller
 import usb_cdc
 from adafruit_neokey.neokey1x4 import NeoKey1x4
 
@@ -396,121 +397,165 @@ if i2c_error:
     print("Reconnecting it needs a reset; it is not picked up live.")
 
 
-while True:
-    now = time.monotonic_ns()
+# An uncaught exception is the worst thing that can happen here, and it
+# is silent: CircuitPython stops code.py, the data port goes quiet and
+# the LEDs freeze at whatever they last showed. From the host that is
+# indistinguishable from a board that never booted, and the only way out
+# is for a human to notice and unplug it.
+#
+# So: say so, then reboot into the recovery path that already exists --
+# a fresh HELLO, which the host already treats as "re-push everything".
+#
+# The one thing this must never do is make the board unreachable. A fault
+# that fires immediately on every boot would otherwise reset-loop, and a
+# board whose USB re-enumerates every few seconds is hard to write a new
+# code.py to. Below MIN_UPTIME_BEFORE_RESET_NS the device stays halted
+# and red instead, which is both the louder failure signal and the state
+# you can actually recover from.
+MIN_UPTIME_BEFORE_RESET_NS = 60_000_000_000  # 60 s
+booted_at = time.monotonic_ns()
 
-    # --- host connect / disconnect -------------------------------------
-    connected = serial.connected
-    if connected and not was_connected:
-        # Announce on every fresh open, not just at power-on: a banner
-        # sent at boot is lost if the host was not listening yet. This is
-        # also the host's cue to re-push every color after a device reset.
-        rx_buffer = b""
-        resync_keys = True
-        write_line("HELLO {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
-        if using_fallback_port:
-            write_line("ERR no-data-cdc-check-boot-py")
-        if i2c_error:
-            write_line("ERR i2c {} (reset required after fixing)".format(
-                i2c_error))
-    elif was_connected and not connected:
-        # Nobody owns the LEDs any more. Stale status is worse than none:
-        # a frozen orange key claims a session still wants an answer.
-        # Brightness goes back to the default for the same reason -- the
-        # next host should not inherit a `B 5` the last one left behind.
-        # A partial line from the departing host goes too, or it would be
-        # concatenated onto the next host's first command.
-        try:
-            all_off()
-            set_brightness(int(DEFAULT_BRIGHTNESS * 100))
-        except Exception:  # noqa: BLE001 - the I2C guard below reports it
-            pass
-        rx_buffer = b""
-    was_connected = connected
+try:
+    while True:
+        now = time.monotonic_ns()
 
-    # --- commands from the host (non-blocking) -------------------------
-    if serial.in_waiting:
-        rx_buffer += serial.read(serial.in_waiting) or b""
-        if len(rx_buffer) > MAX_LINE_BYTES:
-            # No newline in that much traffic means the sender is not
-            # speaking this protocol. Dropping beats growing the heap
-            # until MemoryError takes the device down silently.
+        # --- host connect / disconnect -------------------------------------
+        connected = serial.connected
+        if connected and not was_connected:
+            # Announce on every fresh open, not just at power-on: a banner
+            # sent at boot is lost if the host was not listening yet. This is
+            # also the host's cue to re-push every color after a device reset.
             rx_buffer = b""
-        while b"\n" in rx_buffer:
-            line, rx_buffer = rx_buffer.split(b"\n", 1)
+            resync_keys = True
+            write_line("HELLO {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
+            if using_fallback_port:
+                write_line("ERR no-data-cdc-check-boot-py")
+            if i2c_error:
+                write_line("ERR i2c {} (reset required after fixing)".format(
+                    i2c_error))
+        elif was_connected and not connected:
+            # Nobody owns the LEDs any more. Stale status is worse than none:
+            # a frozen orange key claims a session still wants an answer.
+            # Brightness goes back to the default for the same reason -- the
+            # next host should not inherit a `B 5` the last one left behind.
+            # A partial line from the departing host goes too, or it would be
+            # concatenated onto the next host's first command.
             try:
-                handle(line)
-            except Exception as err:  # noqa: BLE001 - never die on bad input
-                # The type name matters: several CircuitPython builtins
-                # are raised with no argument, so str(err) alone can be
-                # empty and the host would receive a bare "ERR ".
-                write_line("ERR {} {}".format(type(err).__name__, err))
+                all_off()
+                set_brightness(int(DEFAULT_BRIGHTNESS * 100))
+            except Exception:  # noqa: BLE001 - the I2C guard below reports it
+                pass
+            rx_buffer = b""
+        was_connected = connected
 
-    # --- LEDs and keys -------------------------------------------------
-    # Every I2C touch lives inside this guard. The startup path already
-    # treats a missing keypad as a survivable state; a cable knocked
-    # loose *after* boot is the likelier version of the same event, and
-    # without this it raises straight out of the loop, drops to the REPL,
-    # and leaves a silent port with frozen LEDs -- which is exactly what
-    # a board that never booted looks like.
-    try:
-        if now - last_pulse_at >= PULSE_STEP_NS:
-            last_pulse_at = now
+        # --- commands from the host (non-blocking) -------------------------
+        if serial.in_waiting:
+            rx_buffer += serial.read(serial.in_waiting) or b""
+            if len(rx_buffer) > MAX_LINE_BYTES:
+                # No newline in that much traffic means the sender is not
+                # speaking this protocol. Dropping beats growing the heap
+                # until MemoryError takes the device down silently.
+                rx_buffer = b""
+            while b"\n" in rx_buffer:
+                line, rx_buffer = rx_buffer.split(b"\n", 1)
+                try:
+                    handle(line)
+                except Exception as err:  # noqa: BLE001 - never die on bad input
+                    # The type name matters: several CircuitPython builtins
+                    # are raised with no argument, so str(err) alone can be
+                    # empty and the host would receive a bare "ERR ".
+                    write_line("ERR {} {}".format(type(err).__name__, err))
+
+        # --- LEDs and keys -------------------------------------------------
+        # Every I2C touch lives inside this guard. The startup path already
+        # treats a missing keypad as a survivable state; a cable knocked
+        # loose *after* boot is the likelier version of the same event, and
+        # without this it raises straight out of the loop, drops to the REPL,
+        # and leaves a silent port with frozen LEDs -- which is exactly what
+        # a board that never booted looks like.
+        try:
+            if now - last_pulse_at >= PULSE_STEP_NS:
+                last_pulse_at = now
+                for i in range(NUM_KEYS):
+                    t = fade_progress(i, now)
+                    if t >= 1.0:
+                        if to_floor[i] >= 1.0 and from_floor[i] >= 1.0 \
+                                and from_rgb[i] == to_rgb[i]:
+                            continue  # settled and solid: nothing moves
+                        from_rgb[i] = to_rgb[i]
+                        from_floor[i] = to_floor[i]
+                    base = lerp_rgb(from_rgb[i], to_rgb[i], t)
+                    floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
+                    # Integer modulo before the divide, so phase stays exact
+                    # no matter how long the board has been up. Cosine starts
+                    # at its minimum, so a key that begins pulsing fades up
+                    # rather than snapping to full.
+                    phase = ((now - pulse_started[i]) % period_ns[i]) / period_ns[i]
+                    level = (1 - math.cos(2 * math.pi * phase)) / 2
+                    level = floor + (1 - floor) * level ** PULSE_GAMMA
+                    write_pixel(i, (int(((base >> 16) & 0xFF) * level) << 16)
+                                | (int(((base >> 8) & 0xFF) * level) << 8)
+                                | int((base & 0xFF) * level))
+            flush_pixels()
+
+            # get_keys() reads all four keys of a board in one I2C
+            # transaction, which is 4x fewer round trips than indexing each.
+            raw = []
+            for pad in pads:
+                raw.extend(pad.get_keys())
+        except Exception as err:  # noqa: BLE001
+            i2c_fail_count += 1
+            if i2c_fail_count >= I2C_FAIL_LIMIT and not i2c_lost_reported:
+                i2c_lost_reported = True
+                print("I2C lost after {} failed scans: {}: {}".format(
+                    i2c_fail_count, type(err).__name__, err))
+            time.sleep(POLL_INTERVAL_S)
+            continue
+        else:
+            i2c_fail_count = 0
+            i2c_lost_reported = False
+
+        if resync_keys:
+            # Adopt the current levels without emitting anything, so keys
+            # held across a reconnect produce neither a phantom press nor an
+            # orphan release.
+            resync_keys = False
             for i in range(NUM_KEYS):
-                t = fade_progress(i, now)
-                if t >= 1.0:
-                    if to_floor[i] >= 1.0 and from_floor[i] >= 1.0 \
-                            and from_rgb[i] == to_rgb[i]:
-                        continue  # settled and solid: nothing moves
-                    from_rgb[i] = to_rgb[i]
-                    from_floor[i] = to_floor[i]
-                base = lerp_rgb(from_rgb[i], to_rgb[i], t)
-                floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
-                # Integer modulo before the divide, so phase stays exact
-                # no matter how long the board has been up. Cosine starts
-                # at its minimum, so a key that begins pulsing fades up
-                # rather than snapping to full.
-                phase = ((now - pulse_started[i]) % period_ns[i]) / period_ns[i]
-                level = (1 - math.cos(2 * math.pi * phase)) / 2
-                level = floor + (1 - floor) * level ** PULSE_GAMMA
-                write_pixel(i, (int(((base >> 16) & 0xFF) * level) << 16)
-                            | (int(((base >> 8) & 0xFF) * level) << 8)
-                            | int((base & 0xFF) * level))
-        flush_pixels()
-
-        # get_keys() reads all four keys of a board in one I2C
-        # transaction, which is 4x fewer round trips than indexing each.
-        raw = []
-        for pad in pads:
-            raw.extend(pad.get_keys())
-    except Exception as err:  # noqa: BLE001
-        i2c_fail_count += 1
-        if i2c_fail_count >= I2C_FAIL_LIMIT and not i2c_lost_reported:
-            i2c_lost_reported = True
-            print("I2C lost after {} failed scans: {}: {}".format(
-                i2c_fail_count, type(err).__name__, err))
-        time.sleep(POLL_INTERVAL_S)
-        continue
-    else:
-        i2c_fail_count = 0
-        i2c_lost_reported = False
-
-    if resync_keys:
-        # Adopt the current levels without emitting anything, so keys
-        # held across a reconnect produce neither a phantom press nor an
-        # orphan release.
-        resync_keys = False
-        for i in range(NUM_KEYS):
-            stable[i] = raw_prev[i] = raw[i]
-            changed_at[i] = now
-    else:
-        for i in range(NUM_KEYS):
-            level = raw[i]
-            if level != raw_prev[i]:
-                raw_prev[i] = level
+                stable[i] = raw_prev[i] = raw[i]
                 changed_at[i] = now
-            elif level != stable[i] and (now - changed_at[i]) >= DEBOUNCE_NS:
-                stable[i] = level
-                write_line("K {} {}".format(i, 1 if level else 0))
+        else:
+            for i in range(NUM_KEYS):
+                level = raw[i]
+                if level != raw_prev[i]:
+                    raw_prev[i] = level
+                    changed_at[i] = now
+                elif level != stable[i] and (now - changed_at[i]) >= DEBOUNCE_NS:
+                    stable[i] = level
+                    write_line("K {} {}".format(i, 1 if level else 0))
 
-    time.sleep(POLL_INTERVAL_S)
+        time.sleep(POLL_INTERVAL_S)
+
+except Exception as err:  # noqa: BLE001 - last line before a silent brick
+    detail = "{}: {}".format(type(err).__name__, err)
+    print("FATAL:", detail)
+    try:
+        write_line("ERR fatal {}".format(detail))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        # Best effort: if the fault *was* the I2C bus, this cannot work,
+        # and that is precisely when the reset matters most.
+        for i in range(NUM_KEYS):
+            last_rgb[i] = None
+            write_pixel(i, 0xFF0000)
+        flush_pixels()
+    except Exception:  # noqa: BLE001
+        pass
+    if time.monotonic_ns() - booted_at < MIN_UPTIME_BEFORE_RESET_NS:
+        print("Failed within {} s of boot - halting red rather than "
+              "reset-looping. Fix code.py on CIRCUITPY, then reset."
+              .format(MIN_UPTIME_BEFORE_RESET_NS // 1_000_000_000))
+        while True:
+            time.sleep(1)
+    time.sleep(2)
+    microcontroller.reset()
