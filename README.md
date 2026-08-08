@@ -292,7 +292,7 @@ First bring-up, 2026-08-08, CircuitPython 10.2.1, board ID
 | What | Measured |
 |---|---|
 | product string | `Canopy MacroPad` (set by `boot.py`, confirmed in the descriptor) |
-| manufacturer | `Whatever` |
+| manufacturer | `Saqoosha` |
 | VID / PID | `0x239A` / `0x80F8` |
 | console port | `/dev/cu.usbmodem20101` |
 | data port | `/dev/cu.usbmodem20103` |

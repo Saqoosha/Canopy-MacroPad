@@ -28,6 +28,6 @@ usb_cdc.enable(console=True, data=True)
 # The host matches on this product string (plus VID/PID) instead of a
 # hardcoded /dev/cu.* path, which changes across ports and reboots.
 supervisor.set_usb_identification(
-    manufacturer="Whatever",
+    manufacturer="Saqoosha",
     product="Canopy MacroPad",
 )
