@@ -64,6 +64,11 @@ PALETTE_PAGES = [
 ]
 
 
+# Returned by do_probe when several boards answered: not a port, but
+# not "nothing found" either.
+AMBIGUOUS = object()
+
+
 class DeviceGone(Exception):
     """The port went away mid-session — unplugged, or closed under us."""
 
@@ -137,7 +142,7 @@ class LineReader:
         return lines
 
 
-def send(fd, text):
+def send(fd, text, timeout=2.0):
     """Write one whole line, or raise DeviceGone.
 
     The fd is non-blocking, so a bare os.write can write fewer bytes than
@@ -145,11 +150,19 @@ def send(fd, text):
     a corrupt line with a baffling ERR.
     """
     data = (text.rstrip("\n") + "\n").encode()
+    deadline = time.monotonic() + timeout
     while data:
         try:
             written = os.write(fd, data)
         except BlockingIOError:
-            select.select([], [fd], [], 0.5)
+            # A device that asserts DTR then stops reading would spin
+            # here forever printing nothing -- the "looks connected,
+            # isn't" state DeviceGone exists to name. The firmware's
+            # halt branch is exactly such a device.
+            if time.monotonic() >= deadline:
+                raise DeviceGone("device stopped accepting input after "
+                                 "{:.0f}s (firmware halted?)".format(timeout))
+            select.select([], [fd], [], 0.25)
             continue
         except OSError as err:
             raise DeviceGone("write failed: {}".format(err)) from err
@@ -282,7 +295,9 @@ def do_probe(verbose=True):
     if len(data_ports) > 1:
         print("\n{} devices answered: {}. Pick one with --port.".format(
             len(data_ports), ", ".join(data_ports)), file=sys.stderr)
-        return None
+        # Distinct from "nothing answered", so main does not follow a
+        # correct explanation with its opposite.
+        return AMBIGUOUS
     return data_ports[0] if data_ports else None
 
 
@@ -294,6 +309,10 @@ def console(path, demo=False):
     try:
         send(fd, "P")
         if demo:
+            # This mode answers "does a press reach the host and light
+            # the key". Crossfading a tap into a partial fade is exactly
+            # the ambiguity it exists to remove.
+            send(fd, "X 0")
             for idx, color in enumerate(DEMO_COLORS):
                 send(fd, "C {} {}".format(idx, color))
                 time.sleep(0.25)
@@ -344,6 +363,9 @@ def palette(path, brightness=60):
     fd = open_raw(path)
     reader = LineReader(fd)
     page = 0
+    # Comparing candidate colours is this mode's whole job; fading
+    # between pages muddies the A/B.
+    send(fd, "X 0")
 
     def show():
         name, entries = PALETTE_PAGES[page % len(PALETTE_PAGES)]
@@ -409,6 +431,8 @@ def main():
         return 0 if do_probe() else 1
 
     port = args.port or do_probe()
+    if port is AMBIGUOUS:
+        return 1
     if not port:
         print("\nno data port answered. see README.md bring-up steps.",
               file=sys.stderr)

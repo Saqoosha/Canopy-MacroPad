@@ -42,7 +42,7 @@ what the README does not.
 ```
 python3 -m py_compile firmware/*.py tools/mpad.py
 cp firmware/code.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._code.py
-tools/mpad.py --probe          # expect: HELLO 2 4 on the data port
+tools/mpad.py --probe          # expect: PONG 3 4 on the data port
 tools/mpad.py --demo           # LEDs out, key edges in
 ```
 

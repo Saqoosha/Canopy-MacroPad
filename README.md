@@ -146,7 +146,7 @@ Three behaviours the host depends on:
 - **`C` and `S` with an out-of-range index are dropped in silence**, so
   the host may paint before it has learned the key count.
 
-`ERR unknown <cmd>` covers two cases, not one: a verb outside the five,
+`ERR unknown <cmd>` covers two cases, not one: a verb outside the six,
 **and a known verb with the wrong argument count** — `C 0` reports as an
 unknown `C`. Misleading, but stable; a host should not read it as "this
 firmware lacks that verb".
@@ -216,8 +216,8 @@ What the bench actually taught, none of which was predictable on paper:
   blue-dominant blue.
 - **Dark colors are unstable, and it is quantisation, not the LED.**
   `101010` at 30% brightness is `(4,4,4)`; four steps above off, where
-  WS2812 mixing is coarse enough to visibly flicker. Hence `303030` for
-  idle, and 60% global brightness rather than 30.
+  WS2812 mixing is coarse enough to visibly flicker. Hence a lighter idle grey
+  (white-balanced to `273027` below), and 60% global brightness rather than 30.
 - **The same shortage stalls a deep pulse.** At 30% brightness an orange
   pulse with a floor of 5 has a handful of distinct values in its lower
   half, so it freezes at the bottom. Raising global brightness buys steps;
@@ -233,8 +233,8 @@ What the bench actually taught, none of which was predictable on paper:
   (`303030` → `273027`). Per-channel efficiency diverges as drive drops,
   so **a single global white balance is wrong at one end or the other by
   construction** — the grey-axis values are corrected individually
-  instead, by eye, like every other colour here. The seven status colours
-  are saturated and need none of this.
+  instead, by eye, like every other colour here. The five saturated status
+  colours need none of this.
 - **Some of the cast is per-LED, and that part is left alone.** With all
   four keys set to one value, key 1 reads neutral while 0, 2 and 3 do
   not. Correcting that needs a per-key gain table, which would be valid
@@ -311,7 +311,7 @@ board, not the QT Py. The firmware catches this and keeps the serial half
 running rather than dying, so the host sees:
 
 ```
-HELLO 2 0
+HELLO 3 0
 ERR i2c bus RuntimeError: No pull up found on SDA or SCL; check your wiring (reset required after fixing)
 ```
 

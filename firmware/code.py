@@ -55,7 +55,15 @@ import time
 import board
 import microcontroller
 import usb_cdc
-from adafruit_neokey.neokey1x4 import NeoKey1x4
+
+# adafruit_neokey lives in CIRCUITPY/lib, so it is the one import that
+# can be missing -- a board flashed without the bundle, or with one for
+# the wrong CircuitPython major. That is the same class of operator
+# error as a missing Qwiic cable, which this firmware goes to real
+# trouble to survive; at module scope it instead raises straight to the
+# REPL and produces the silent brick everything else here is built to
+# avoid. Imported inside the setup guard below instead.
+NeoKey1x4 = None
 
 # 1: C / B / P / R
 # 2: adds S (device-side sine pulse)
@@ -126,6 +134,8 @@ PULSE_GAMMA = 1.0
 # makes the pad overstate the event. 500 ms is slow enough to read as a
 # transition rather than a glitch, fast enough not to lag the session.
 DEFAULT_CROSSFADE_NS = 500_000_000
+# One fat-fingered X must not look like a hung device.
+MAX_CROSSFADE_MS = 10_000
 
 # A host that never sends a newline would otherwise grow the receive
 # buffer until the heap gives out -- the only unbounded allocation in a
@@ -152,10 +162,13 @@ I2C_FAIL_LIMIT = 20
 pads = []
 pad_errors = []
 try:
+    from adafruit_neokey.neokey1x4 import NeoKey1x4
     i2c = board.STEMMA_I2C()
-except Exception as err:  # noqa: BLE001 - any bus fault is the same story
+except Exception as err:  # noqa: BLE001 - a missing lib and a missing
+    # cable arrive here identically, and both must leave the serial half
+    # alive so the host is told rather than left staring at a dead port.
     i2c = None
-    pad_errors.append("bus {}: {}".format(type(err).__name__, err))
+    pad_errors.append("setup {}: {}".format(type(err).__name__, err))
 if i2c is not None:
     for addr in PAD_ADDRESSES:
         try:
@@ -222,20 +235,24 @@ serial.write_timeout = 0.05
 
 
 def write_line(text):
-    """Write one protocol line, dropping it if the host is not taking it.
+    """Write one protocol line. True only if it actually left.
 
     Covers two cases the loop must survive: no host has the port open,
-    and a host has it open but is not draining it.
+    and a host has it open but is not draining it. Callers that commit
+    state on the strength of a message -- the key scan does -- must check
+    the result, or the device ends up believing it said something it
+    never said.
     """
     if not serial.connected:
-        return
+        return False
     try:
         # A newline anywhere in the payload would split one message into
         # two and hand the host a fragment it cannot parse. This is the
         # single choke point, so sanitising here covers every caller.
         serial.write(text.replace("\n", " ").replace("\r", " ").encode() + b"\n")
+        return True
     except Exception:  # noqa: BLE001 - a dropped line must not stop the loop
-        pass
+        return False
 
 
 def write_pixel(idx, rgb):
@@ -248,17 +265,37 @@ def write_pixel(idx, rgb):
     repeat. Call `flush_pixels()` to push staged writes to the hardware.
     """
     if last_rgb[idx] != rgb:
-        last_rgb[idx] = rgb
+        # Hardware first, bookkeeping second. The other order looks
+        # harmless until an I2C fault raises between them: the cache then
+        # claims the key was painted, every later write of that value is
+        # elided as redundant, and a settled solid key -- which the
+        # render loop skips -- keeps the old colour until the host
+        # happens to change it. Including through `all_off()`, which is
+        # the frozen orange key the disconnect handler exists to prevent.
         pad_index = idx // KEYS_PER_PAD
         pads[pad_index].pixels[idx % KEYS_PER_PAD] = rgb
+        last_rgb[idx] = rgb
         pads_dirty[pad_index] = True
 
 
 def flush_pixels():
     for i, dirty in enumerate(pads_dirty):
         if dirty:
-            pads_dirty[i] = False
             pads[i].pixels.show()
+            pads_dirty[i] = False
+
+
+def invalidate_pixels():
+    """Forget what the hardware is showing, so the next tick repaints.
+
+    Called after an I2C failure: the write cache cannot be trusted about
+    anything that may have been half-applied, and a settled solid key
+    would otherwise never be written again.
+    """
+    for i in range(NUM_KEYS):
+        last_rgb[i] = None
+    for i in range(len(pads_dirty)):
+        pads_dirty[i] = True
 
 
 def lerp_rgb(a, b, t):
@@ -271,6 +308,17 @@ def fade_progress(idx, now):
     if crossfade_ns <= 0:
         return 1.0
     elapsed = now - fade_started[idx]
+    # The lower clamp is load-bearing, not defensive. `now` is sampled
+    # once at the top of the loop while `retarget` stamps a fresh
+    # timestamp, so a key retargeted in the same iteration has
+    # `fade_started > now` and elapsed goes negative. A negative t makes
+    # lerp_rgb extrapolate past `from`, a channel underflows to -1, the
+    # whole packed value goes negative, and `>> 16 & 0xFF` decodes it as
+    # 255 -- a full-brightness wrong-colour frame on exactly the
+    # transition this fade exists to smooth. It also pushes the floor
+    # above 1.0, spilling the level past 24 bits.
+    if elapsed <= 0:
+        return 0.0
     return 1.0 if elapsed >= crossfade_ns else elapsed / crossfade_ns
 
 
@@ -318,16 +366,29 @@ def set_pulse(idx, rgb, period, floor):
     # breathing keeps its phase through a colour or floor change: what
     # altered is the urgency, not the heartbeat, and dropping the breath
     # back to its trough would read louder than the change itself.
-    retarget(idx, rgb, floor, period, to_floor[idx] >= 1.0)
+    # Read the floor currently *displayed*, not the target. A key going
+    # pulsing -> solid has to_floor == 1.0 from the first instant while
+    # it keeps visibly breathing for the whole crossfade; testing the
+    # target would restart the phase mid-breath, which is exactly what
+    # this rule promises cannot happen.
+    now = time.monotonic_ns()
+    shown_floor = (from_floor[idx]
+                   + (to_floor[idx] - from_floor[idx]) * fade_progress(idx, now))
+    retarget(idx, rgb, floor, period, shown_floor >= 1.0)
 
 
 def all_off():
     # No crossfade here. `R` and a host disconnect both mean "nobody owns
     # these any more", and that should be true the moment it is said.
     for i in range(NUM_KEYS):
+        # Every per-key field, named in one place. Splitting them across
+        # parallel lists bought an allocation-free hot path; the price is
+        # that nothing structural stops a reset from forgetting one.
         from_rgb[i] = to_rgb[i] = 0x000000
         from_floor[i] = to_floor[i] = 1.0
         fade_started[i] = 0
+        pulse_started[i] = 0
+        period_ns[i] = DEFAULT_PULSE_PERIOD_NS
         write_pixel(i, 0x000000)
 
 
@@ -358,7 +419,20 @@ def handle(line):
     elif cmd == "B" and len(parts) == 2:
         set_brightness(int(parts[1]))
     elif cmd == "X" and len(parts) == 2:
-        crossfade_ns = max(0, int(parts[1])) * 1_000_000
+        # Clamped at both ends like S's period and floor: with no
+        # ceiling, one fat-fingered value freezes every transition for
+        # hours and reads as a device that stopped responding.
+        now = time.monotonic_ns()
+        for i in range(NUM_KEYS):
+            # fade_progress divides by the live global, so changing it
+            # would otherwise rescale fades already in flight -- a fade
+            # 80% done snaps backwards on a longer X, or jumps to its end
+            # on a shorter one. Re-anchor from what is on screen instead.
+            t = fade_progress(i, now)
+            from_rgb[i] = lerp_rgb(from_rgb[i], to_rgb[i], t)
+            from_floor[i] = from_floor[i] + (to_floor[i] - from_floor[i]) * t
+            fade_started[i] = now
+        crossfade_ns = min(max(0, int(parts[1])), MAX_CROSSFADE_MS) * 1_000_000
     elif cmd == "P":
         write_line("PONG {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
     elif cmd == "R":
@@ -445,17 +519,15 @@ try:
                 set_brightness(int(DEFAULT_BRIGHTNESS * 100))
             except Exception:  # noqa: BLE001 - the I2C guard below reports it
                 pass
+            # Host-set state, same as brightness: the next host should
+            # not inherit an `X 0` the last one left behind.
+            crossfade_ns = DEFAULT_CROSSFADE_NS
             rx_buffer = b""
         was_connected = connected
 
         # --- commands from the host (non-blocking) -------------------------
         if serial.in_waiting:
             rx_buffer += serial.read(serial.in_waiting) or b""
-            if len(rx_buffer) > MAX_LINE_BYTES:
-                # No newline in that much traffic means the sender is not
-                # speaking this protocol. Dropping beats growing the heap
-                # until MemoryError takes the device down silently.
-                rx_buffer = b""
             while b"\n" in rx_buffer:
                 line, rx_buffer = rx_buffer.split(b"\n", 1)
                 try:
@@ -504,10 +576,16 @@ try:
             for pad in pads:
                 raw.extend(pad.get_keys())
         except Exception as err:  # noqa: BLE001
+            # A failure may have landed between a pixel write and its
+            # show, so nothing the cache claims is trustworthy.
+            invalidate_pixels()
             i2c_fail_count += 1
             if i2c_fail_count >= I2C_FAIL_LIMIT and not i2c_lost_reported:
                 i2c_lost_reported = True
-                print("I2C lost after {} failed scans: {}: {}".format(
+                # Not necessarily I2C: this guard also covers the pulse
+                # arithmetic, so naming the type keeps it from sending
+                # someone to check a cable that is fine.
+                print("key/LED tick failed {} times: {}: {}".format(
                     i2c_fail_count, type(err).__name__, err))
             time.sleep(POLL_INTERVAL_S)
             continue
@@ -530,16 +608,35 @@ try:
                     raw_prev[i] = level
                     changed_at[i] = now
                 elif level != stable[i] and (now - changed_at[i]) >= DEBOUNCE_NS:
-                    stable[i] = level
-                    write_line("K {} {}".format(i, 1 if level else 0))
+                    # `stable` means "what the host has been told", so it
+                    # may only advance once the telling succeeded.
+                    # Committing regardless leaves the host holding a
+                    # release for a press it never saw -- the orphan edge
+                    # `resync_keys` prevents across reconnects, reachable
+                    # here without one.
+                    if write_line("K {} {}".format(i, 1 if level else 0)):
+                        stable[i] = level
 
         time.sleep(POLL_INTERVAL_S)
 
 except Exception as err:  # noqa: BLE001 - last line before a silent brick
-    detail = "{}: {}".format(type(err).__name__, err)
-    print("FATAL:", detail)
+    # Free memory before doing anything else. MemoryError is an Exception
+    # and lands here like any other, and every line below allocates --
+    # formatting a message, encoding it, packing a colour. Without this
+    # the handler re-raises and drops to the REPL: the exact silent brick
+    # it exists to prevent, in the one case it is most likely to face.
+    gc.collect()
+    detail = "unknown"
     try:
+        detail = "{}: {}".format(type(err).__name__, err)
+        print("FATAL:", detail)
         write_line("ERR fatal {}".format(detail))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        # Whatever the last host left is not a signal any more, and `B 5`
+        # would make the alert invisible.
+        set_brightness(int(DEFAULT_BRIGHTNESS * 100))
     except Exception:  # noqa: BLE001
         pass
     try:
@@ -555,7 +652,17 @@ except Exception as err:  # noqa: BLE001 - last line before a silent brick
         print("Failed within {} s of boot - halting red rather than "
               "reset-looping. Fix code.py on CIRCUITPY, then reset."
               .format(MIN_UPTIME_BEFORE_RESET_NS // 1_000_000_000))
+        # `ERR fatal` above only reached a host that was already
+        # attached. Without this the board sits on an enumerated, wholly
+        # silent port -- the signature this whole guard exists to
+        # eliminate -- for every host that arrives afterwards.
+        halted_connected = False
         while True:
-            time.sleep(1)
+            now_connected = serial.connected
+            if now_connected and not halted_connected:
+                write_line("HELLO {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
+                write_line("ERR fatal-halted {}".format(detail))
+            halted_connected = now_connected
+            time.sleep(0.2)
     time.sleep(2)
     microcontroller.reset()
