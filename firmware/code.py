@@ -13,8 +13,9 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
                        pulse that color, sine-eased. `ms` is the full
                        period (min 100), `floor` is the percentage the
                        dip bottoms out at, 0-100: 0 reads as an alert,
-                       80 as a slow breath that says "alive" without
-                       asking for attention. Both are clamped silently.
+                       50 as a slow breath that says "alive" without
+                       asking for attention. Defaults: 2000 ms and 0.
+                       Both are clamped silently.
     B <0-100>          global brightness
     X <ms>             crossfade duration for C and S, default 500
     P                  ping
@@ -29,7 +30,8 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
 `C` and `S` drop out-of-range key indices in silence; the host may paint
 before it has learned the key count.
 
-Every change of color or floor is crossfaded, so a state change reads as
+Every change of color or floor is crossfaded (except `R` and a host
+disconnect, which are immediate), so a state change reads as
 a state change and not as an alarm. Solid is modelled as a pulse whose
 floor is 100%, which is what lets one interpolation cover all four
 transitions -- solid to solid, solid to pulsing, pulsing to solid, and
@@ -87,16 +89,17 @@ DEFAULT_BRIGHTNESS = 0.6
 
 # All timing is integer nanoseconds. `time.monotonic()` returns a float
 # whose precision decays with uptime -- on a single-precision build the
-# step near `now` grows past both thresholds below within a couple of
-# weeks, and this is a device that lives plugged into a desk. The failure
+# step near `now` grows past both thresholds below in a day or two --
+# 15 ms is the ulp somewhere past 2^17 seconds -- and this is a device
+# that lives plugged into a desk. The failure
 # is silent and awful: the debounce window stops measuring anything, so
 # one press reports as several and the wrong pane gets focused.
 DEBOUNCE_NS = 15_000_000       # 15 ms
 PULSE_STEP_NS = 20_000_000     # 20 ms, i.e. 50 Hz
 
-# Adds at most 5 ms on top of the 15 ms debounce, so a press reaches the
-# host in ~20 ms worst case. The debounce dominates; this only decides
-# how much is added to it.
+# Adds roughly 5 ms plus the scan and paint themselves on top of the
+# 15 ms debounce, so a press reaches the host in ~20 ms. The debounce
+# dominates; this only decides how much is added to it.
 POLL_INTERVAL_S = 0.005
 
 # The pulse lives here rather than on the host. A square blink is one
@@ -111,8 +114,9 @@ POLL_INTERVAL_S = 0.005
 # keys told to pulse in the same instant. The two are not compatible: an
 # offset that is non-zero at t=0 is exactly a key that does not start at
 # its floor, and with four keys it put key 2 at full brightness on its
-# very first frame. Starting at the floor won, because the key it was
-# breaking is the approval key. Keys whose states change at different
+# very first frame. Starting at the floor won, because the key it broke
+# is whichever one is holding the approval state -- nothing here maps a
+# key index to a pane state, so it could be any of them. Keys whose states change at different
 # moments still drift apart on their own.
 #
 # 2 s measured as the point where the breath reads as deliberate rather
@@ -187,7 +191,20 @@ if i2c is not None:
         except Exception as err:  # noqa: BLE001
             pad_errors.append("0x{:02x} {}: {}".format(
                 addr, type(err).__name__, err))
-i2c_error = "; ".join(pad_errors) or None
+# Two variables on purpose. `boot_i2c_error` is what setup found and
+# never changes; `i2c_error` is what is true *now*, so the connect
+# branch reports the current state instead of a snapshot taken before
+# the cable was knocked loose. Without that split, a host reconnecting
+# after a runtime bus loss is greeted with a clean HELLO and a key count
+# the device can no longer honour -- worse than silence, because it is a
+# positive claim of health.
+#
+# The key count in HELLO stays at its startup value even then. Resizing
+# eight parallel per-key lists mid-loop is the one hazard this shape
+# genuinely has, and it is not worth taking for a rare fault when the
+# accompanying ERR already says the keypad is gone.
+boot_i2c_error = "; ".join(pad_errors) or None
+i2c_error = boot_i2c_error
 
 # Reported to the host in HELLO/PONG, so the key count is never a
 # constant on the macOS side. Zero when the keypad is missing.
@@ -229,8 +246,11 @@ if using_fallback_port:
 # stops draining (suspended, at a debugger breakpoint, App Nap) fills the
 # CDC endpoint, and the default write_timeout of None then blocks
 # forever, freezing the one loop that scans keys and paints LEDs. A
-# bounded timeout turns that into a dropped line, and lines are
-# newline-framed, so the host resyncs at the next one.
+# bounded timeout stops the stall. Note what it does *not* do:
+# CircuitPython's write returns a short count rather than raising on
+# timeout, so the result is a truncated line, not a dropped one. The
+# fragment glues onto the next message, so the host loses two lines and
+# resyncs at the newline after them.
 serial.write_timeout = 0.05
 
 
@@ -505,8 +525,14 @@ try:
             if using_fallback_port:
                 write_line("ERR no-data-cdc-check-boot-py")
             if i2c_error:
-                write_line("ERR i2c {} (reset required after fixing)".format(
-                    i2c_error))
+                # The advice differs by cause and must not be guessed at:
+                # a keypad missing since boot needs a reset once it is
+                # reconnected, while a bus lost at runtime comes back on
+                # its own the moment it answers again.
+                write_line("ERR i2c {}{}".format(
+                    i2c_error,
+                    " (reset required after fixing)"
+                    if i2c_error is boot_i2c_error else ""))
         elif was_connected and not connected:
             # Nobody owns the LEDs any more. Stale status is worse than none:
             # a frozen orange key claims a session still wants an answer.
@@ -585,11 +611,18 @@ try:
                 # Not necessarily I2C: this guard also covers the pulse
                 # arithmetic, so naming the type keeps it from sending
                 # someone to check a cable that is fine.
-                print("key/LED tick failed {} times: {}: {}".format(
-                    i2c_fail_count, type(err).__name__, err))
+                i2c_error = "lost at runtime: {}: {}".format(
+                    type(err).__name__, err)
+                print("key/LED tick failed {} times: {}".format(
+                    i2c_fail_count, i2c_error))
             time.sleep(POLL_INTERVAL_S)
             continue
         else:
+            if i2c_lost_reported:
+                # Back on the bus. Fall back to whatever setup found, so
+                # a recovered wobble stops being reported as a fault.
+                i2c_error = boot_i2c_error
+                print("key/LED tick recovered")
             i2c_fail_count = 0
             i2c_lost_reported = False
 

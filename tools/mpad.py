@@ -85,7 +85,8 @@ def open_raw(path):
         attrs = termios.tcgetattr(fd)
         attrs[0] = 0  # iflag
         attrs[1] = 0  # oflag
-        attrs[2] = (attrs[2] & ~termios.CSIZE & ~termios.PARENB) | termios.CS8
+        attrs[2] = ((attrs[2] & ~termios.CSIZE & ~termios.PARENB)
+                    | termios.CS8 | termios.CLOCAL | termios.CREAD)
         attrs[3] = 0  # lflag
         attrs[6][termios.VMIN] = 0
         attrs[6][termios.VTIME] = 0
@@ -280,9 +281,17 @@ def do_probe(verbose=True):
     if verbose:
         print("candidate ports: {}".format(candidates or "none"))
         for dev in usb_identity():
-            print("usb: product={!r} vid={} (0x{:04x}) pid={} (0x{:04x})"
-                  .format(dev.get("product", "?"), dev["vid"], int(dev["vid"]),
-                          dev.get("pid", "0"), int(dev.get("pid", "0"))))
+            try:
+                hexed = " (0x{:04x} / 0x{:04x})".format(
+                    int(dev["vid"]), int(dev.get("pid", "0")))
+            except ValueError:
+                # This function exists so a broken query cannot pose as a
+                # hardware diagnosis; crashing on odd ioreg text would
+                # undo that for the sake of a convenience.
+                hexed = ""
+            print("usb: product={!r} vid={} pid={}{}".format(
+                dev.get("product", "?"), dev["vid"],
+                dev.get("pid", "?"), hexed))
     data_ports = []
     for path in candidates:
         line, why = probe_port(path)
@@ -327,11 +336,14 @@ def console(path, demo=False):
                         # A malformed line is exactly what this tool
                         # exists to show; crashing on one would take the
                         # observer down with the thing being observed.
+                        # int() is the real test; `isdigit` says yes to
+                        # superscripts and other numerals it rejects.
                         parts = line.split()
-                        if len(parts) != 3 or not parts[1].isdigit():
+                        try:
+                            idx, state = int(parts[1]), parts[2]
+                        except (IndexError, ValueError):
                             print("! malformed: {!r}".format(line))
                             continue
-                        idx, state = parts[1], parts[2]
                         color = (DEMO_HELD if state == "1"
                                  else DEMO_COLORS[int(idx) % len(DEMO_COLORS)])
                         send(fd, "C {} {}".format(idx, color))
@@ -347,6 +359,9 @@ def console(path, demo=False):
         print("\ndevice disconnected: {}".format(err), file=sys.stderr)
         os.close(fd)
         return 1
+    except BaseException:
+        os.close(fd)
+        raise
     close_quietly(fd)
     return 0
 
@@ -393,10 +408,12 @@ def palette(path, brightness=60):
                     break
                 parts = text.split()
                 if parts and parts[0] == "b":
-                    if len(parts) != 2 or not parts[1].lstrip("-").isdigit():
+                    try:
+                        brightness = max(0, min(100, int(parts[1])))
+                    except (IndexError, ValueError):
+                        # `lstrip("-")` used to let `b --5` through.
                         print("usage: b <0-100>")
                         continue
-                    brightness = max(0, min(100, int(parts[1])))
                 else:
                     page += 1
                 show()
@@ -406,6 +423,9 @@ def palette(path, brightness=60):
         print("\ndevice disconnected: {}".format(err), file=sys.stderr)
         os.close(fd)
         return 1
+    except BaseException:
+        os.close(fd)
+        raise
     close_quietly(fd)
     return 0
 
