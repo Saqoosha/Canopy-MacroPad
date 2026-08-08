@@ -1,4 +1,4 @@
-# ClaudeMicro — working notes
+# Canopy MacroPad — working notes
 
 Device half of the Canopy MacroPad. The macOS half is in the `Canopy`
 repo under `Sources/Canopy/MacroPad/`.
