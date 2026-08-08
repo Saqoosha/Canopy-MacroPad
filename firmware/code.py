@@ -2,7 +2,7 @@
 
 The device is deliberately dumb: it reports key edges and paints the
 colors it is told to paint. All meaning (which pane, which status, when
-to blink) lives in the host. That split is what lets the same wire
+to pulse) lives in the host. That split is what lets the same wire
 protocol survive the move to BLE later.
 
 Wire protocol, line-delimited ASCII on usb_cdc.data.
@@ -11,12 +11,14 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
     C <idx> <rrggbb>   set key idx to that color, e.g. `C 0 ff8000`
     S <idx> <rrggbb> [ms] [floor]
                        pulse that color, sine-eased. `ms` is the full
-                       period, `floor` is the percentage the dip bottoms
-                       out at: 0 reads as an alert, 80 as a slow breath
-                       that says "alive" without asking for attention.
+                       period (min 100), `floor` is the percentage the
+                       dip bottoms out at, 0-100: 0 reads as an alert,
+                       80 as a slow breath that says "alive" without
+                       asking for attention. Both are clamped silently.
     B <0-100>          global brightness
+    X <ms>             crossfade duration for C and S, default 500
     P                  ping
-    R                  reset: all keys off
+    R                  reset: all keys off, immediately
 
   device -> host
     HELLO <ver> <keys> sent when a host opens the data port
@@ -24,8 +26,27 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
     K <idx> <0|1>      key idx pressed (1) / released (0)
     ERR <msg>          a command could not be handled
 
-Nothing else is ever written to the data port. Debug output goes to the
-console port (plain `print`), which the host does not read.
+`C` and `S` drop out-of-range key indices in silence; the host may paint
+before it has learned the key count.
+
+Every change of color or floor is crossfaded, so a state change reads as
+a state change and not as an alarm. Solid is modelled as a pulse whose
+floor is 100%, which is what lets one interpolation cover all four
+transitions -- solid to solid, solid to pulsing, pulsing to solid, and
+pulsing to pulsing -- with no special cases.
+
+**A pulsing key keeps its phase when only its color or floor changes.**
+Resetting it would drop the breath back to its trough, and "the heartbeat
+stopped" reads louder than "the urgency changed", which is the opposite
+of what happened. Phase restarts only when a solid key starts pulsing, or
+when the period itself changes.
+
+Nothing else is written to the data port, and debug output goes to the
+console port (plain `print`) which the host does not read — with one
+exception. If `boot.py` did not take effect there is no data port, and
+this falls back to the console, where protocol lines then share a stream
+with the REPL banner and any tracebacks. The host is told so explicitly:
+it receives `ERR no-data-cdc-check-boot-py` right after `HELLO`.
 """
 
 import math
@@ -37,12 +58,15 @@ from adafruit_neokey.neokey1x4 import NeoKey1x4
 
 # 1: C / B / P / R
 # 2: adds S (device-side sine pulse)
-PROTOCOL_VERSION = 2
+# 3: adds X, crossfades every C/S, and holds phase across a colour change
+PROTOCOL_VERSION = 3
 
-# Number of NeoKey 1x4 boards on the I2C bus. The second board needs its
-# A0 jumper bridged on the back to move it off the default address.
-NUM_PADS = 1
-PAD_ADDRESSES = (0x30, 0x31)[:NUM_PADS]
+# The I2C addresses of the NeoKey boards, in physical left-to-right key
+# order. This tuple is the single source of truth for how many boards
+# exist -- deriving it the other way round (a count that slices a longer
+# address list) silently clamps instead of failing. A second board needs
+# its A0 jumper bridged on the back to answer 0x31.
+PAD_ADDRESSES = (0x30,)
 KEYS_PER_PAD = 4
 
 # Full brightness is genuinely painful to sit next to, but going too dim
@@ -52,13 +76,18 @@ KEYS_PER_PAD = 4
 # override this at runtime with `B`.
 DEFAULT_BRIGHTNESS = 0.6
 
-# A key edge must hold this long before it is reported. Mechanical
-# switches chatter for a few ms; without this the host sees phantom
-# double-presses.
-DEBOUNCE_S = 0.015
+# All timing is integer nanoseconds. `time.monotonic()` returns a float
+# whose precision decays with uptime -- on a single-precision build the
+# step near `now` grows past both thresholds below within a couple of
+# weeks, and this is a device that lives plugged into a desk. The failure
+# is silent and awful: the debounce window stops measuring anything, so
+# one press reports as several and the wrong pane gets focused.
+DEBOUNCE_NS = 15_000_000       # 15 ms
+PULSE_STEP_NS = 20_000_000     # 20 ms, i.e. 50 Hz
 
-# ~200 Hz. Keeps press-to-report well under a single 60 Hz frame while
-# leaving the I2C bus mostly idle.
+# Adds at most 5 ms on top of the 15 ms debounce, so a press reaches the
+# host in ~20 ms worst case. The debounce dominates; this only decides
+# how much is added to it.
 POLL_INTERVAL_S = 0.005
 
 # The pulse lives here rather than on the host. A square blink is one
@@ -66,138 +95,269 @@ POLL_INTERVAL_S = 0.005
 # is ~50 updates a second, which is a silly thing to push down a wire and
 # would stutter on any host hiccup. Keeping it local also means the pulse
 # is already where it has to be when this moves to BLE.
-DEFAULT_PULSE_PERIOD_S = 2.0
-# 50 Hz. Faster buys nothing: the 8-bit output repeats between steps, and
-# repeats are skipped before they reach I2C.
-PULSE_STEP_S = 0.02
+#
+# A pulse is timed from the moment its command arrives, so a key entering
+# a state fades up from its floor and the transition itself is visible.
+# An earlier revision also added a fixed per-key phase offset, to stagger
+# keys told to pulse in the same instant. The two are not compatible: an
+# offset that is non-zero at t=0 is exactly a key that does not start at
+# its floor, and with four keys it put key 2 at full brightness on its
+# very first frame. Starting at the floor won, because the key it was
+# breaking is the approval key. Keys whose states change at different
+# moments still drift apart on their own.
+#
+# 2 s measured as the point where the breath reads as deliberate rather
+# than nervous; every state uses it and only the floor changes.
+DEFAULT_PULSE_PERIOD_NS = 2_000_000_000
 # Perceptually a raw sine lingers at the top, and gamma 2.0 corrects
 # that -- but only where there are 8-bit steps to spend. At a low global
 # brightness the bottom of a deep pulse has a handful of distinct values
 # in total, and squaring makes the level crawl through exactly that
 # region, so the fade visibly stalls at the floor. Staying near 1.0
 # trades the perceptual curve for movement that never runs out of steps.
+# 1.0 makes the exponentiation an identity; it is kept as a retunable
+# knob, not left behind by accident.
 PULSE_GAMMA = 1.0
-# A pulse is timed from the moment its command arrives, so a key entering
-# a state fades up from the floor and the transition itself is visible.
-# Keys whose states changed at different moments then drift apart on
-# their own, with no phase bookkeeping on the host.
+
+# How long a color or floor change takes to complete. An instant switch
+# reads as "something just happened", but most transitions are a session
+# moving from one continuous state to the next -- so an abrupt change
+# makes the pad overstate the event. 500 ms is slow enough to read as a
+# transition rather than a glitch, fast enough not to lag the session.
+DEFAULT_CROSSFADE_NS = 500_000_000
+
+# A host that never sends a newline would otherwise grow the receive
+# buffer until the heap gives out -- the only unbounded allocation in a
+# loop that is otherwise allocation-free. Longest legal line is ~24 bytes.
+MAX_LINE_BYTES = 256
+
+# How many consecutive failed I2C scans before the keypad is declared
+# gone on the console. One or two is bus noise; a run of them is a cable.
+I2C_FAIL_LIMIT = 20
+
+
+# `board.STEMMA_I2C()` is what raises when the Qwiic cable is missing:
+# the I2C pull-ups live on the NeoKey board, so without it the bus check
+# fails before any NeoKey1x4 is constructed. That must not kill the whole
+# device. With the serial half still up, a host that receives
+# `HELLO <ver> 0` learns "the pad is plugged in but has no keypad
+# attached", which is a diagnosable state. Dying here instead leaves a
+# port that never answers, indistinguishable from a board that failed to
+# boot at all.
 #
-# This spread is the backstop for the case that does not: several keys
-# told to pulse in the same instant, which is exactly what a full re-push
-# after HELLO looks like. Fraction of a period that key N is offset from
-# key 0; 0 leaves simultaneous starts in lockstep, where every lit key
-# dims together and the approval key's peak sinks into its neighbours'.
-PULSE_PHASE_SPREAD = 1.0
-
-
-# A missing Qwiic cable takes the I2C pull-ups with it, and NeoKey1x4()
-# raises. That must not kill the whole device: with the serial half still
-# up, a host that receives `HELLO 1 0` learns "the pad is plugged in but
-# has no keypad attached", which is a diagnosable state. Dying here
-# instead leaves a port that never answers, indistinguishable from a
-# board that failed to boot at all.
+# Each board is then initialised separately so a second board with an
+# unbridged A0 jumper -- the likeliest wiring mistake once there are two
+# -- degrades to "one board works" instead of "no keypad at all".
 pads = []
-i2c_error = None
+pad_errors = []
 try:
     i2c = board.STEMMA_I2C()
-    pads = [NeoKey1x4(i2c, addr=addr) for addr in PAD_ADDRESSES]
-    for pad in pads:
-        pad.pixels.brightness = DEFAULT_BRIGHTNESS
-        pad.pixels.fill(0x000000)
-except Exception as err:  # noqa: BLE001 - any I2C fault is the same story
-    pads = []
-    i2c_error = str(err)
+except Exception as err:  # noqa: BLE001 - any bus fault is the same story
+    i2c = None
+    pad_errors.append("bus {}: {}".format(type(err).__name__, err))
+if i2c is not None:
+    for addr in PAD_ADDRESSES:
+        try:
+            pad = NeoKey1x4(i2c, addr=addr)
+            # NeoKey1x4 leaves auto_write on, which turns every single
+            # pixel assignment into a full buffer transmit plus a SHOW
+            # over seesaw. During a pulse that is one transaction per key
+            # per step -- four times the bus traffic needed, competing
+            # with the key scan for the same bus. Batch instead: write
+            # the pixels, then show once per pad per tick.
+            pad.pixels.auto_write = False
+            pad.pixels.brightness = DEFAULT_BRIGHTNESS
+            pad.pixels.fill(0x000000)
+            pad.pixels.show()
+            pads.append(pad)
+        except Exception as err:  # noqa: BLE001
+            pad_errors.append("0x{:02x} {}: {}".format(
+                addr, type(err).__name__, err))
+i2c_error = "; ".join(pad_errors) or None
 
 # Reported to the host in HELLO/PONG, so the key count is never a
 # constant on the macOS side. Zero when the keypad is missing.
 NUM_KEYS = KEYS_PER_PAD * len(pads)
 
-# Per key: (base_rgb, period_s, floor, started_at) while pulsing, None
-# while solid.
-pulse = [None] * NUM_KEYS
-# Last value actually pushed to each pixel, so redundant writes are cheap
-# to detect. None means "nothing written yet".
+# Per key, one appearance model for both solid and pulsing: a colour and
+# a floor, where floor 1.0 means the sine contributes nothing and the key
+# is simply lit. That single representation is what lets one crossfade
+# cover all four transitions -- solid->solid, solid->pulsing,
+# pulsing->solid, pulsing->pulsing -- with no special cases.
+#
+# `from_*` is the appearance the running crossfade started from, `to_*`
+# is where it is heading, and `fade_started` is when. Separate lists
+# rather than tuples: nothing here is ever resized, and comparing whole
+# scalars avoids the field-order coupling a packed tuple invites.
+from_rgb = [0x000000] * NUM_KEYS
+from_floor = [1.0] * NUM_KEYS
+to_rgb = [0x000000] * NUM_KEYS
+to_floor = [1.0] * NUM_KEYS
+fade_started = [0] * NUM_KEYS
+period_ns = [DEFAULT_PULSE_PERIOD_NS] * NUM_KEYS
+pulse_started = [0] * NUM_KEYS
+# Last value actually pushed to each pixel. None means "nothing written
+# yet", which is distinct from black, so the startup fill does not poison
+# the cache. Holds the *logical* color: adafruit_pixelbuf re-renders from
+# its unscaled buffer when brightness changes, so `B` still lands on
+# solid keys without invalidating this.
 last_rgb = [None] * NUM_KEYS
+# Which pads have pixel writes waiting for a show().
+pads_dirty = [False] * len(pads)
 
-# usb_cdc.data is None when boot.py did not run (or ran before the data
-# interface was enabled). Falling back to the console port keeps the
-# device testable with a plain serial monitor instead of looking dead,
-# and the ERR line below says exactly what went wrong.
 serial = usb_cdc.data
 using_fallback_port = serial is None
 if using_fallback_port:
     serial = usb_cdc.console
 
+# `connected` only means the host asserted DTR -- it says nothing about
+# whether the host is *reading*. A host that opens the port and then
+# stops draining (suspended, at a debugger breakpoint, App Nap) fills the
+# CDC endpoint, and the default write_timeout of None then blocks
+# forever, freezing the one loop that scans keys and paints LEDs. A
+# bounded timeout turns that into a dropped line, and lines are
+# newline-framed, so the host resyncs at the next one.
+serial.write_timeout = 0.05
+
 
 def write_line(text):
-    """Write one protocol line, dropping it if no host is listening.
+    """Write one protocol line, dropping it if the host is not taking it.
 
-    Writing to a disconnected CDC endpoint stalls the loop, which would
-    freeze key scanning for as long as the cable sits unplugged.
+    Covers two cases the loop must survive: no host has the port open,
+    and a host has it open but is not draining it.
     """
-    if serial.connected:
-        serial.write(text.encode() + b"\n")
+    if not serial.connected:
+        return
+    try:
+        # A newline anywhere in the payload would split one message into
+        # two and hand the host a fragment it cannot parse. This is the
+        # single choke point, so sanitising here covers every caller.
+        serial.write(text.replace("\n", " ").replace("\r", " ").encode() + b"\n")
+    except Exception:  # noqa: BLE001 - a dropped line must not stop the loop
+        pass
 
 
 def write_pixel(idx, rgb):
-    """Push a color to the hardware, skipping unchanged writes.
+    """Stage a color for one key, skipping unchanged writes.
 
-    The pulse recomputes every key 50 times a second; most of those land
-    on the same 8-bit value as the previous step, and each redundant
-    write is an I2C transaction competing with the key scan.
+    Cheap insurance rather than a hot-path win: a bright pulse really
+    does change value on nearly every step. What this elides is the
+    repeated identical commands a host is explicitly invited to send, and
+    every step of a dark or shallow pulse, where the 8-bit output does
+    repeat. Call `flush_pixels()` to push staged writes to the hardware.
     """
     if last_rgb[idx] != rgb:
         last_rgb[idx] = rgb
-        pads[idx // KEYS_PER_PAD].pixels[idx % KEYS_PER_PAD] = rgb
+        pad_index = idx // KEYS_PER_PAD
+        pads[pad_index].pixels[idx % KEYS_PER_PAD] = rgb
+        pads_dirty[pad_index] = True
+
+
+def flush_pixels():
+    for i, dirty in enumerate(pads_dirty):
+        if dirty:
+            pads_dirty[i] = False
+            pads[i].pixels.show()
+
+
+def lerp_rgb(a, b, t):
+    return ((int(((a >> 16) & 0xFF) + (((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t) << 16)
+            | (int(((a >> 8) & 0xFF) + (((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t) << 8)
+            | int((a & 0xFF) + ((b & 0xFF) - (a & 0xFF)) * t))
+
+
+def fade_progress(idx, now):
+    if crossfade_ns <= 0:
+        return 1.0
+    elapsed = now - fade_started[idx]
+    return 1.0 if elapsed >= crossfade_ns else elapsed / crossfade_ns
+
+
+def retarget(idx, rgb, floor, period, restart_phase):
+    """Begin a crossfade towards a new appearance for one key.
+
+    Re-issuing the appearance a key is already heading for is a no-op, so
+    a host can re-push its whole state whenever convenient -- after every
+    HELLO, on a timer -- without restarting either the crossfade or the
+    breath. That guarantee is why the host never has to track which keys
+    are already doing what.
+    """
+    if to_rgb[idx] == rgb and to_floor[idx] == floor and period_ns[idx] == period:
+        return
+    now = time.monotonic_ns()
+    # Start the new fade from what is on screen *now*, not from the last
+    # target -- otherwise a change arriving mid-fade jumps backwards to
+    # where the previous one began.
+    t = fade_progress(idx, now)
+    from_rgb[idx] = lerp_rgb(from_rgb[idx], to_rgb[idx], t)
+    from_floor[idx] = from_floor[idx] + (to_floor[idx] - from_floor[idx]) * t
+    to_rgb[idx] = rgb
+    to_floor[idx] = floor
+    fade_started[idx] = now
+    if restart_phase or period_ns[idx] != period:
+        pulse_started[idx] = now
+    period_ns[idx] = period
 
 
 def set_color(idx, rgb):
     if 0 <= idx < NUM_KEYS:
-        pulse[idx] = None
-        write_pixel(idx, rgb)
-    # Out-of-range indices are dropped in silence on purpose: the host
-    # may paint before it has learned the key count from HELLO/PONG.
+        # Solid is floor 1.0: the sine term drops out and the key just
+        # sits at its colour.
+        retarget(idx, rgb, 1.0, period_ns[idx], False)
 
 
-def set_pulse(idx, rgb, period_s, floor):
+def set_pulse(idx, rgb, period, floor):
     if not 0 <= idx < NUM_KEYS:
         return
-    spec = (rgb, max(0.1, period_s), min(max(floor, 0.0), 1.0))
-    current = pulse[idx]
-    # Restarting the clock only for a *different* pulse is what makes a
-    # host safe to re-push from. A host that repaints its whole state
-    # periodically, or after every HELLO, would otherwise reset the phase
-    # each time and the breath would never get past its first moments.
-    if current is not None and current[:3] == spec:
-        return
-    pulse[idx] = spec + (time.monotonic(),)
+    # Clamp before the comparison in retarget, so two commands that clamp
+    # to the same effective pulse are recognised as identical.
+    period = max(100_000_000, period)
+    floor = min(max(floor, 0.0), 1.0)
+    # Phase restarts only when a *solid* key begins pulsing. A key already
+    # breathing keeps its phase through a colour or floor change: what
+    # altered is the urgency, not the heartbeat, and dropping the breath
+    # back to its trough would read louder than the change itself.
+    retarget(idx, rgb, floor, period, to_floor[idx] >= 1.0)
 
 
 def all_off():
+    # No crossfade here. `R` and a host disconnect both mean "nobody owns
+    # these any more", and that should be true the moment it is said.
     for i in range(NUM_KEYS):
-        pulse[i] = None
+        from_rgb[i] = to_rgb[i] = 0x000000
+        from_floor[i] = to_floor[i] = 1.0
+        fade_started[i] = 0
         write_pixel(i, 0x000000)
 
 
 def set_brightness(percent):
     level = max(0, min(100, percent)) / 100
-    for pad in pads:
+    for i, pad in enumerate(pads):
         pad.pixels.brightness = level
+        pads_dirty[i] = True
 
 
 def handle(line):
+    global crossfade_ns
     parts = line.decode().strip().split()
     if not parts:
         return
     cmd = parts[0]
     if cmd == "C" and len(parts) == 3:
-        set_color(int(parts[1]), int(parts[2], 16))
+        # Masking here rather than at each use keeps C and S agreeing on
+        # what an out-of-range color means. Without it `C 0 1ffffff`
+        # raises inside pixelbuf while `S 0 1ffffff` is quietly truncated
+        # by the shift arithmetic, and a negative value pulses white.
+        set_color(int(parts[1]), int(parts[2], 16) & 0xFFFFFF)
     elif cmd == "S" and len(parts) in (3, 4, 5):
-        period = int(parts[3]) / 1000 if len(parts) > 3 else DEFAULT_PULSE_PERIOD_S
+        period = (int(parts[3]) * 1_000_000 if len(parts) > 3
+                  else DEFAULT_PULSE_PERIOD_NS)
         floor = int(parts[4]) / 100 if len(parts) > 4 else 0.0
-        set_pulse(int(parts[1]), int(parts[2], 16), period, floor)
+        set_pulse(int(parts[1]), int(parts[2], 16) & 0xFFFFFF, period, floor)
     elif cmd == "B" and len(parts) == 2:
         set_brightness(int(parts[1]))
+    elif cmd == "X" and len(parts) == 2:
+        crossfade_ns = max(0, int(parts[1])) * 1_000_000
     elif cmd == "P":
         write_line("PONG {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
     elif cmd == "R":
@@ -209,25 +369,35 @@ def handle(line):
 # --- key state ---------------------------------------------------------
 # `stable` is what the host has been told. `raw_prev` plus `changed_at`
 # implement the debounce: an edge only becomes stable once the raw level
-# has held its new value for DEBOUNCE_S.
+# has held its new value for DEBOUNCE_NS. `changed_at[i]` is meaningful
+# only while `raw_prev[i] != stable[i]`; when they agree it is dead data.
 stable = [False] * NUM_KEYS
 raw_prev = [False] * NUM_KEYS
-changed_at = [0.0] * NUM_KEYS
+changed_at = [0] * NUM_KEYS
 
+crossfade_ns = DEFAULT_CROSSFADE_NS
 rx_buffer = b""
 was_connected = False
-last_pulse_at = 0.0
+last_pulse_at = 0
+i2c_fail_count = 0
+i2c_lost_reported = False
+# Set when a host connects, so the first scan afterwards adopts whatever
+# the keys are doing right now instead of reporting edges against a
+# previous session's state. Without it, a key held across a reconnect
+# sends the new host a release for a press it never saw.
+resync_keys = False
 
 if using_fallback_port:
     print("WARNING: usb_cdc.data is None - boot.py did not take effect.")
-    print("Copy boot.py to CIRCUITPY, then physically unplug and replug USB.")
+    print("Copy boot.py to CIRCUITPY, then reset (see README bring-up).")
 if i2c_error:
     print("WARNING: no keypad on I2C ({}).".format(i2c_error))
     print("Check the Qwiic cable between the QT Py and the NeoKey.")
+    print("Reconnecting it needs a reset; it is not picked up live.")
 
 
 while True:
-    now = time.monotonic()
+    now = time.monotonic_ns()
 
     # --- host connect / disconnect -------------------------------------
     connected = serial.connected
@@ -235,59 +405,112 @@ while True:
         # Announce on every fresh open, not just at power-on: a banner
         # sent at boot is lost if the host was not listening yet. This is
         # also the host's cue to re-push every color after a device reset.
+        rx_buffer = b""
+        resync_keys = True
         write_line("HELLO {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
         if using_fallback_port:
             write_line("ERR no-data-cdc-check-boot-py")
         if i2c_error:
-            write_line("ERR i2c {}".format(i2c_error))
+            write_line("ERR i2c {} (reset required after fixing)".format(
+                i2c_error))
     elif was_connected and not connected:
         # Nobody owns the LEDs any more. Stale status is worse than none:
         # a frozen orange key claims a session still wants an answer.
-        all_off()
+        # Brightness goes back to the default for the same reason -- the
+        # next host should not inherit a `B 5` the last one left behind.
+        # A partial line from the departing host goes too, or it would be
+        # concatenated onto the next host's first command.
+        try:
+            all_off()
+            set_brightness(int(DEFAULT_BRIGHTNESS * 100))
+        except Exception:  # noqa: BLE001 - the I2C guard below reports it
+            pass
+        rx_buffer = b""
     was_connected = connected
 
     # --- commands from the host (non-blocking) -------------------------
     if serial.in_waiting:
-        rx_buffer += serial.read(serial.in_waiting)
+        rx_buffer += serial.read(serial.in_waiting) or b""
+        if len(rx_buffer) > MAX_LINE_BYTES:
+            # No newline in that much traffic means the sender is not
+            # speaking this protocol. Dropping beats growing the heap
+            # until MemoryError takes the device down silently.
+            rx_buffer = b""
         while b"\n" in rx_buffer:
             line, rx_buffer = rx_buffer.split(b"\n", 1)
             try:
                 handle(line)
             except Exception as err:  # noqa: BLE001 - never die on bad input
-                write_line("ERR {}".format(err))
+                # The type name matters: several CircuitPython builtins
+                # are raised with no argument, so str(err) alone can be
+                # empty and the host would receive a bare "ERR ".
+                write_line("ERR {} {}".format(type(err).__name__, err))
 
-    # --- pulse ---------------------------------------------------------
-    if now - last_pulse_at >= PULSE_STEP_S:
-        last_pulse_at = now
+    # --- LEDs and keys -------------------------------------------------
+    # Every I2C touch lives inside this guard. The startup path already
+    # treats a missing keypad as a survivable state; a cable knocked
+    # loose *after* boot is the likelier version of the same event, and
+    # without this it raises straight out of the loop, drops to the REPL,
+    # and leaves a silent port with frozen LEDs -- which is exactly what
+    # a board that never booted looks like.
+    try:
+        if now - last_pulse_at >= PULSE_STEP_NS:
+            last_pulse_at = now
+            for i in range(NUM_KEYS):
+                t = fade_progress(i, now)
+                if t >= 1.0:
+                    if to_floor[i] >= 1.0 and from_floor[i] >= 1.0 \
+                            and from_rgb[i] == to_rgb[i]:
+                        continue  # settled and solid: nothing moves
+                    from_rgb[i] = to_rgb[i]
+                    from_floor[i] = to_floor[i]
+                base = lerp_rgb(from_rgb[i], to_rgb[i], t)
+                floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
+                # Integer modulo before the divide, so phase stays exact
+                # no matter how long the board has been up. Cosine starts
+                # at its minimum, so a key that begins pulsing fades up
+                # rather than snapping to full.
+                phase = ((now - pulse_started[i]) % period_ns[i]) / period_ns[i]
+                level = (1 - math.cos(2 * math.pi * phase)) / 2
+                level = floor + (1 - floor) * level ** PULSE_GAMMA
+                write_pixel(i, (int(((base >> 16) & 0xFF) * level) << 16)
+                            | (int(((base >> 8) & 0xFF) * level) << 8)
+                            | int((base & 0xFF) * level))
+        flush_pixels()
+
+        # get_keys() reads all four keys of a board in one I2C
+        # transaction, which is 4x fewer round trips than indexing each.
+        raw = []
+        for pad in pads:
+            raw.extend(pad.get_keys())
+    except Exception as err:  # noqa: BLE001
+        i2c_fail_count += 1
+        if i2c_fail_count >= I2C_FAIL_LIMIT and not i2c_lost_reported:
+            i2c_lost_reported = True
+            print("I2C lost after {} failed scans: {}: {}".format(
+                i2c_fail_count, type(err).__name__, err))
+        time.sleep(POLL_INTERVAL_S)
+        continue
+    else:
+        i2c_fail_count = 0
+        i2c_lost_reported = False
+
+    if resync_keys:
+        # Adopt the current levels without emitting anything, so keys
+        # held across a reconnect produce neither a phantom press nor an
+        # orphan release.
+        resync_keys = False
         for i in range(NUM_KEYS):
-            spec = pulse[i]
-            if spec is None:
-                continue
-            base, period, floor, started = spec
-            # Cosine starting at its minimum, so a key that begins
-            # pulsing fades up rather than snapping to full.
-            phase = ((now - started) / period
-                     + i * PULSE_PHASE_SPREAD / NUM_KEYS) % 1.0
-            level = (1 - math.cos(2 * math.pi * phase)) / 2
-            level = floor + (1 - floor) * level ** PULSE_GAMMA
-            write_pixel(i, (int(((base >> 16) & 0xFF) * level) << 16)
-                        | (int(((base >> 8) & 0xFF) * level) << 8)
-                        | int((base & 0xFF) * level))
-
-    # --- key scan ------------------------------------------------------
-    # get_keys() reads all four keys of a board in one I2C transaction,
-    # which is 4x fewer round trips than indexing each key.
-    raw = []
-    for pad in pads:
-        raw.extend(pad.get_keys())
-
-    for i in range(NUM_KEYS):
-        level = raw[i]
-        if level != raw_prev[i]:
-            raw_prev[i] = level
+            stable[i] = raw_prev[i] = raw[i]
             changed_at[i] = now
-        elif level != stable[i] and (now - changed_at[i]) >= DEBOUNCE_S:
-            stable[i] = level
-            write_line("K {} {}".format(i, 1 if level else 0))
+    else:
+        for i in range(NUM_KEYS):
+            level = raw[i]
+            if level != raw_prev[i]:
+                raw_prev[i] = level
+                changed_at[i] = now
+            elif level != stable[i] and (now - changed_at[i]) >= DEBOUNCE_NS:
+                stable[i] = level
+                write_line("K {} {}".format(i, 1 if level else 0))
 
     time.sleep(POLL_INTERVAL_S)

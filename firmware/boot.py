@@ -1,8 +1,10 @@
 """Canopy MacroPad — boot-time USB configuration.
 
-Runs once, before code.py, on every hard reset. Changes here need a
-physical USB unplug/replug to take effect; the RESET button alone does
-not always re-enumerate.
+Runs once, before code.py, on every hard reset — and only a hard reset,
+which is also what re-enumerates USB and so makes a changed CDC layout
+visible to the host. Saving this file is not enough: the auto-reload
+that follows is a soft reset. Unplug and replug, or `microcontroller.
+reset()` from the REPL, which was the path used on the bench.
 
 The whole point of this file: the device must NOT be a keyboard.
 See README.md "Why not HID".

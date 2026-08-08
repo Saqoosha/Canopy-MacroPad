@@ -2,25 +2,20 @@
 """Host-side console for the Canopy MacroPad firmware.
 
 Stdlib only, so there is nothing to install before bring-up. Serves two
-jobs during Phase 1:
+jobs during Phase 1 — probe, and talk — plus two scripted variants of
+talking:
 
-  probe  - work out which of the two /dev/cu.usbmodem* ports is the data
-           port, and report the numbers the macOS side needs to match on
-  talk   - an interactive line console: type `C 0 ff0000`, watch `K 0 1`
-
-Usage:
     tools/mpad.py                 probe, then open a console on the data port
     tools/mpad.py --probe         probe and exit (prints a report)
     tools/mpad.py --port PATH     skip probing, talk to PATH
     tools/mpad.py --demo          light every key in turn, then mirror
                                   presses to white. Verifies the whole
                                   loop without typing anything.
-    tools/mpad.py --palette       paint the candidate status colors side
-                                  by side and step global brightness, to
-                                  pick values that survive real ambient
-                                  light. Prints the post-brightness 8-bit
-                                  values, which is where dark colors fall
-                                  apart.
+    tools/mpad.py --palette       step through candidate status colors and
+                                  global brightness, to re-tune values
+                                  against real ambient light. Prints the
+                                  post-brightness 8-bit values, which is
+                                  where dark colors fall apart.
 """
 
 import argparse
@@ -34,56 +29,79 @@ import time
 
 PROBE_TIMEOUT_S = 1.5
 CANDIDATE_GLOB = "/dev/cu.usbmodem*"
+ADAFRUIT_VID = "9114"  # 0x239A
 DEMO_COLORS = ["ff0000", "00ff00", "0040ff", "ff8000"]
+# Equal RGB does not come out neutral on these LEDs — the green channel
+# is the weak one, so ffffff reads visibly purple through a clear keycap.
+# Trimming red and blue ~6% is enough; measured as the smallest cut that
+# looks neutral, and deeper cuts were indistinguishable from it.
+DEMO_HELD = "f0fff0"
 
-# Candidate status colors, four at a time because there are four keys.
-# The point of the side-by-side pages is that colors chosen on a screen
-# do not survive a WS2812 under desk lighting — cyan next to blue is the
-# pair most likely to collapse into "some blue-ish key".
+# Bring-up candidates, NOT the settled palette — the shipped values live
+# in the README's status-colour table and are repeated on page 1 here for
+# reference. These pages exist to re-tune against a new keycap, a new
+# diffuser, or a different desk lamp; they are the question, not the
+# answer. Four entries per page because the pad has four keys.
 PALETTE_PAGES = [
-    ("the four active states", [
-        ("0040ff", "running / spawning"),
-        ("00c0c0", "background task (cyan A)"),
+    ("the shipped palette", [
+        ("0040ff", "running"),
+        ("00ffa0", "background task"),
         ("ff8000", "awaiting approval"),
-        ("00ff40", "done, unread"),
+        ("00ff00", "done, unread"),
     ]),
-    ("idle, error, and the rest of the cyans", [
-        ("101010", "idle"),
+    ("idle, error, and dimmer alternatives", [
+        ("273027", "idle (shipped, white-balanced)"),
+        ("303030", "idle, uncorrected - reads purple"),
         ("ff0000", "error"),
-        ("00a0a0", "cyan B"),
-        ("00ffc0", "cyan C"),
+        ("00c0c0", "cyan, rejected - too close to blue"),
     ]),
     ("blue vs cyan, alternating - the hard pair", [
         ("0040ff", "blue"),
-        ("00c0c0", "cyan A"),
+        ("00ffa0", "cyan (shipped)"),
         ("0040ff", "blue"),
-        ("00a0a0", "cyan B"),
+        ("00c0c0", "cyan, rejected"),
     ]),
 ]
+
+
+class DeviceGone(Exception):
+    """The port went away mid-session — unplugged, or closed under us."""
 
 
 def open_raw(path):
     """Open a CDC-ACM port in raw mode, non-blocking.
 
     CDC ignores line speed entirely, so no baud rate is set — for a USB
-    serial device that setting is decoration.
+    serial device that setting is decoration. Raw in the `cfmakeraw`
+    sense, except `VMIN = 0` so reads never block.
     """
     fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    attrs = termios.tcgetattr(fd)
-    # cfmakeraw equivalent: no echo, no canonical mode, no translation.
-    attrs[0] = 0  # iflag
-    attrs[1] = 0  # oflag
-    attrs[2] = attrs[2] | termios.CS8
-    attrs[3] = 0  # lflag
-    attrs[6][termios.VMIN] = 0
-    attrs[6][termios.VTIME] = 0
-    termios.tcsetattr(fd, termios.TCSANOW, attrs)
-    termios.tcflush(fd, termios.TCIOFLUSH)
+    try:
+        attrs = termios.tcgetattr(fd)
+        attrs[0] = 0  # iflag
+        attrs[1] = 0  # oflag
+        attrs[2] = (attrs[2] & ~termios.CSIZE & ~termios.PARENB) | termios.CS8
+        attrs[3] = 0  # lflag
+        attrs[6][termios.VMIN] = 0
+        attrs[6][termios.VTIME] = 0
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+        termios.tcflush(fd, termios.TCIOFLUSH)
+    except BaseException:
+        # tcgetattr on a node that is not a tty — a stale device file
+        # after an unplug, say — would otherwise leak the descriptor,
+        # once per candidate port probed.
+        os.close(fd)
+        raise
     return fd
 
 
 class LineReader:
-    """Accumulates raw reads and yields complete lines."""
+    """Accumulates raw reads and returns complete, non-empty lines.
+
+    A partial trailing line is held for the next call. Raises DeviceGone
+    when the port dies, which is the one thing a bring-up tool must not
+    confuse with "nothing to read yet".
+    """
 
     def __init__(self, fd):
         self.fd = fd
@@ -92,9 +110,19 @@ class LineReader:
     def poll(self):
         try:
             chunk = os.read(self.fd, 4096)
-        except (BlockingIOError, OSError):
-            return []
+        except BlockingIOError:
+            return []  # the only legitimate "not yet"
+        except OSError as err:
+            raise DeviceGone("read failed: {}".format(err)) from err
         if not chunk:
+            # With VMIN=0 an empty read is normal, so this is not EOF on
+            # its own. A dead fd, though, reports permanently readable in
+            # select and returns empty forever — which would spin at 100%
+            # CPU looking connected. Confirm with a zero-length write.
+            try:
+                os.write(self.fd, b"")
+            except OSError as err:
+                raise DeviceGone("port closed: {}".format(err)) from err
             return []
         self.buf += chunk
         lines = []
@@ -103,22 +131,56 @@ class LineReader:
             text = line.decode("utf-8", "replace").strip()
             if text:
                 lines.append(text)
+        # A device that never sends a newline must not grow this forever.
+        if len(self.buf) > 4096:
+            self.buf = b""
         return lines
 
 
 def send(fd, text):
-    os.write(fd, (text.rstrip("\n") + "\n").encode())
+    """Write one whole line, or raise DeviceGone.
+
+    The fd is non-blocking, so a bare os.write can write fewer bytes than
+    asked and truncate a command mid-line — the device would then answer
+    a corrupt line with a baffling ERR.
+    """
+    data = (text.rstrip("\n") + "\n").encode()
+    while data:
+        try:
+            written = os.write(fd, data)
+        except BlockingIOError:
+            select.select([], [fd], [], 0.5)
+            continue
+        except OSError as err:
+            raise DeviceGone("write failed: {}".format(err)) from err
+        data = data[written:]
+
+
+def close_quietly(fd, farewell=True):
+    """Send R and close, without letting cleanup mask the real error."""
+    try:
+        if farewell:
+            send(fd, "R")
+            print("\nclosed (sent R)")
+    except DeviceGone as err:
+        print("\ndevice gone, could not send R: {}".format(err),
+              file=sys.stderr)
+    finally:
+        os.close(fd)
 
 
 def probe_port(path):
     """Return the PONG/HELLO line if this port speaks the protocol.
 
     The console port runs the REPL: it echoes `P` back but never answers
-    `PONG`, which is what makes this a reliable discriminator.
+    `PONG`, which is what makes this a reliable discriminator — far more
+    so than the trailing digits of the device name.
     """
     try:
         fd = open_raw(path)
-    except OSError as err:
+    except (OSError, termios.error) as err:
+        # termios.error is not an OSError subclass, so catching only
+        # OSError would let it escape and kill the whole probe run.
         return None, "open failed: {}".format(err)
     try:
         reader = LineReader(fd)
@@ -132,25 +194,57 @@ def probe_port(path):
                     return line, None
             time.sleep(0.02)
         return None, "no PONG (saw: {})".format(seen or "nothing")
+    except DeviceGone as err:
+        return None, str(err)
     finally:
         os.close(fd)
 
 
 def usb_identity():
-    """VID/PID/product string of any attached CircuitPython board.
+    """Adafruit USB devices (VID 0x239A) as ioreg reports them.
 
-    Reported so the macOS side can match on real numbers instead of a
-    guessed device path.
+    Vendor-filtered, not a CircuitPython test: another Adafruit board on
+    the bench shows up here too, and a CircuitPython board from any other
+    vendor does not.
     """
     try:
-        out = subprocess.run(
+        proc = subprocess.run(
             ["ioreg", "-p", "IOUSB", "-w0", "-l"],
             capture_output=True, text=True, timeout=10,
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
+        )
+    except (OSError, subprocess.SubprocessError) as err:
+        # Staying silent here would be worse than useless: the README
+        # tells the reader that no VID 0x239A line means the board is not
+        # on the bus, so a broken query would masquerade as a hardware
+        # diagnosis and send them to replace innocent cables.
+        print("usb: could not run ioreg ({}) — USB report unavailable. "
+              "Do NOT read this as 'no board'.".format(err), file=sys.stderr)
         return []
-    found, block = [], {}
-    for line in out.splitlines():
+    if proc.returncode != 0:
+        print("usb: ioreg exited {}: {}".format(
+            proc.returncode, proc.stderr.strip()[:200]), file=sys.stderr)
+        return []
+
+    found, others, block = [], 0, {}
+
+    def finish(block):
+        nonlocal others
+        if not block.get("vid"):
+            return
+        if block["vid"] == ADAFRUIT_VID:
+            found.append(dict(block))
+        else:
+            others += 1
+
+    for line in proc.stdout.splitlines():
+        # ioreg prints one node per "+-o" line. Closing the record there
+        # rather than once a product/vid/pid triple happens to be
+        # complete stops a hub's VID being paired with the next device's
+        # product name — which would publish a wrong number at exactly
+        # the moment the operator copies it into the macOS side.
+        if "+-o " in line:
+            finish(block)
+            block = {}
         for key, label in (
             ('"USB Product Name" = ', "product"),
             ('"USB Vendor Name" = ', "vendor"),
@@ -159,55 +253,68 @@ def usb_identity():
         ):
             if key in line:
                 block[label] = line.split(key, 1)[1].strip().strip('"')
-        if {"product", "vid", "pid"} <= block.keys():
-            if block.get("vid") == "9114":  # 0x239A, Adafruit
-                found.append(dict(block))
-            block = {}
+    finish(block)
+
+    if not found and others:
+        print("usb: no Adafruit (0x239A) device among {} USB devices"
+              .format(others), file=sys.stderr)
     return found
 
 
 def do_probe(verbose=True):
+    """Return the single data port, or None if not exactly one answered."""
     candidates = sorted(glob.glob(CANDIDATE_GLOB))
     if verbose:
         print("candidate ports: {}".format(candidates or "none"))
         for dev in usb_identity():
-            print("usb: product={!r} vid={} (0x{:04x}) pid={} (0x{:04x})".format(
-                dev["product"], dev["vid"], int(dev["vid"]),
-                dev["pid"], int(dev["pid"])))
-    data_port = None
+            print("usb: product={!r} vid={} (0x{:04x}) pid={} (0x{:04x})"
+                  .format(dev.get("product", "?"), dev["vid"], int(dev["vid"]),
+                          dev.get("pid", "0"), int(dev.get("pid", "0"))))
+    data_ports = []
     for path in candidates:
         line, why = probe_port(path)
         if line:
-            data_port = path
+            data_ports.append(path)
             if verbose:
                 print("  {}  DATA   -> {}".format(path, line))
         elif verbose:
             print("  {}  console/silent ({})".format(path, why))
-    return data_port
+    if len(data_ports) > 1:
+        print("\n{} devices answered: {}. Pick one with --port.".format(
+            len(data_ports), ", ".join(data_ports)), file=sys.stderr)
+        return None
+    return data_ports[0] if data_ports else None
 
 
 def console(path, demo=False):
     fd = open_raw(path)
     reader = LineReader(fd)
     print("connected: {}  (Ctrl-D to quit)".format(path))
-    send(fd, "P")
-
-    if demo:
-        for idx, color in enumerate(DEMO_COLORS):
-            send(fd, "C {} {}".format(idx, color))
-            time.sleep(0.25)
-        print("demo: keys lit. press them — each press turns its key white.")
 
     try:
+        send(fd, "P")
+        if demo:
+            for idx, color in enumerate(DEMO_COLORS):
+                send(fd, "C {} {}".format(idx, color))
+                time.sleep(0.25)
+            print("demo: keys lit. press them — each press turns its key white.")
+
         while True:
             ready, _, _ = select.select([fd, sys.stdin], [], [], 0.1)
             if fd in ready:
                 for line in reader.poll():
                     print("< {}".format(line))
                     if demo and line.startswith("K "):
-                        _, idx, state = line.split()
-                        color = "ffffff" if state == "1" else DEMO_COLORS[
-                            int(idx) % len(DEMO_COLORS)]
+                        # A malformed line is exactly what this tool
+                        # exists to show; crashing on one would take the
+                        # observer down with the thing being observed.
+                        parts = line.split()
+                        if len(parts) != 3 or not parts[1].isdigit():
+                            print("! malformed: {!r}".format(line))
+                            continue
+                        idx, state = parts[1], parts[2]
+                        color = (DEMO_HELD if state == "1"
+                                 else DEMO_COLORS[int(idx) % len(DEMO_COLORS)])
                         send(fd, "C {} {}".format(idx, color))
             if sys.stdin in ready:
                 text = sys.stdin.readline()
@@ -217,13 +324,15 @@ def console(path, demo=False):
                     send(fd, text)
     except KeyboardInterrupt:
         pass
-    finally:
-        send(fd, "R")
+    except DeviceGone as err:
+        print("\ndevice disconnected: {}".format(err), file=sys.stderr)
         os.close(fd)
-        print("\nclosed (sent R)")
+        return 1
+    close_quietly(fd)
+    return 0
 
 
-def palette(path, brightness=30):
+def palette(path, brightness=60):
     """Step through candidate status colors at adjustable brightness.
 
     Also prints what each color becomes *after* the global brightness
@@ -249,8 +358,8 @@ def palette(path, brightness=30):
                 idx, hexcolor, scaled, label))
         print("[enter] next page   [b N] brightness   [q] quit")
 
-    show()
     try:
+        show()
         while True:
             ready, _, _ = select.select([fd, sys.stdin], [], [], 0.1)
             if fd in ready:
@@ -261,43 +370,58 @@ def palette(path, brightness=30):
                 if not text or text.strip() == "q":
                     break
                 parts = text.split()
-                if parts and parts[0] == "b" and len(parts) == 2:
+                if parts and parts[0] == "b":
+                    if len(parts) != 2 or not parts[1].lstrip("-").isdigit():
+                        print("usage: b <0-100>")
+                        continue
                     brightness = max(0, min(100, int(parts[1])))
                 else:
                     page += 1
                 show()
     except KeyboardInterrupt:
         pass
-    finally:
-        send(fd, "R")
+    except DeviceGone as err:
+        print("\ndevice disconnected: {}".format(err), file=sys.stderr)
         os.close(fd)
-        print("\nclosed (sent R)")
+        return 1
+    close_quietly(fd)
+    return 0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", help="skip probing, use this port")
     parser.add_argument("--probe", action="store_true", help="probe and exit")
-    parser.add_argument("--demo", action="store_true",
-                        help="light all keys, mirror presses to white")
-    parser.add_argument("--palette", action="store_true",
-                        help="step through candidate status colors")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--demo", action="store_true",
+                      help="light all keys, mirror presses to white")
+    mode.add_argument("--palette", action="store_true",
+                      help="step through candidate status colors")
     args = parser.parse_args()
 
-    port = args.port
-    if not port:
-        port = do_probe()
-        if args.probe:
-            return 0 if port else 1
-        if not port:
-            print("\nno data port answered. see README.md bring-up steps.")
-            return 1
+    if args.probe:
+        # Honour --probe whether or not --port was given, rather than
+        # silently dropping into a console the caller did not ask for.
+        if args.port:
+            line, why = probe_port(args.port)
+            print("{}  {}".format(args.port, line or "no answer ({})".format(why)))
+            return 0 if line else 1
+        return 0 if do_probe() else 1
 
-    if args.palette:
-        palette(port)
-    else:
-        console(port, demo=args.demo)
-    return 0
+    port = args.port or do_probe()
+    if not port:
+        print("\nno data port answered. see README.md bring-up steps.",
+              file=sys.stderr)
+        return 1
+
+    try:
+        if args.palette:
+            return palette(port)
+        return console(port, demo=args.demo)
+    except (OSError, termios.error) as err:
+        print("cannot open {}: {}\ntry --probe to list ports."
+              .format(port, err), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

@@ -16,15 +16,24 @@ The device enumerates as USB serial only — `usb_hid.disable()` in
 - keystrokes cannot leak into whatever app is focused
 - with Canopy not running, pressing a key does nothing at all
 - macOS never asks for the Input Monitoring permission, because nothing
-  reads HID. (OpenAI's Codex Micro does require it.)
+  reads HID. (OpenAI's Codex Micro required it as of 2026-08.)
 - a serial port is plain file I/O on `/dev/cu.*` — no entitlement, no
   Hardened Runtime or notarization friction
 - raw press/release edges, with no OS key-repeat logic in between
 
-The one constraint: an App Sandbox process cannot open a serial port.
-Canopy is not sandboxed (no `com.apple.security.app-sandbox` key in
-`Canopy.entitlements`), so this holds. If that ever changes, this design
-has to be revisited.
+Verifiable rather than asserted: `ioreg -w0 -l -r -c IOHIDDevice | grep
+-c 'Canopy MacroPad'` returns 0, and the device's USB descriptor offers
+CDC control, CDC data and mass storage — no HID class at all.
+
+Two limits worth stating, since the argument above reads as exhaustive
+and is not. **Mass storage stays enumerated**, so `CIRCUITPY` — and
+therefore `code.py` itself — is writable by any process on the host.
+That is a deliberate bring-up affordance, not an oversight, but it means
+the threat model here is "no input injection", not "tamper-proof". And a
+**sandboxed** app would need `com.apple.security.device.serial` to open
+the port; Canopy sidesteps that by not being sandboxed at all (no
+`com.apple.security.app-sandbox` key in `Canopy.entitlements`). If that
+changes, this design has to be revisited.
 
 ## Hardware
 
@@ -39,8 +48,12 @@ has to be revisited.
 One STEMMA QT / Qwiic cable, no soldering. NeoKey defaults to I2C
 address `0x30`; a second board needs its A0 jumper bridged for `0x31`.
 
-Key count is never hardcoded on the host — the device reports it, so
-going to six keys is a firmware constant and nothing else.
+Key count is never hardcoded in Canopy — the device reports it in
+`HELLO`, so a second board is a firmware constant and nothing else on
+that side. Two caveats: a second NeoKey 1x4 gives eight keys, not the six
+the later phases talk about, which needs different hardware; and
+`tools/mpad.py` does assume four, since its demo colours and palette
+pages are written per key.
 
 ## Protocol
 
@@ -52,10 +65,11 @@ purpose: the whole thing can be driven from a serial monitor.
 | Command | Meaning |
 |---|---|
 | `C <idx> <rrggbb>` | set key to a solid color, e.g. `C 0 ff8000` |
-| `S <idx> <rrggbb> [ms] [floor]` | pulse that color, sine-eased |
+| `S <idx> <rrggbb> [ms] [floor]` | pulse that color, sine-eased. `ms` is clamped to ≥100, `floor` to 0-100 |
 | `B <0-100>` | global brightness |
+| `X <ms>` | crossfade duration for `C` and `S`, default 500 |
 | `P` | ping |
-| `R` | all keys off |
+| `R` | all keys off, immediately |
 
 `S` runs on the device, not the host. A square blink is one command per
 half period and would sit on the host happily, but a sine fade is ~50
@@ -64,21 +78,47 @@ hiccup. It is also already where it needs to be for BLE. `ms` is the full
 period (default 2000); `floor` is the percentage the dip bottoms out at
 (default 0). `C` on the same key cancels the pulse.
 
-**Re-sending an identical `S` is a no-op, deliberately.** A pulse is timed
-from the moment its command arrives, so a key entering a state fades up
-from the floor and the transition is visible. That only works if a host
-repainting its whole state — periodically, or after every `HELLO` — does
-not restart the clock each time; otherwise the breath replays its first
-moments forever. So the host never has to track which keys are already
-pulsing: push the full picture whenever convenient, and only genuine
-changes are acted on.
+**Every colour and floor change is crossfaded**, over `X` milliseconds.
+An instant switch reads as "something just happened", but most
+transitions are a session moving from one continuous state to the next,
+so an abrupt change makes the pad overstate the event.
 
-Phase is the device's business too. Keys whose states changed at
-different moments drift apart on their own, and `PULSE_PHASE_SPREAD`
-staggers the case that does not — several keys told to pulse in the same
-instant, which is exactly what a full re-push looks like. In lockstep
-every lit key dims together and the approval key's peak sinks into its
-neighbours'.
+Internally there is only one appearance model: a colour and a floor,
+where **solid is a pulse whose floor is 100%** and the sine term drops
+out. One interpolation therefore covers all four transitions with no
+special cases:
+
+| Transition | What happens |
+|---|---|
+| solid → solid | colour crossfades |
+| solid → pulsing | colour and floor crossfade; phase starts here |
+| pulsing → solid | colour and floor crossfade; the breath flattens out |
+| **pulsing → pulsing** | **phase is held**; only colour and floor move |
+
+That last row is the one that matters. Going from running to awaiting
+approval changes the floor from 50 to 10 — restarting the phase would
+drop the breath to its trough, and "the heartbeat stopped" reads louder
+than "the urgency changed", which is the opposite of what happened.
+Phase restarts only when a solid key starts pulsing, or when the period
+itself changes.
+
+**Re-issuing the appearance a key is already heading for is a no-op.**
+Not just an identical `S` — any `C` or `S` whose colour, floor and period
+match the current target returns without restarting either the crossfade
+or the breath. So the host never has to track which keys are already
+doing what: push the full picture whenever convenient — after every
+`HELLO`, on a timer — and only genuine changes are acted on.
+
+Phase, then, is simply "when the key started breathing". Keys whose
+states change at different moments drift apart on their own, with no
+phase bookkeeping on either side.
+
+An earlier revision also added a fixed per-key offset, to stagger keys
+told to pulse in the same instant. It was removed: an offset that is
+non-zero at t=0 is exactly a key that does not start at its floor, and
+with four keys it put key 2 at full brightness on its first frame —
+breaking the fade-up on whichever key held the approval state. The two
+properties cannot both hold for simultaneous starts, and fading up won.
 
 **device → host**
 
@@ -89,9 +129,11 @@ neighbours'.
 | `K <idx> <0\|1>` | key pressed (1) / released (0) |
 | `ERR <msg>` | command could not be handled |
 
-`<ver>` is 1 for `C`/`B`/`P`/`R` and 2 once `S` exists. Accept anything
-`>= 1`: the number says which verbs are available, it is not a
-compatibility gate.
+`<ver>` is 1 for `C`/`B`/`P`/`R`, 2 once `S` exists, and 3 once `X`,
+crossfading, and phase-held colour changes exist. Accept anything `>= 1`:
+the number says which verbs and behaviours are available, it is not a
+compatibility gate. A v3 device needs no `X` to behave correctly — the
+default is already 500 ms.
 
 Three behaviours the host depends on:
 
@@ -101,11 +143,18 @@ Three behaviours the host depends on:
 - **The device clears all LEDs when the host disconnects.** Stale status
   is worse than none; a frozen orange key claims a session still wants an
   answer. Sending `R` before closing is belt and braces, not required.
-- **`C` with an out-of-range index is dropped in silence**, so the host
-  may paint before it has learned the key count.
+- **`C` and `S` with an out-of-range index are dropped in silence**, so
+  the host may paint before it has learned the key count.
 
-Anything outside the four verbs draws `ERR unknown <cmd>`. Debug output
-goes to the *console* port via plain `print`, never to data.
+`ERR unknown <cmd>` covers two cases, not one: a verb outside the five,
+**and a known verb with the wrong argument count** — `C 0` reports as an
+unknown `C`. Misleading, but stable; a host should not read it as "this
+firmware lacks that verb".
+
+Debug output goes to the *console* port via plain `print`, never to data
+— unless `boot.py` did not take effect, in which case there is no data
+port and both share the console. The host is told: it gets
+`ERR no-data-cdc-check-boot-py` right after `HELLO`.
 
 Keep the protocol layer separate from the transport in the host code: on
 BLE these same lines become a GATT characteristic payload.
@@ -118,7 +167,7 @@ desk lighting. Values picked on a screen do not survive that trip.
 | Pane state | Color | Motion | Command |
 |---|---|---|---|
 | no pane, or launcher | off | — | `C n 000000` |
-| idle | `303030` | static | `C n 303030` |
+| idle | `273027` | static | `C n 273027` |
 | running (`isThinking`, `.spawning`) | `0040ff` | breath | `S n 0040ff 2000 50` |
 | background task (`isWaiting`) | `00ffa0` | breath | `S n 00ffa0 2000 40` |
 | **awaiting approval (`isAsking`)** | `ff8000` | **pulse** | `S n ff8000 2000 10` |
@@ -147,8 +196,26 @@ What the bench actually taught, none of which was predictable on paper:
   pulse with a floor of 5 has a handful of distinct values in its lower
   half, so it freezes at the bottom. Raising global brightness buys steps;
   lowering `PULSE_GAMMA` to 1.0 stops the level crawling through them.
-  Scaling the color value down instead does nothing — brightness and the
-  color value multiply, so the headroom is unchanged.
+  Dimming via the color value is the same multiply as global brightness,
+  so trading one for the other buys no steps — and scaling the color down
+  on its own makes the shortage worse.
+- **Equal RGB is not neutral, and the correction is level-dependent.**
+  The green channel is the weak one, so an equal-RGB value reads purple
+  through a clear keycap. What is surprising is that the size of the fix
+  is not constant: white needed red and blue trimmed ~6% (`ffffff` →
+  `f0fff0`), while idle at the same global brightness needed ~18%
+  (`303030` → `273027`). Per-channel efficiency diverges as drive drops,
+  so **a single global white balance is wrong at one end or the other by
+  construction** — the grey-axis values are corrected individually
+  instead, by eye, like every other colour here. The seven status colours
+  are saturated and need none of this.
+- **Some of the cast is per-LED, and that part is left alone.** With all
+  four keys set to one value, key 1 reads neutral while 0, 2 and 3 do
+  not. Correcting that needs a per-key gain table, which would be valid
+  for this one assembled unit and wrong for the next — so only the
+  systematic part is corrected, and the residual spread is accepted. Idle
+  is the one colour carrying no hue meaning, so a little variation in it
+  costs nothing.
 - **Equal amplitude does not read as equal motion across hues.** Cyan sits
   near the eye's sensitivity peak and looks far brighter than blue, so the
   same modulation reads as less movement. Cyan's floor is 40 against
@@ -157,8 +224,8 @@ What the bench actually taught, none of which was predictable on paper:
 ## Bring-up
 
 1. With USB connected, **hold BOOT, tap RST, release BOOT** → the
-   `RPI-RP2` volume appears. Double-tapping RST is not a documented entry
-   path on this board and does not reliably work. Drop the [CircuitPython
+   `RPI-RP2` volume appears. Double-tapping RST did not work here on
+   2026-08-08 with CircuitPython 10.2.1. Drop the [CircuitPython
    UF2 for QT Py RP2040](https://circuitpython.org/board/adafruit_qtpy_rp2040/)
    on it; the board reboots as `CIRCUITPY`.
 2. From the [CircuitPython Library
@@ -196,14 +263,14 @@ my editor".
 First bring-up, 2026-08-08, CircuitPython 10.2.1, board ID
 `adafruit_qtpy_rp2040`:
 
-| | |
+| What | Measured |
 |---|---|
 | product string | `Canopy MacroPad` (set by `boot.py`, confirmed in the descriptor) |
 | manufacturer | `Whatever` |
 | VID / PID | `0x239A` / `0x80F8` |
 | console port | `/dev/cu.usbmodem20101` |
 | data port | `/dev/cu.usbmodem20103` |
-| USB interfaces | CDC control (2), CDC data (10), mass storage (8). **No HID (3).** |
+| USB interfaces | CDC control (class 2), CDC data (class 10), mass storage (class 8). **No class 3 — no HID.** |
 | `IOHIDDevice` entries | none |
 
 The data port took the higher trailing number here, but do not select on
@@ -218,8 +285,8 @@ board, not the QT Py. The firmware catches this and keeps the serial half
 running rather than dying, so the host sees:
 
 ```
-HELLO 1 0
-ERR i2c No pull up found on SDA or SCL; check your wiring
+HELLO 2 0
+ERR i2c bus RuntimeError: No pull up found on SDA or SCL; check your wiring (reset required after fixing)
 ```
 
 `HELLO <ver> 0` is a valid state meaning "device present, keypad absent".
@@ -239,6 +306,6 @@ the Mac before suspecting the board.
 
 Four keys, USB wired, status out and focus in. Later phases (six keys and
 a printed enclosure, low-profile Choc switches, wireless on nice!nano with
-a MagSafe dock) are documented in `canopy-macropad-handoff.md` and are
+a MagSafe dock) are documented in [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
 deliberately not built yet — the only requirement now is not to block
 them.
