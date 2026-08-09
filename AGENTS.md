@@ -26,7 +26,24 @@ what the README does not.
   in `firmware/`; the only shared facts are board dimensions, and those
   live in `case/params.py` with their source named.
 
+## Patching files with a script
+
+**Assert every substitution.** A bare `str.replace()` that misses returns
+the string unchanged, so the edit silently does nothing and the next
+command reports success on code that was never modified. `assert old in s`
+before every replace, and check the assert actually fired by watching for
+the confirmation print. This has bitten in `firmware/code.py` and again in
+`case/webgl.py` — the second time over two spaces of indentation, which is
+exactly the kind of mismatch eyes skip. Once it produced a "test passed"
+for a fault that had never been injected.
+
 ## Editing the case
+
+Environment is a venv at `case/.venv`, Python 3.12 (`uv venv --python
+3.12 .venv`, then `uv pip install build123d trimesh matplotlib`). The
+system Python is 3.14 and has no build123d; whether that is a wheel gap
+or just a missing install was never checked, so 3.12 is the known-good
+one, not necessarily the only one.
 
 - **Two layouts come out of the same source**, selected with
   `MPAD_LAYOUT=stacked|inline`, and each writes to `out/<layout>/`. A
@@ -35,28 +52,72 @@ what the README does not.
   further than it looks.
 - **Change a number in `params.py`, never the geometry in `parts.py`.**
   Every dimension that matters is derived, so a hand-edit to a part is a
-  number that stops agreeing with the rest of the model silently.
+  number that stops agreeing with the rest of the model silently. Board
+  centres in particular: hard-coding the NeoKey's at `x = 0` is right in
+  one layout and 13 mm wrong in the other, and it was wrong in two files
+  before `NEOKEY_CENTER` existed.
 - **`build.py` must end in `all checks passed` before anything is
   printed.** It booleans both printed parts against stand-ins for the
-  boards, the switches and a *mated* Qwiic plug, and against each other.
-  Eight real errors have come out of it, none visible in a render. The one
-  worth knowing: **a connector is not the thing that has to fit — the
-  mated plug is.** A wall can clear a socket perfectly and still seal it
-  off, or leave a port a millimetre short of seating. That mistake was
-  made four times, in four different places, on both the Qwiic sockets
-  and the USB-C port, and every stand-in models mated connectors because
-  of it. The USB one was caught by eye, not by the check, because the
-  plug was not modelled yet.
-- **Prove a check fires before trusting it.** Same rule as the firmware's
-  error paths: break the fix, watch the number go non-zero, put it back.
-  This is not theoretical here — the standoff diameter was cut on the
-  stated grounds that the check had flagged it, and it never had. The
-  0.009 mm³ came from somewhere else entirely. A check nobody has watched
-  fail proves nothing, and a *credited* catch that never happened is
-  worse, because it also launders the reasoning that went with it.
-- Print `out/coupon.stl` before the case. `SWITCH_HOLE` and `PILOT_DIA`
-  are the only guesses left in `params.py`, and ten minutes of coupon
-  settles both.
+  boards, the switches and every mated connector, and against each other.
+  The full list of what it has caught lives in `case/README.md`; the one
+  worth carrying around is that **a connector is not the thing that has
+  to fit — the mated plug is.** A wall can clear a socket perfectly and
+  still seal it off, or leave a port a millimetre short of seating. That
+  same shape of mistake happened four times, on both Qwiic sockets and
+  the USB-C port, and every stand-in models plugs because of it.
+- **A margin check is not a boolean.** The M3 post landed on the Qwiic
+  plug while the margin that existed to prevent exactly that read green,
+  because it measured to the board edge and the plug sticks out past it.
+  Arithmetic guards are worth having and are not evidence; the boolean
+  is the evidence.
+- **Prove a check fires before trusting it**, and **inject the fault by
+  moving geometry, not by shrinking it to nothing.** A zero-width `Box`
+  makes OCCT throw, so the build dies before the check ever runs and the
+  test proves nothing. Injections also have to isolate one thing: growing
+  `QTPY_LIP` to reach a button grew its height too and tripped a
+  different check entirely. Moving the feature 60 mm sideways, or setting
+  one diameter past its limit, keeps the fault where it was aimed.
+  Watched-to-fail numbers so far: cable notch 28.4 mm³, rail over a
+  button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
+  3.8 mm³.
+- **The standoff story is the reason for the rule above.** Its diameter
+  was cut on the stated grounds that the check had flagged it, and it
+  never had — the 0.009 mm³ came from the plate-hole corner instead. A
+  check nobody has watched fail proves nothing, and a *credited* catch
+  that never happened is worse, because it launders the reasoning that
+  came with it.
+- Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` (14.15)
+  and `PILOT_DIA` (2.50) are the only guesses left in `params.py`, and
+  about fifteen minutes of coupon settles both.
+
+## Checking the viewer
+
+`out/viewer.html` is generated by `webgl.py dump` (once per layout) then
+`webgl.py page`. Two ways to verify it, and both are worth doing because
+they cover different halves:
+
+- **The data half, without a browser.** Decode the base64 back out of the
+  page in Python and compare bounds, vertex count and part offsets
+  against `out/<layout>/geom.json`. Round-trip error should be 0.0000 mm
+  and every part offset divisible by 3, or a part draws another's
+  triangles.
+- **The rendered half, in Chrome.** `mcp__chrome-devtools__*` attaches to
+  a running Chrome — it needs one actually open, or it fails with
+  `Could not find DevToolsActivePort`. Drive the rail with
+  `evaluate_script` (`document.querySelector('#preset button[data-v=
+  "top"]').click()`), screenshot, and check `list_console_messages` for
+  errors. Four real rendering bugs were found this way and none of them
+  raised an error, so the screenshot is the test, not the console.
+
+## Remaining on the case
+
+Nothing is printed yet. Next step is `out/<layout>/coupon.stl` on the
+A1 mini, then the numbers it settles go back into `params.py` before the
+case itself. Beyond the boards, the build needs M3 × 10 button-head
+self-tappers, Ø8 × 2 feet, and — for `stacked` only — a 100 mm Qwiic
+cable, since stacking puts the two sockets about 60 mm apart and the
+50 mm one no longer reaches. `inline` runs on the 50 mm cable already in
+the BOM.
 
 ## Editing the firmware
 
@@ -73,12 +134,6 @@ what the README does not.
   timing is integer `monotonic_ns`.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
-- **Patching this file with a script? Assert every substitution.** A
-  bare `str.replace()` that misses returns the string unchanged, so the
-  edit silently does nothing and the next command reports success on
-  code that was never modified. This bit three times in one session,
-  once producing a "test passed" for a fault that had never been
-  injected. `assert old in s` before every replace.
 
 ## Verifying a change
 

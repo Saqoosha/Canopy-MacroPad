@@ -78,6 +78,9 @@ The other three scripts take the same variable.
     MPAD_LAYOUT=inline .venv/bin/python webgl.py dump
     .venv/bin/python webgl.py page                    # -> out/viewer.html
 
+The viewer is also published, and republishing the same file keeps the
+same address: <https://claude.ai/code/artifact/9eb9c2b4-689a-420f-a597-ef61fb970770>
+
 `out/viewer.html` is the one to actually look at. `product.py` sorts
 triangles by distance and paints them back to front, which is the only
 depth test matplotlib offers and is wrong wherever two surfaces
