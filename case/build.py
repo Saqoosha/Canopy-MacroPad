@@ -8,6 +8,7 @@ it is the only way to catch a parameter edit that quietly moved a hole,
 since nothing here is dimensioned on a drawing anyone reads.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -18,6 +19,21 @@ import params as P
 import parts
 
 OUT = Path(__file__).parent / "out" / P.LAYOUT
+
+
+def export_step_stable(part, path):
+    """Write STEP with the clock taken out of the header.
+
+    OCCT stamps the moment of export into FILE_NAME, so a model that did
+    not change still produces a changed file on every build -- six of
+    them here, which reads in a diff as though geometry moved. The
+    geometry is the artefact; when it was written is not.
+    """
+    export_step(part, path)
+    f = Path(path)
+    f.write_text(re.sub(r"(FILE_NAME\('[^']*',')[^']*(')",
+                        r"\g<1>1970-01-01T00:00:00\g<2>",
+                        f.read_text(), count=1))
 
 
 def check(label, got, want, tol=0.01):
@@ -48,7 +64,7 @@ def main():
         export_stl(
             printable, str(OUT / f"{name}.stl"), tolerance=0.005, angular_tolerance=0.1
         )
-        export_step(part, str(OUT / f"{name}.step"))
+        export_step_stable(part, str(OUT / f"{name}.step"))
         bb = part.bounding_box()
         print(
             f"  {name:<7} {bb.size.X:6.2f} x {bb.size.Y:6.2f} x {bb.size.Z:6.2f} mm"
