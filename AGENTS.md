@@ -20,6 +20,43 @@ what the README does not.
   so it runs on a fresh machine. `--probe` first, always.
 - `docs/canopy-macropad-handoff.md` — the original design brief, vendored
   verbatim. Not edited here.
+- `case/` — the printed enclosure, parametric in `build123d`. Its own
+  `README.md` carries the stack, the print settings and the assembly
+  order. Nothing in `firmware/` depends on it and it depends on nothing
+  in `firmware/`; the only shared facts are board dimensions, and those
+  live in `case/params.py` with their source named.
+
+## Editing the case
+
+- **Two layouts come out of the same source**, selected with
+  `MPAD_LAYOUT=stacked|inline`, and each writes to `out/<layout>/`. A
+  change is not done until **both** build clean — they share every part
+  of the geometry except where the QT Py sits, so a "small" edit reaches
+  further than it looks.
+- **Change a number in `params.py`, never the geometry in `parts.py`.**
+  Every dimension that matters is derived, so a hand-edit to a part is a
+  number that stops agreeing with the rest of the model silently.
+- **`build.py` must end in `all checks passed` before anything is
+  printed.** It booleans both printed parts against stand-ins for the
+  boards, the switches and a *mated* Qwiic plug, and against each other.
+  Eight real errors have come out of it, none visible in a render. The one
+  worth knowing: **a connector is not the thing that has to fit — the
+  mated plug is.** A wall can clear a socket perfectly and still seal it
+  off, or leave a port a millimetre short of seating. That mistake was
+  made four times, in four different places, on both the Qwiic sockets
+  and the USB-C port, and every stand-in models mated connectors because
+  of it. The USB one was caught by eye, not by the check, because the
+  plug was not modelled yet.
+- **Prove a check fires before trusting it.** Same rule as the firmware's
+  error paths: break the fix, watch the number go non-zero, put it back.
+  This is not theoretical here — the standoff diameter was cut on the
+  stated grounds that the check had flagged it, and it never had. The
+  0.009 mm³ came from somewhere else entirely. A check nobody has watched
+  fail proves nothing, and a *credited* catch that never happened is
+  worse, because it also launders the reasoning that went with it.
+- Print `out/coupon.stl` before the case. `SWITCH_HOLE` and `PILOT_DIA`
+  are the only guesses left in `params.py`, and ten minutes of coupon
+  settles both.
 
 ## Editing the firmware
 
