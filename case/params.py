@@ -122,7 +122,10 @@ SCREW_HEAD_H = 1.65
 # 0 for the full domed look and taller feet.
 SCREW_SINK = 1.00
 
-PEG_DIA = 2.30  # into the PCB's 2.5 holes
+# Into the PCB's 2.5 holes. Confirmed on the printed inline shell: the
+# board drops on free with a little play, which is what a locating peg
+# wants -- it is there to stop the board wandering, not to grip it.
+PEG_DIA = 2.30
 PEG_H = 1.40  # stops inside the 1.57 board rather than poking out the back
 
 # A plate-mount switch is 14 wide below its flange, so between two keys at
@@ -193,6 +196,8 @@ USB_FLOOR_CLEAR = 0.40  # under the USB-C shell, which is now the low point
 # opening, which is the tightest spot in the shell.
 SOCKET_CLEARANCE = 2.80
 
+# 0.20 a side, and confirmed on the printed inline shell: the board goes
+# into the pocket without force and without slop.
 QTPY_SLOP = 0.40
 QTPY_FRAME_W = 1.60  # pocket wall around the QT Py, on the bottom plate
 QTPY_RAIL_W = 3.00  # posts under the board's clear margins
@@ -206,6 +211,15 @@ QTPY_CLEAR_X = ((0.40, 3.30), (14.40, 17.40))
 # STEMMA QT socket footprint, board-local, for the pocket to keep clear.
 QTPY_STEMMA = (4.01, 10.01, -0.09, 4.87)
 QTPY_STEMMA_H = 2.96
+
+# How far past that footprint the wall in front of the socket opens up.
+# It is the room a thumb and a plug share while mating a connector that
+# is already boxed in on three sides. At 1.00 the plug goes in and takes
+# some working at, on the printed `inline` shell -- fine, not comfortable.
+# Widening it costs a little of the wall that stops the board sliding,
+# and the wall below the notch is untouched either way, so 1.5-2.0 is
+# the knob to turn if the pocket is ever reprinted.
+QTPY_STEMMA_NOTCH = 1.00
 
 USB_CLEAR_W = 1.10  # added to USB_W/USB_H for the back-wall opening
 USB_CLEAR_H = 0.80
@@ -369,6 +383,10 @@ USB_R = USB_H / 2
 # hand is slimmer. The receptacle sits recessed behind the wall face, so
 # the overmold has to come *into* the case by that much to seat, and both
 # printed parts are in its way, not just the shell.
+# Confirmed on the printed inline shell with a real cable: it seats fully
+# and leaves about 1 mm around the plug's housing, so the guess was
+# generous rather than wrong. Tighten it for a closer-looking port; the
+# slack is also what lets a fatter cable work.
 USB_PLUG_W = 12.00
 USB_PLUG_H = 6.60
 USB_PLUG_L = 8.00  # how far it stands off the wall once seated

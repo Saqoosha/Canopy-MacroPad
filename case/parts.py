@@ -183,8 +183,9 @@ def shell():
         # time this design has had to learn that a wall can fit the board
         # and still make the case impossible to wire.
         ex0, ex1, ey0, ey1 = _stemma_rect()
+        n = P.QTPY_STEMMA_NOTCH
         frame -= _block(qx0 - s_ - f - 0.1, qx0 - s_ + 0.1,
-                        ey0 - 1.0, ey1 + 1.0,
+                        ey0 - n, ey1 + n,
                         P.Z_STEMMA_LOW - 0.4, P.Z_PLATE_BOTTOM)
         part += frame
 
@@ -238,7 +239,8 @@ def _stacked_qtpy_mount():
     # the Qwiic plug, hanging off a socket that now faces the floor.
     stop = _block(px0 - f, px1 + f, qy0 - f, qy0, P.BOTTOM_T, pocket_top)
     ex0, ex1, _, _ = _stemma_rect()
-    stop -= _block(ex0 - 1.0, ex1 + 1.0, qy0 - f - 0.1, qy0 + 0.1,
+    n = P.QTPY_STEMMA_NOTCH
+    stop -= _block(ex0 - n, ex1 + n, qy0 - f - 0.1, qy0 + 0.1,
                    P.BOTTOM_T - 0.1, P.Z_QTPY_LOW)
     part += stop
 

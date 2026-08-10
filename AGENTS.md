@@ -113,20 +113,19 @@ they cover different halves:
 
 ## Remaining on the case
 
-The `inline` case is printed -- shell, bottom plate, coupon -- and the
-switch hole is right, so `SWITCH_HOLE` is settled. Everything else is now
-being proven on the real part instead of the coupon, so nothing is
-confirmed until it is assembled. Watch, in order: whether an M3 cuts its
-own thread in a post without splitting it (`PILOT_DIA`), whether the
-Ø2.3 pegs drop into the NeoKey's holes (`PEG_DIA`), whether the QT Py
-slides under the shell's pinch bars on 0.2 a side (`QTPY_SLOP`), and
-whether a USB-C plug actually seats -- that last one was a late fix and
-has never been tested against a real cable. `stacked` has not been
-printed at all. Beyond the boards, the build needs M3 × 10 button-head
-self-tappers, Ø8 × 2 feet, and — for `stacked` only — a 100 mm Qwiic
-cable, since stacking puts the two sockets about 60 mm apart and the
-50 mm one no longer reaches. `inline` runs on the 50 mm cable already in
-the BOM.
+The `inline` case is printed and mostly proven on the real part. Settled
+by assembly: `SWITCH_HOLE` at 14.15 (a Durock Ice King seats right),
+`PEG_DIA` at 2.30 (the NeoKey drops on free with a little play),
+`QTPY_SLOP` at 0.40, and the USB-C port -- a real cable seats fully with
+about 1 mm around its housing, which matters because `USB_PLUG_W/H` were
+never measured off anything, just chosen generously.
+
+Still open: **`PILOT_DIA` (2.50) has never had an M3 driven into it.**
+That is the last guess in the file, and the one that fails destructively
+-- too small splits a post, too large strips on the second open. Also
+noted: the Qwiic plug goes into the `inline` pocket but takes some
+working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
+on a reprint. `stacked` has not been printed at all.
 
 ## Editing the firmware
 
