@@ -113,10 +113,16 @@ they cover different halves:
 
 ## Remaining on the case
 
-The `inline` coupon is printed and its switch hole is right, so
-`SWITCH_HOLE` is settled. Still open on that same coupon: driving an M3
-into the post to settle `PILOT_DIA`, and dropping the peg into a real
-NeoKey hole. After that the case itself can go on the plate. Beyond the boards, the build needs M3 × 10 button-head
+The `inline` case is printed -- shell, bottom plate, coupon -- and the
+switch hole is right, so `SWITCH_HOLE` is settled. Everything else is now
+being proven on the real part instead of the coupon, so nothing is
+confirmed until it is assembled. Watch, in order: whether an M3 cuts its
+own thread in a post without splitting it (`PILOT_DIA`), whether the
+Ø2.3 pegs drop into the NeoKey's holes (`PEG_DIA`), whether the QT Py
+slides under the shell's pinch bars on 0.2 a side (`QTPY_SLOP`), and
+whether a USB-C plug actually seats -- that last one was a late fix and
+has never been tested against a real cable. `stacked` has not been
+printed at all. Beyond the boards, the build needs M3 × 10 button-head
 self-tappers, Ø8 × 2 feet, and — for `stacked` only — a 100 mm Qwiic
 cable, since stacking puts the two sockets about 60 mm apart and the
 50 mm one no longer reaches. `inline` runs on the 50 mm cable already in

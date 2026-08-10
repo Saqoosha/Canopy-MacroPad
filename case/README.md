@@ -273,17 +273,37 @@ anything, and the plate keeps them square while they seat.
 
 ## Assembly order
 
-The two halves each carry a board, so they have to be wired together
-before they are closed. That is the price of the depth.
+Different in each layout, because a different half carries the QT Py.
+Both wire up before they close, which is the price of the depth.
 
-1. Slide the QT Py into the bottom plate's pocket, face down, USB-C first
-   through the back opening, under both lips.
-2. Plug the Qwiic cable into the QT Py's socket — it faces forward, into
-   the 2.5 mm strip ahead of the board.
-3. Drop the NeoKey onto the shell's four pegs and plug the cable's other
-   end into either of its end sockets.
+**`inline`** — the shell carries both boards; the bottom plate only holds
+them up.
+
+1. Drop the QT Py into the shell's pocket, **face up**, USB-C first into
+   the right-end opening, so the pinch bars land on its two clear
+   margins.
+2. Plug the Qwiic cable into its socket. It faces back toward the NeoKey
+   across the 12 mm gap, and there is a notch in the pocket wall for
+   exactly this.
+3. Drop the NeoKey onto the shell's four pegs and plug the other end into
+   its **right** socket — inline is right-handed, the left one has a
+   screw post in front of it.
+4. Fold the cable's slack into the gap between the boards. It is 35 mm
+   longer than the run; nothing is routed for you.
+5. Close the halves, four M3 × 10 button-head self-tappers, four Ø8 feet.
+6. Press the switches in through the plate. Keycaps.
+
+**`stacked`** — the bottom plate carries the QT Py alone, because the
+NeoKey covers the case wall to wall and nothing above can reach it.
+
+1. Slide the QT Py into the bottom plate's pocket, **face down**, USB-C
+   first through the back opening, under both lips.
+2. Plug the Qwiic cable into its socket — it faces forward, into the
+   2.5 mm strip ahead of the board.
+3. Drop the NeoKey onto the shell's four pegs and plug the other end into
+   either of its end sockets.
 4. Route the slack down whichever end bay the cable came from and lay it
-   along the floor. Both bays are open and nothing is routed for you.
+   along the floor. Both bays are open.
 5. Close the halves, four M3 × 10 button-head self-tappers, four Ø8 feet.
 6. Press the switches in through the plate. Keycaps.
 
