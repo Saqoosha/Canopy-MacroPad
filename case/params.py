@@ -82,9 +82,12 @@ PLATE_TOP_TO_PCB = 5.00
 # and the check stays worth reading.
 PLATE_HOLE_R = 0.20
 
-# Tuned on the coupon, not calculated. Bambu PLA pulls a square hole in
-# by roughly 0.1-0.15; this is that guess and the coupon exists to correct
-# it. Too tight splits the switch housing, too loose and the key wobbles.
+# Settled on the coupon, not calculated: a Durock Ice King seats in this
+# with the right amount of push on an A1 mini in PLA Basic at 0.4/0.2.
+# The 0.15 over nominal is the printer pulling the hole in, and it is now
+# a measurement rather than the guess it started as. Re-run the coupon if
+# the filament or the nozzle changes -- the number is about the machine,
+# not about the switch.
 SWITCH_HOLE = 14.15
 
 # --- Fasteners ----------------------------------------------------------

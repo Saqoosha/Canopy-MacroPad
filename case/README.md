@@ -30,19 +30,23 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-`out/coupon.stl` is 36 × 24 mm and takes about fifteen minutes. It exists
-because two numbers in `params.py` are guesses that only a printer can
-settle, and getting them wrong costs a two-hour reprint:
+`out/<layout>/coupon.stl` is 36 × 24 mm and takes about fifteen minutes.
+It exists because a few numbers in `params.py` are things only a printer
+can settle, and getting them wrong costs a two-hour reprint:
 
-| Test | What it settles | If wrong |
+| Test | What it settles | Status |
 |---|---|---|
-| switch into the 14.15 square hole | `SWITCH_HOLE` | tight splits the housing, loose lets the key rock |
-| M3 self-tapper into the 2.50 pilot | `PILOT_DIA` | tight splits the post, loose strips on the second open |
-| standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | the board will not seat flat |
+| switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
+| M3 self-tapper into the 2.50 pilot | `PILOT_DIA` | open — tight splits the post, loose strips on the second open |
+| standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | open — the board has to sit flat |
 
-Edit the number, rerun `build.py`, print the real thing. The coupon's
-plate is the real 1.6 mm and its post is the real 13.5 mm, so a fit that
-works here works in the case.
+The two open ones are about the same coupon, so they cost nothing extra
+to check on the print that is already in hand.
+
+Edit the number, rerun `build.py`, print the real thing. The coupon
+carries the real features at their real sizes — the plate is 1.6 mm and
+the post is whatever that layout's post is, 7.8 mm inline and 13.5 mm
+stacked — so a fit that works here works in the case.
 
 ## Cable, per layout
 
@@ -69,7 +73,8 @@ before bends. Either:
     MPAD_LAYOUT=inline .venv/bin/python build.py  # inline
 
 Each writes into `out/<layout>/`, so both sets of STLs exist side by side.
-The other three scripts take the same variable.
+The other scripts take the same variable.
+
     .venv/bin/python section.py    # sections.png -- cut through the stack
     .venv/bin/python render.py     # *.png -- shaded views
     .venv/bin/python product.py    # product.png -- assembled and exploded
@@ -132,11 +137,11 @@ Four things in it were not obvious:
   more useful picture regardless.
 
 `product.py` and `webgl.py` are the only files here that are not
-load-bearing. Its keycap
-and switch shapes are eyeballed, nothing checks them, and no dimension in
-it feeds anything else — it exists so the pad can be looked at. The four
-keys wear the status colours from the main README, since what this device
-is *for* is the one thing a picture of it should say.
+load-bearing. Their keycap and switch shapes are eyeballed, nothing checks
+them, and no dimension in either feeds anything else — they exist so the
+pad can be looked at. The four keys wear the status colours from the main
+README, since what this device is *for* is the one thing a picture of it
+should say.
 
 There is no hole over BOOT or RESET in either layout. They are needed
 once, to write a CircuitPython UF2; after that a firmware update is a

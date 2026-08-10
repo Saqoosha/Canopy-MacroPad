@@ -86,9 +86,11 @@ one, not necessarily the only one.
   check nobody has watched fail proves nothing, and a *credited* catch
   that never happened is worse, because it launders the reasoning that
   came with it.
-- Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` (14.15)
-  and `PILOT_DIA` (2.50) are the only guesses left in `params.py`, and
-  about fifteen minutes of coupon settles both.
+- Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
+  settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
+  in PLA Basic, so the 0.15 over nominal is this machine's hole shrink
+  and holds until the filament or nozzle changes. `PILOT_DIA` (2.50) is
+  still a guess until an M3 has actually been driven into a post.
 
 ## Checking the viewer
 
@@ -111,9 +113,10 @@ they cover different halves:
 
 ## Remaining on the case
 
-Nothing is printed yet. Next step is `out/<layout>/coupon.stl` on the
-A1 mini, then the numbers it settles go back into `params.py` before the
-case itself. Beyond the boards, the build needs M3 × 10 button-head
+The `inline` coupon is printed and its switch hole is right, so
+`SWITCH_HOLE` is settled. Still open on that same coupon: driving an M3
+into the post to settle `PILOT_DIA`, and dropping the peg into a real
+NeoKey hole. After that the case itself can go on the plate. Beyond the boards, the build needs M3 × 10 button-head
 self-tappers, Ø8 × 2 feet, and — for `stacked` only — a 100 mm Qwiic
 cable, since stacking puts the two sockets about 60 mm apart and the
 50 mm one no longer reaches. `inline` runs on the 50 mm cable already in
