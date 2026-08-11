@@ -210,6 +210,23 @@ actually see `>>>`** before sending anything that has to run. This cost
 one wasted reset that reported success on a board that had never
 rebooted.
 
+Two more things the REPL will not give you. `code.py`'s globals are
+**gone** by the time the prompt appears — `print(len(pads))` after an
+interrupt is a `NameError`, not a peek at the running program, so the
+REPL cannot be used to inspect state the firmware built. And anything
+`code.py` prints at startup is emitted before a host can reattach after
+a reset, so it is simply dropped: watching the console for a boot-time
+message is not a test, it is a coin flip that lands tails every time.
+Read the state off the **data** port instead, where `HELLO`'s key count
+answers the same questions and is there whenever you connect.
+
+With the drive disabled, `storage.remount("/", readonly=False)` from the
+REPL is the only way to change a file. Do it the paranoid way, because
+a truncated `boot.py` costs you USB itself: write the new content to a
+*second* name, read it back and check it, then `os.rename` the original
+aside and the new one into place. The original is then one rename from
+being restored, which beats every other recovery path on this device.
+
 Canopy holds the data port whenever it is running, and takes it back on
 its own after a reset — a probe that answered a minute ago can come back
 `console/silent (no PONG)` on **both** ports with nothing wrong at all.
