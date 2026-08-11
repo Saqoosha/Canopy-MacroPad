@@ -24,7 +24,10 @@ what the README does not.
   `README.md` carries the stack, the print settings and the assembly
   order. Nothing in `firmware/` depends on it and it depends on nothing
   in `firmware/`; the only shared facts are board dimensions, and those
-  live in `case/params.py` with their source named.
+  live in `case/params.py` with their source named. The key field is
+  three boards now -- two 4978 breakouts then the NeoKey, left to right
+  -- and `firmware/code.py`'s key numbering follows the case's layout
+  rather than the other way round.
 
 ## Patching files with a script
 
@@ -79,7 +82,9 @@ one, not necessarily the only one.
   one diameter past its limit, keeps the fault where it was aimed.
   Watched-to-fail numbers so far: cable notch 28.4 mm³, rail over a
   button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
-  3.8 mm³.
+  3.8 mm³, a breakout support column moved back onto its second
+  mounting hole 5.675 mm³, and the seam standoffs shifted half a pitch
+  onto the switches 26.260 mm³.
 - **A hole above a counterbore is a ring printed over air.** Ø6.10 of
   counterbore under the Ø3.55 hole of the day leaves 1.275 mm unsupported
   all the way round; it sags into the top of the bore, and the printed
@@ -238,6 +243,18 @@ on a reprint. `stacked` has not been printed at all.
 
 ## Editing the firmware
 
+- **The keypad is two halves and the index space is one.** Keys 0-1 are
+  two 4978 breakouts on GPIO, keys 2-5 a NeoKey on I2C, and `GPIO_BASE`
+  / `SEESAW_BASE` are the only two constants that know which way round.
+  Indices are static: key 2 stays key 2 when the NeoKey is silent,
+  because the host maps index to pane and a silent renumbering focuses
+  the wrong session. That is also why `NUM_KEYS` is a constant 6 and
+  `HELLO <ver> 0` can no longer happen.
+- **A dead Qwiic cable must cost exactly four keys.** The GPIO reads sit
+  outside every guard and each pad's `get_keys()` and each pixel group's
+  `show()` is guarded separately. Collapsing those back into one `try`
+  would take the two keys that do not use the bus down with it, which is
+  the whole reason they are on GPIO.
 - **The device is dumb on purpose.** It reports key edges and paints what
   it is told. Which pane, which status, when to pulse — all host-side.
   Resist moving policy down here; the split is what keeps the protocol
@@ -250,7 +267,7 @@ on a reprint. `stacked` has not been printed at all.
   decays with uptime, and this device lives plugged in for weeks. All
   timing is integer `monotonic_ns`.
 - **`/Volumes/CIRCUITPY` is not there by default.** `boot.py` disables
-  the USB drive unless a key on the first NeoKey board is held through a
+  the USB drive unless one of the six keys is held through a
   hard reset, because a mounted volume yanked off the bus is a macOS
   "Disk Not Ejected Properly" every single unplug. Hold a key and the
   drive comes back — and stays for the rest of the session, so an
@@ -261,10 +278,18 @@ on a reprint. `stacked` has not been printed at all.
   `boot_out.txt` **from the REPL**, not off the drive: mounting the
   drive is what makes the gate take the other branch and overwrite the
   line you came for.
-- `boot.py` now depends on `adafruit_neokey` in `lib/`, which used to be
+- `boot.py` depends on `adafruit_neokey` in `lib/`, which used to be
   `code.py`'s alone, and holds its own copy of the `0x30` from
-  `PAD_ADDRESSES` — it cannot import `code.py` without running the whole
-  program. Both fail in the harmless direction: the drive stays enabled.
+  `PAD_ADDRESSES` **and of the GPIO pin names** — it cannot import
+  `code.py` without running the whole program. The address and the
+  library fail in the harmless direction: the drive stays enabled. The
+  pin names have a second failure mode worth naming, because it is
+  silent: a name that still exists but points at the wrong pin reads
+  high through its pull-up, so keys 0-1 quietly stop opening the drive
+  while the NeoKey's four still do.
+- `lib/` needs `neopixel.mpy` as well now, for the breakouts' chain.
+  Missing, keys 0-1 report presses and never light, and the host is told
+  `ERR gpio pixels ...`.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
 
@@ -275,7 +300,7 @@ python3 -m py_compile firmware/*.py tools/mpad.py
 # CIRCUITPY is not mounted unless a key was held through the last hard
 # reset. Hold one and replug before the copy.
 cp firmware/code.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._code.py
-tools/mpad.py --probe          # expect: PONG 3 4 on the data port
+tools/mpad.py --probe          # expect: PONG 3 6 on the data port
 tools/mpad.py --demo           # LEDs out, key edges in
 ```
 
@@ -289,16 +314,17 @@ the old USB config.
 cp firmware/boot.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._boot.py
 # hard reset -- replug, or from the REPL on the console port:
 #   import microcontroller; microcontroller.reset()
-tools/mpad.py --probe          # expect: PONG 3 4, and CIRCUITPY now gone
+tools/mpad.py --probe          # expect: PONG 3 6, and CIRCUITPY now gone
 ```
 
 Known-good answers, for telling a healthy board from a sick one:
 
 | State | The device says |
 |---|---|
-| healthy | `HELLO 3 4` on connect, `PONG 3 4` to `P` |
-| keypad or `lib/` missing | `HELLO 3 0` + `ERR i2c setup ...`, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
-| bus lost while running | `HELLO 3 4` + `ERR i2c lost at runtime: ...` |
+| healthy | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
+| NeoKey or `adafruit_neokey` missing | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
+| `neopixel` missing | `HELLO 3 6` + `ERR gpio pixels ...`, keys 0-1 dark but still reporting presses |
+| bus lost while running | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
 | firmware died past 60 s uptime | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
 | firmware died inside 60 s | `ERR fatal-halted ...` on every later connect, stays red |
 
@@ -374,15 +400,19 @@ believing a clean run.
 
 **Run the negative control or the test is worth nothing.** Proving the
 gate did not strand the I2C bus meant showing `code.py` still answered
-`HELLO 3 4` with the fault active. The first harness watched the console
-for `code.py`'s `WARNING: no keypad on I2C` line and reported it absent —
+`HELLO 3 4` with the fault active — four keys, at the time. The first
+harness watched the console for `code.py`'s `WARNING: no keypad on I2C`
+line and reported it absent —
 which looked like a pass, and was not: with the library actually moved
 aside, so that the warning *had* to appear, it stayed absent too. The
 harness was reattaching after the print had already been emitted and
 dropped. Every "the bad thing did not happen" result needs its twin run
 where the bad thing is forced to happen. Here that meant reading the key
-count off the data port instead, where `HELLO 3 0` is observable and so
-`HELLO 3 4` means something.
+count off the data port instead, where the count was observable in both
+directions and so a healthy answer meant something. **That trick no
+longer works.** The count is a constant 6 now, because the GPIO half
+cannot fail to enumerate, so the observable signal is the `ERR i2c ...`
+line itself rather than the number beside `HELLO`.
 
 Canopy holding the data port defeats a probe, which reads exactly like a
 dead board. Beat it by resetting through the console REPL, waiting for
@@ -417,6 +447,15 @@ the same reasoning that keeps exactly one status pulsing.
 - `usb_midi.disable()` in `boot.py` — builds without the module raise
   `AttributeError` there and break USB entirely, to defend against an
   interface the measured descriptor already lacks.
+
+One diagnostic *was* added, and the grounds matter because they are the
+inverse of the list above: `ERR gpio <detail>` on connect, when the
+breakouts' pins or `neopixel` failed to come up. It is not a new class of
+noise -- it is the exact twin of `ERR i2c ...`, emitted once at the same
+moment, for the half of the keypad that had no way to report anything.
+Without it a missing `neopixel.mpy` is two dark keys and no explanation.
+There is no runtime twin of it: a bus can be unplugged mid-session, a
+soldered pin cannot.
 
 If one of these is proposed again, the question to answer first is what
 state the new behaviour would be *wrong* in. Every one of them has one.
