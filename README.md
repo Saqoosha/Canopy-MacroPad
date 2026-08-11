@@ -1,4 +1,4 @@
-# Canopy MacroPad — firmware
+# Canopy MacroPad
 
 Four keys next to the keyboard. Each key mirrors one Canopy pane: its
 LED shows what that pane's Claude session is doing, and pressing it
