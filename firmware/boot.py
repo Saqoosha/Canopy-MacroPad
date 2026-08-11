@@ -73,7 +73,7 @@ try:
     import board
     import digitalio
 
-    # Keys 4 and 5 first, because they are nearly free: two pin reads
+    # Keys 0 and 1 first, because they are nearly free: two pin reads
     # against the seesaw software reset below, which costs 0.5 s flat. A
     # finger on either one answers the question without the bus being
     # touched at all -- so a board with no Qwiic cable, or without the

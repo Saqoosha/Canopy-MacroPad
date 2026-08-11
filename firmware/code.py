@@ -86,7 +86,7 @@ PAD_ADDRESSES = (0x30,)
 KEYS_PER_PAD = 4
 SEESAW_KEYS = KEYS_PER_PAD * len(PAD_ADDRESSES)
 
-# Keys 4 and 5: two Adafruit 4978 NeoKey Socket Breakouts, read straight
+# Keys 0 and 1: two Adafruit 4978 NeoKey Socket Breakouts, read straight
 # off GPIO. They carry no seesaw, so there is nothing to address and
 # nothing to enumerate -- which is why this is the half that cannot fail
 # to come up, and why the key count below can be a constant.
@@ -103,23 +103,34 @@ SEESAW_KEYS = KEYS_PER_PAD * len(PAD_ADDRESSES)
 # at module scope, which is the silent brick again -- and a wrong-board
 # flash is exactly when you want the serial half still talking.
 #
-# In physical left-to-right order, continuing where the NeoKey stops.
-# All three sit on the QT Py's 3V/GND edge, so the harness does not have
-# to cross the board.
+# In physical left-to-right order, which here means these come *before*
+# the NeoKey's four. All three pins sit on the QT Py's 3V/GND edge, so
+# the harness does not have to cross the board.
 GPIO_KEY_PIN_NAMES = ("MISO", "SCK")
 GPIO_PIXEL_PIN_NAME = "MOSI"
 GPIO_KEYS = len(GPIO_KEY_PIN_NAMES)
 
-# Fixed, and deliberately not derived from what enumerated. Key 4 is key
-# 4 whether or not the NeoKey answered: the host maps index to pane, so
-# letting the breakouts slide into 0 and 1 when the Qwiic cable is out
-# would quietly focus the wrong session.
+# Index order is physical, left to right, and the case decided it rather
+# than this file: the breakouts sit to the *left* of the NeoKey, because
+# on the right a mated Qwiic plug lands 0.025 mm from the first
+# breakout's switch body and the NeoKey's socket ends up 114 mm from a
+# QT Py holding a 50 mm cable. See case/params.py, BREAKOUT_ORIGINS_LOCAL.
+#
+# So the GPIO pair is 0-1 and the NeoKey is 2-5. These two constants are
+# the only place that knows which way round it goes.
+GPIO_BASE = 0
+SEESAW_BASE = GPIO_KEYS
+
+# Fixed, and deliberately not derived from what enumerated. Key 2 is key
+# 2 whether or not the NeoKey answered: the host maps index to pane, so
+# letting the boards renumber when the Qwiic cable is out would quietly
+# focus the wrong session.
 #
 # The cost is that `HELLO <ver> 0` -- which used to mean "device present,
 # keypad absent" -- can no longer happen. A missing NeoKey now shows up
-# as `HELLO <ver> 6` plus `ERR i2c ...`, and the host paints four keys
-# that do not light. Writes to absent hardware are dropped in silence,
-# the same way an out-of-range index already is.
+# as `HELLO <ver> 6` plus `ERR i2c ...`, and the host paints keys 2-5
+# into a board that is not there. Writes to absent hardware are dropped
+# in silence, the same way an out-of-range index already is.
 NUM_KEYS = SEESAW_KEYS + GPIO_KEYS
 
 # Full brightness is genuinely painful to sit next to, but going too dim
@@ -230,7 +241,7 @@ if i2c is not None:
         # addresses configured and the first one silent, the second
         # board's keys take the first board's indices -- the same silent
         # renumbering the GPIO half is kept static to avoid.
-        base = slot * KEYS_PER_PAD
+        base = SEESAW_BASE + slot * KEYS_PER_PAD
         try:
             pad = NeoKey1x4(i2c, addr=addr)
             # NeoKey1x4 leaves auto_write on, which turns every single
@@ -271,7 +282,7 @@ try:
 
     # GRB is the WS2812 family's wire order and what the NeoKey's seesaw
     # driver already assumes, so the breakouts carrying the same
-    # NEO3535_REVERSE part should match. If keys 4 and 5 come up with red
+    # NEO3535_REVERSE part should match. If keys 0 and 1 come up with red
     # and green swapped while 0-3 look right, this is the line -- it is a
     # property of the LED, and nothing in the .brd files states it.
     gpio_pixels = NeoPixel(
@@ -280,7 +291,7 @@ try:
         pixel_order="GRB")
     gpio_pixels.fill(0x000000)
     gpio_pixels.show()
-    pixel_groups.append((gpio_pixels, SEESAW_KEYS, GPIO_KEYS))
+    pixel_groups.append((gpio_pixels, GPIO_BASE, GPIO_KEYS))
 except Exception as err:  # noqa: BLE001
     gpio_errors.append("pixels {}: {}".format(type(err).__name__, err))
 # Two variables on purpose. `boot_i2c_error` is what setup found and
@@ -404,7 +415,7 @@ def flush_pixels():
     """Push staged writes to hardware. Returns the first error, or None.
 
     Guarded per group rather than inside the loop's single try. The
-    groups fail independently, and the whole reason keys 4 and 5 hang
+    groups fail independently, and the whole reason keys 0 and 1 hang
     off GPIO is that they do not need the Qwiic cable -- letting a dead
     bus stop them painting would give that away for nothing.
     """
@@ -613,7 +624,7 @@ if i2c_error:
 if gpio_error:
     print("WARNING: breakout keys degraded ({}).".format(gpio_error))
     print("Keys {}-{} are the two 4978 boards on GPIO {} / pixels on {}."
-          .format(SEESAW_KEYS, NUM_KEYS - 1,
+          .format(GPIO_BASE, GPIO_BASE + GPIO_KEYS - 1,
                   "/".join(GPIO_KEY_PIN_NAMES), GPIO_PIXEL_PIN_NAME))
 
 
@@ -708,7 +719,7 @@ try:
         # Several guards now rather than one, because half the keypad no
         # longer touches the bus. A dead Qwiic cable has to cost exactly
         # the keys that hang off it and no others -- otherwise putting
-        # keys 4 and 5 on GPIO bought nothing. Every arm records into
+        # keys 0 and 1 on GPIO bought nothing. Every arm records into
         # `tick_err` and the accounting below stays in one place.
         tick_err = None
         try:
@@ -754,7 +765,7 @@ try:
         # on GPIO precisely so that a missing cable could not reach them.
         for i in range(len(gpio_switches)):
             # Pull-up plus a diode to ground: pressed reads low.
-            raw[SEESAW_KEYS + i] = not gpio_switches[i].value
+            raw[GPIO_BASE + i] = not gpio_switches[i].value
 
         # get_keys() reads all four keys of a board in one I2C
         # transaction, which is 4x fewer round trips than indexing each.
