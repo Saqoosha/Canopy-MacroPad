@@ -181,6 +181,14 @@ def shell():
         part += _tube(x, y, P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
         part += _tube(x, y, P.Z_NEOKEY_TOP - P.PEG_H, P.Z_NEOKEY_TOP, P.PEG_DIA)
 
+    # The breakouts are pressed at the seams between boards rather than
+    # at their own holes -- params/SEAM_XY carries the 1.48 mm of overlap
+    # that rules the holes out. No peg on these: a seam is where two
+    # boards meet, so there is nothing to locate into. Placing them is
+    # the bottom plate's job.
+    for x, y in P.SEAM_XY:
+        part += _tube(x, y, P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
+
     # Corner posts for the bottom plate's screws, full interior height.
     for x, y in P.POST_XY:
         part += _tube(x, y, P.Z_FLOOR, P.Z_PLATE_BOTTOM, P.POST_DIA)
@@ -298,6 +306,17 @@ def bottom():
     # Columns that push the NeoKey up against the shell's standoffs.
     for x, y in P.MOUNT_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
+
+    # The same, for the breakouts, but their positions dodge the
+    # hot-swap socket rather than following the mounting holes -- see
+    # BREAKOUT_SUPPORT_LOCAL. Only the pair that lands on a real hole
+    # carries a peg, and it points up into the board from below, since
+    # there is no standoff overhead to hang one from.
+    for x, y in P.BREAKOUT_SUPPORT_XY:
+        part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
+    for x, y in P.BREAKOUT_PEG_XY:
+        part += _tube(x, y, P.Z_NEOKEY_BOTTOM,
+                      P.Z_NEOKEY_BOTTOM + P.PEG_H, P.PEG_DIA)
 
     if P.STACKED:
         part += _stacked_qtpy_mount()

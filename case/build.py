@@ -97,7 +97,11 @@ def main():
         ok += [
             check("key field centred on x=0",
                   (P.SWITCH_XY[0][0] + P.SWITCH_XY[-1][0]) / 2, 0.0),
-            check("USB-C centred across the case", P.USB_CX, 0.0),
+            # USB-C used to be asserted centred across the case. The
+            # six-key field moved the QT Py off centre to get it out of a
+            # support column -- see QTPY_CX -- so the property worth
+            # asserting is the one that displaced it, and it lives in the
+            # margins below as "QT Py clear of the board columns".
             check("depth is set by the QT Py, not the NeoKey", P.CASE_D,
                   P.WALL + P.QTPY_D + P.QTPY_SLOP + P.QWIIC_PLUG_L + P.WALL),
         ]
@@ -203,13 +207,21 @@ def main():
         # Against the plug, not the board. Measuring to the board edge is
         # what let an M3 post land on the Qwiic connector with this check
         # still reading green.
+        # Measured from the plug's own outer face, and to the *nearest*
+        # post rather than to a post picked by index. The field stopped
+        # being centred in the case when the breakouts went on one end,
+        # so a half-width from the middle no longer points at the board
+        # edge the plug is on.
         "screw post clears the mated plug": (
-            abs(P.POST_XY[0][0]) - P.POST_DIA / 2
-            - (P.NEOKEY_W / 2 + P.QWIIC_PLUG_L)
+            min(abs(px - (P.NEOKEY_CENTER[0] + P.NEOKEY_W / 2
+                          + P.QWIIC_PLUG_L))
+                for px, _ in P.POST_XY)
+            - P.POST_DIA / 2
         ),
-        "NeoKey column inside the cavity": (
+        "board columns inside the cavity": (
             P.CASE_D / 2 - P.WALL
-            - max(abs(y) for _, y in P.MOUNT_XY) - P.COLUMN_DIA / 2
+            - max(abs(y) for _, y in P.MOUNT_XY + P.BREAKOUT_SUPPORT_XY)
+            - P.COLUMN_DIA / 2
         ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening
@@ -222,6 +234,15 @@ def main():
         # Only meaningful with one board over the other.
         margins["QT Py to the NeoKey's sockets"] = (
             P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP - P.Z_QTPY_HIGH
+        )
+        # Sideways, against the columns that hold the boards above it.
+        # This is the arithmetic guard for the collision that moved the
+        # QT Py off centre; the interference boolean below is still the
+        # evidence.
+        margins["QT Py clear of the board columns"] = (
+            min(abs(P.QTPY_CX - cx)
+                for cx, _ in P.MOUNT_XY + P.BREAKOUT_SUPPORT_XY)
+            - P.QTPY_PLAN_W / 2 - P.COLUMN_DIA / 2
         )
     print("\nmargins")
     for label, v in margins.items():

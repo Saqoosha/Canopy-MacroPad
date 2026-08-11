@@ -58,6 +58,49 @@ def _stadium(across, w, h, axis, a0, a1):
     return extrude(pl * prof, amount=a1 - a0)
 
 
+def _socket(sx, sy):
+    """One Kailh hot-swap socket, hanging below the board.
+
+    Shared by both board kinds because it is the same part fitted the
+    same way up: `KAILH_SOCKET` at `MR0` in both Eagle files, at the same
+    offset from its switch centre. Had the breakout mirrored it, this
+    would stick out the other side and the mock would be quietly wrong
+    about the one feature that decides where a column can stand.
+    """
+    return _block(
+        sx - 4.792, sx + 6.108, sy + 0.858, sy + 6.758,
+        P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP, P.Z_NEOKEY_BOTTOM,
+    )
+
+
+def breakouts():
+    """The two 4978 boards, their sockets, and their real mounting holes.
+
+    They sit at the same height as the NeoKey and are the same depth, so
+    they share Z_NEOKEY_BOTTOM and the plate above spans all three. That
+    only holds while BREAKOUT_T equals NEOKEY_T, which params says out
+    loud because it is the one board number still unmeasured.
+    """
+    part = None
+    for cx, cy in P.BREAKOUT_CENTERS:
+        slab = _slab(
+            P.BREAKOUT_W, P.BREAKOUT_D, P.BREAKOUT_CORNER_R, cx, cy,
+            P.Z_NEOKEY_BOTTOM, P.Z_NEOKEY_BOTTOM + P.BREAKOUT_T,
+        )
+        part = slab if part is None else part + slab
+    for sx, sy in P.BREAKOUT_SWITCH_XY:
+        part += _socket(sx, sy)
+    # Both holes are modelled even though only one is used, so that a peg
+    # moved onto the unused one would still read as a fit rather than as
+    # a collision -- and so that a peg moved off *either* one starts
+    # reading as the collision it would be.
+    for x, y in P.BREAKOUT_HOLE_XY:
+        part -= Pos(x, y, P.Z_NEOKEY_BOTTOM + P.BREAKOUT_T / 2) * Cylinder(
+            radius=1.27, height=P.BREAKOUT_T + 0.2
+        )
+    return part
+
+
 def neokey():
     """Board, plus the hot-swap sockets hanging off its underside."""
     part = _slab(
@@ -67,17 +110,19 @@ def neokey():
     )
     # Socket footprint read off the STEP, relative to its switch centre:
     # 10.9 x 5.9 and offset in both axes, not centred on the switch.
-    for sx, sy in P.SWITCH_XY:
-        part += _block(
-            sx - 4.792, sx + 6.108, sy + 0.858, sy + 6.758,
-            P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP, P.Z_NEOKEY_BOTTOM,
-        )
+    for sx, sy in P.NEOKEY_SWITCH_XY:
+        part += _socket(sx, sy)
     # STEMMA QT receptacles with a mated Qwiic plug standing off each.
     # Stacked, either end may carry the cable, so both are claimed. Inline
     # the QT Py is at the right end and the cable can only come from the
     # right socket -- claiming the left one too would put an imaginary
     # plug through the left screw post, and that layout is handed anyway.
-    ends = (-1, 1) if P.STACKED else (1,)
+    # Only the right one now, in both layouts. The NeoKey's left socket
+    # has a breakout butted against it, so nothing can be plugged in
+    # there -- which is also the reason the breakouts are on that side:
+    # see BREAKOUT_ORIGINS_LOCAL, where the right-hand alternative leaves
+    # the mated plug 0.025 from the first breakout's switch.
+    ends = (1,)
     for sign in ends:
         sx = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 2.54)
         outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + P.QWIIC_PLUG_L)
@@ -161,6 +206,7 @@ def qtpy():
 def everything():
     return {
         "NeoKey + sockets": neokey(),
+        "breakouts + sockets": breakouts(),
         "switch bodies": switches(),
         "QT Py + parts": qtpy(),
     }

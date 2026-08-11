@@ -45,6 +45,52 @@ NEOKEY_SW_X = [9.525, 28.575, 47.625, 66.675]
 # Kailh CPG151101S11 datasheet height, not a measurement of that file.
 NEOKEY_SOCKET_DROP = 1.85
 
+# --- NeoKey Socket Breakout (ADA-4978), keys 0 and 1 --------------------
+# Outline, switch centre and hole positions: Adafruit-NeoKey-Breakout-PCB
+# Eagle .brd. Three numbers do all the work and none of them were chosen
+# by us: the board is exactly one SWITCH_PITCH wide, its switch sits in
+# the middle of that width, and its depth is the NeoKey's to three
+# decimals. Butt two onto the NeoKey and the pitch continues with nothing
+# to tune.
+BREAKOUT_W = 19.05
+BREAKOUT_D = 21.59
+BREAKOUT_CORNER_R = 2.54
+BREAKOUT_SW = (9.525, 10.795)
+# 2.54 drill against the NeoKey's 2.5 plated, so PEG_DIA has 0.24 of play
+# here instead of 0.20. The peg locates, it does not grip.
+BREAKOUT_HOLES = [(1.905, 5.080), (17.145, 16.510)]
+BREAKOUT_COUNT = 2
+
+# Adafruit publishes no STEP for this board and a .brd carries no
+# thickness, so this is the NeoKey's measured 1.57 on the grounds of the
+# same fab and the same stackup. **The one board number in this file that
+# is a guess.** It has to *equal* NEOKEY_T rather than merely be close:
+# one plate spans both boards and PLATE_TOP_TO_PCB is a single number, so
+# a difference puts two of the six switches at the wrong height. Measure
+# it when the boards arrive; if it differs, that is a design decision to
+# take, not a constant to nudge.
+BREAKOUT_T = NEOKEY_T
+
+# They go to the *left* of the NeoKey, and that is forced rather than
+# preferred. A mated Qwiic plug stands 2.50 proud of the board edge it is
+# plugged into (QWIIC_PLUG_L), and the first switch on a butted breakout
+# starts 2.525 from that same edge -- 0.025 apart, which is the number
+# this file elsewhere calls "not clearance, the same value as the
+# tolerance". Putting them on the right would also strand the NeoKey's
+# socket 114 mm from the QT Py, and the cable is 50 mm.
+#
+# So keys 0-1 are the GPIO pair and 2-5 are the NeoKey, left to right,
+# and firmware/code.py assigns its index bases the same way round.
+BREAKOUT_ORIGINS_LOCAL = [(i * BREAKOUT_W, 0.0) for i in range(BREAKOUT_COUNT)]
+NEOKEY_LOCAL = (BREAKOUT_COUNT * BREAKOUT_W, 0.0)
+
+# What the plate spans and what the case is sized around. Derived from
+# both boards rather than from a key count times a pitch, so a board that
+# turns out not to be the width it should be cannot keep agreeing with
+# itself.
+KEY_FIELD_W = BREAKOUT_COUNT * BREAKOUT_W + NEOKEY_W
+KEY_FIELD_D = max(NEOKEY_D, BREAKOUT_D)
+
 # --- QT Py RP2040 (ADA-4900) --------------------------------------------
 # All measured off ref/qtpy-rp2040.step.
 QTPY_W = 17.78
@@ -424,14 +470,29 @@ if STACKED:
     # post has to miss the NeoKey above it and the bottom plate's own
     # columns, which leaves only the end bays, and an end-mounted QT Py
     # fills one of them.
-    CASE_W = NEOKEY_W + PCB_SLOP + 2 * (CABLE_BAY + WALL)
+    CASE_W = KEY_FIELD_W + PCB_SLOP + 2 * (CABLE_BAY + WALL)
     CASE_D = WALL + max(
-        NEOKEY_D + PCB_SLOP,
+        KEY_FIELD_D + PCB_SLOP,
         QTPY_D + QTPY_SLOP + QWIIC_PLUG_L,
     ) + WALL
-    NEOKEY_ORIGIN = (-NEOKEY_W / 2, -CASE_D / 2 + WALL + PCB_SLOP / 2)
+    FIELD_ORIGIN = (-KEY_FIELD_W / 2, -CASE_D / 2 + WALL + PCB_SLOP / 2)
     QTPY_PLAN_W, QTPY_PLAN_D = QTPY_W, QTPY_D
-    QTPY_CX = 0.0
+    # Not centred any more, and this is the one number the six-key field
+    # forced. The NeoKey's mounting holes are 19.05 and 57.15 across its
+    # own board; with two breakouts ahead of it the board no longer
+    # starts at the field's left edge, and the first pair of holes lands
+    # at case x = 0 -- which is where the QT Py used to sit. 116 mm3 of
+    # column through the middle of it, found by the interference boolean
+    # rather than by looking.
+    #
+    # 19.05 is the centre of the widest gap the columns leave (0 to
+    # 38.10), and it is a pitch rather than a fudge: 19.05 of room each
+    # side against the 11.14 a half-board plus a column radius needs. The
+    # cost is that USB-C stops coming out of the middle of the back wall,
+    # which is why the check that asserted that is now a clearance margin
+    # instead. `stacked` has never been printed, so this trades a
+    # cosmetic property of an unbuilt layout for one that closes.
+    QTPY_CX = SWITCH_PITCH
     QTPY_CY = CASE_D / 2 - WALL - QTPY_SLOP / 2 - QTPY_D / 2
 else:
     # Turned 90 degrees so USB-C faces the right wall, which puts its
@@ -440,22 +501,34 @@ else:
     # straight hop with no drop and no detour.
     QTPY_PLAN_W, QTPY_PLAN_D = QTPY_D, QTPY_W
     CASE_W = (
-        WALL + INLINE_LEFT_BAY + PCB_SLOP + NEOKEY_W
+        WALL + INLINE_LEFT_BAY + PCB_SLOP + KEY_FIELD_W
         + INLINE_BOARD_GAP + QTPY_PLAN_W + QTPY_SLOP / 2 + WALL
     )
-    CASE_D = WALL + max(NEOKEY_D + PCB_SLOP, QTPY_PLAN_D + QTPY_SLOP) + WALL
-    NEOKEY_ORIGIN = (
+    CASE_D = WALL + max(KEY_FIELD_D + PCB_SLOP, QTPY_PLAN_D + QTPY_SLOP) + WALL
+    FIELD_ORIGIN = (
         -CASE_W / 2 + WALL + INLINE_LEFT_BAY + PCB_SLOP / 2,
         -CASE_D / 2 + WALL + PCB_SLOP / 2,
     )
     QTPY_CX = (
-        NEOKEY_ORIGIN[0] + NEOKEY_W + INLINE_BOARD_GAP + QTPY_PLAN_W / 2
+        FIELD_ORIGIN[0] + KEY_FIELD_W + INLINE_BOARD_GAP + QTPY_PLAN_W / 2
     )
     QTPY_CY = 0.0
 
 
+def field_xy(local):
+    """Key-field-local (x, y) -> case (x, y).
+
+    The field's origin is the left edge of the leftmost breakout, so
+    field-local x runs 0 .. KEY_FIELD_W across all three boards.
+    """
+    return (FIELD_ORIGIN[0] + local[0], FIELD_ORIGIN[1] + local[1])
+
+
+NEOKEY_ORIGIN = field_xy(NEOKEY_LOCAL)
+
+
 def neokey_xy(local):
-    """PCB-local (x, y) -> case (x, y)."""
+    """NeoKey board-local (x, y) -> case (x, y)."""
     return (NEOKEY_ORIGIN[0] + local[0], NEOKEY_ORIGIN[1] + local[1])
 
 
@@ -481,9 +554,60 @@ def qtpy_xy(local):
 NEOKEY_CENTER = (NEOKEY_ORIGIN[0] + NEOKEY_W / 2,
                  NEOKEY_ORIGIN[1] + NEOKEY_D / 2)
 QTPY_CENTER = (QTPY_CX, QTPY_CY)
+BREAKOUT_ORIGINS = [field_xy(o) for o in BREAKOUT_ORIGINS_LOCAL]
+BREAKOUT_CENTERS = [(ox + BREAKOUT_W / 2, oy + BREAKOUT_D / 2)
+                    for ox, oy in BREAKOUT_ORIGINS]
 
-SWITCH_XY = [neokey_xy((x, NEOKEY_SW_Y)) for x in NEOKEY_SW_X]
+# Left to right, which is also key order: the two breakouts, then the
+# NeoKey's four. Built from each board's own switch centre rather than
+# from a pitch times an index, so a board that is not the width it is
+# supposed to be shows up as a failed pitch check instead of agreeing
+# with itself.
+BREAKOUT_SWITCH_XY = [(ox + BREAKOUT_SW[0], oy + BREAKOUT_SW[1])
+                      for ox, oy in BREAKOUT_ORIGINS]
+NEOKEY_SWITCH_XY = [neokey_xy((x, NEOKEY_SW_Y)) for x in NEOKEY_SW_X]
+SWITCH_XY = BREAKOUT_SWITCH_XY + NEOKEY_SWITCH_XY
+
 MOUNT_XY = [neokey_xy(h) for h in NEOKEY_HOLES]
+BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
+                    for ox, oy in BREAKOUT_ORIGINS
+                    for hx, hy in BREAKOUT_HOLES]
+
+# Where the bottom plate holds a breakout up. Both sit in the strip in
+# front of the hot-swap socket, and that is the constraint: the socket
+# reaches 15.633 across the board, the second mounting hole is at 17.145,
+# and COLUMN_DIA wants 2.25 of radius -- so a column in that hole crosses
+# the socket by 0.738. Moving the support forward, to the same x but the
+# front row's y, clears it outright. Watched to fail: putting it back on
+# the hole reports 5.675 mm3 against the breakout mock.
+#
+# Only the first support lands on a real hole, so only it carries a
+# locating peg. One peg, two butted neighbours and 0.40 of slop across
+# the whole field is enough to stop a 19 x 21.6 board wandering; the
+# second support is there to keep it flat, not to place it.
+BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080)]
+BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
+                       for ox, oy in BREAKOUT_ORIGINS
+                       for sx, sy in BREAKOUT_SUPPORT_LOCAL]
+BREAKOUT_PEG_XY = [(ox + BREAKOUT_HOLES[0][0], oy + BREAKOUT_HOLES[0][1])
+                   for ox, oy in BREAKOUT_ORIGINS]
+
+# Where the shell presses the boards down. The NeoKey gets standoffs in
+# its own four holes; the breakouts cannot, and the arithmetic is worth
+# keeping because it is the whole reason this looks different. A breakout
+# hole sits 7.62 from its switch centre, a plate-mount switch is 14 wide,
+# so the hole clears the switch body by 0.62 -- and STANDOFF_DIA is 4.20,
+# which needs 2.10. It fouls the switch by 1.48.
+#
+# So the breakouts are pressed at the seams between boards instead. A
+# seam is a switch-gap centre by construction, which is exactly where
+# STANDOFF_DIA is already known to fit: 4.20 in the 5.05 that 19.05 pitch
+# leaves between two 14 mm bodies. Same y values as the NeoKey's holes,
+# so the whole field is pressed along two lines rather than at scattered
+# points.
+SEAM_XY = [field_xy((i * BREAKOUT_W, y))
+           for i in range(1, BREAKOUT_COUNT + 1)
+           for y in (NEOKEY_HOLES[0][1], NEOKEY_HOLES[2][1])]
 BTN_XY = [qtpy_xy(QTPY_BTN_A), qtpy_xy(QTPY_BTN_B)]
 # Taken at the board edge the connector actually sits on. Passing y=0
 # here happens to be harmless when the board is only mirrored and puts
@@ -537,6 +661,6 @@ else:
     # between two mated plugs aimed at each other.
     _POST_X = (
         -CASE_W / 2 + WALL + INLINE_LEFT_BAY / 2,
-        NEOKEY_ORIGIN[0] + NEOKEY_W + INLINE_BOARD_GAP / 2,
+        FIELD_ORIGIN[0] + KEY_FIELD_W + INLINE_BOARD_GAP / 2,
     )
 POST_XY = [(x, y) for x in _POST_X for y in _POST_Y]
