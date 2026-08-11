@@ -682,8 +682,15 @@ except Exception as err:  # noqa: BLE001 - last line before a silent brick
     except Exception:  # noqa: BLE001
         pass
     if time.monotonic_ns() - booted_at < MIN_UPTIME_BEFORE_RESET_NS:
+        # The CIRCUITPY part is not filler. Getting here means boot.py
+        # ran to completion, so the drive gate ran too and the volume is
+        # gone -- this branch is reached with a healthy keypad and dead
+        # firmware, which is the one shape the gate's fail-open does not
+        # cover. Naming the key is the difference between a recovery and
+        # a hunt for a disk that is not there.
         print("Failed within {} s of boot - halting red rather than "
-              "reset-looping. Fix code.py on CIRCUITPY, then reset."
+              "reset-looping. Hold a key and replug to mount CIRCUITPY, "
+              "fix code.py, then reset."
               .format(MIN_UPTIME_BEFORE_RESET_NS // 1_000_000_000))
         # `ERR fatal` above only reached a host that was already
         # attached. Without this the board sits on an enumerated, wholly
