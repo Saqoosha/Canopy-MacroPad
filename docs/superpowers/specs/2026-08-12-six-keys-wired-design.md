@@ -6,9 +6,12 @@ already reads the key count out of `HELLO`.
 
 ## Hardware
 
-Keep the NeoKey 1x4 at `0x30` for keys 0-3. Add two Adafruit 4978
-NeoKey Socket Breakouts for keys 4-5, read on GPIO. The QT Py RP2040
+Keep the NeoKey 1x4 at `0x30` for keys 2-5. Add two Adafruit 4978
+NeoKey Socket Breakouts for keys 0-1, read on GPIO. The QT Py RP2040
 does not change.
+
+The numbering is that way round because the case forced it, which this
+document originally got wrong -- see Butting them on below.
 
 The alternatives, and why not:
 
@@ -35,9 +38,22 @@ Read out of the Eagle `.brd` files, not the product pages.
 
 The breakout is exactly one pitch wide, its switch is centred in that
 width, and its depth is the NeoKey's to three decimals. Butt two of
-them against the NeoKey's right edge and the switches land at 85.725
-and 104.775 — 19.05 apart, same as every other pair. Key field
-**114.30 x 21.59**, six switches at `9.525 + n x 19.05`.
+them onto the NeoKey and the switches land 19.05 apart, same as every
+other pair. Key field **114.30 x 21.59**, six switches at
+`9.525 + n x 19.05`.
+
+### Butting them on
+
+They go on the **left**, and it is forced rather than chosen. This spec
+first said the right, and the arithmetic says otherwise: a mated Qwiic
+plug stands `QWIIC_PLUG_L` = 2.50 proud of the board edge it is in, and
+a butted breakout's switch body starts 2.525 from that same edge. 0.025
+apart is not clearance, it is the tolerance -- the repository already
+has that sentence, about a standoff. On the right the NeoKey's socket
+would also sit 114 mm from the QT Py, against a 50 mm cable.
+
+So physical order is breakout, breakout, NeoKey, and key order follows
+it: 0-1 on GPIO, 2-5 on I2C.
 
 Two mismatches, both accepted rather than worked around:
 
@@ -67,9 +83,12 @@ Five wires reach the QT Py:
 |---|---|
 | `3V` | both boards' `VDD` |
 | `GND` | both boards' `GND`, and `SWITCHC` |
-| one GPIO | breakout A `NEO_IN`; A `NEO_OUT` to B `NEO_IN` on the side pads |
-| one GPIO | breakout A `SWITCHA`, `Pull.UP` |
-| one GPIO | breakout B `SWITCHA`, `Pull.UP` |
+| `MOSI` | breakout 0 `NEO_IN`; its `NEO_OUT` to breakout 1 `NEO_IN` on the side pads |
+| `MISO` | breakout 0 `SWITCHA`, `Pull.UP` |
+| `SCK` | breakout 1 `SWITCHA`, `Pull.UP` |
+
+All three are on the QT Py's `3V`/`GND` edge, so the harness does not
+have to cross the board.
 
 The diode points `SWITCHA` to `SWITCHC`, so `SWITCHC` goes to ground
 and a pressed key pulls its input low. The 1N4148 drops about 0.45 V at
@@ -95,9 +114,14 @@ pixel routing and the scan. Replace them with an explicit list of
 sources, each carrying its pixel object, its read function, its base
 index and its count:
 
-- seesaw source — `pad.pixels`, `pad.get_keys()`, base 0, count 4
 - gpio source — `neopixel.NeoPixel(pin, 2, auto_write=False)`,
-  `[not p.value for p in pins]`, base 4, count 2
+  `[not p.value for p in pins]`, base `GPIO_BASE` = 0, count 2
+- seesaw source — `pad.pixels`, `pad.get_keys()`, base `SEESAW_BASE`
+  = 2, count 4
+
+`GPIO_BASE` and `SEESAW_BASE` are the only two constants that know which
+way round the boards go, so the case moving them is a two-line change
+rather than a hunt.
 
 `pad.pixels` and `neopixel.NeoPixel` are both `adafruit_pixelbuf.PixelBuf`
 subclasses: same `[i] = rgb`, `.show()`, `.brightness`, `.fill()`,
@@ -107,8 +131,8 @@ nothing else about the appearance model moves.
 
 ### Indices are static, not enumerated
 
-Key 4 is always index 4. If the I2C half fails to come up, the
-breakouts must not slide down into 0 and 1 — the host maps index to
+Key 2 is always index 2. If the I2C half fails to come up, the NeoKey's
+four must not vanish and let everything shift — the host maps index to
 pane, and a silent renumbering focuses the wrong one.
 
 That forces `NUM_KEYS` to be 6 unconditionally, because the GPIO half
@@ -124,7 +148,9 @@ has to say so.
 
 GPIO reads move outside it. A Qwiic cable knocked loose should not take
 down the two keys that do not use the cable; on I2C failure the loop
-still reports edges for 4 and 5.
+still reports edges for 0 and 1. Each pad's `get_keys()` and each pixel
+group's `show()` end up guarded separately, so a bus that cannot paint
+the NeoKey still lets the breakout chain paint.
 
 ### boot.py
 
@@ -156,8 +182,36 @@ numbers and derive the field from both:
 - switch centres `9.525 + n x 19.05`, n = 0..5
 
 `inline` grows from 120.50 to **158.60** wide. Depth and height do not
-change. Two pegs per breakout, diagonally opposite, so rotation is
-constrained by the same mechanism the NeoKey already uses.
+change.
+
+**A breakout cannot be held the way the NeoKey is**, and the arithmetic
+is the interesting part. Its mounting hole sits 7.62 from its switch
+centre; a plate-mount switch is 14 wide, so the hole clears the body by
+0.62, and `STANDOFF_DIA` = 4.20 needs 2.10. A standoff there fouls the
+switch by 1.48. They are pressed at the **seams** between boards
+instead, which are switch-gap centres by construction -- 4.20 in the
+5.05 that 19.05 pitch leaves, the one figure this case already trusts.
+
+**And a column cannot go in the second hole either.** The hot-swap
+socket reaches 15.633 across the board and that hole is at 17.145, so
+`COLUMN_DIA` = 4.50 crosses it by 0.738. Both bottom-plate supports move
+to the front row, at the same x. Only the first lands on a real hole, so
+only it carries a locating peg; one peg, two butted neighbours and 0.40
+of slop across the whole field is enough to place a 19 x 21.6 board.
+
+**`stacked` had to move the QT Py.** With two breakouts ahead of it the
+NeoKey no longer starts at the field's left edge, so its first pair of
+mounting holes lands at case x = 0 -- straight through the QT Py, 116
+mm3 of it. `QTPY_CX` becomes 19.05, the centre of the widest gap the
+columns leave. USB-C stops being centred on the back wall, so the check
+that asserted that becomes a clearance margin for the thing that
+displaced it. `stacked` has never been printed, so this trades a
+cosmetic property of an unbuilt layout for one that closes.
+
+Both of the new checks were watched to fail before being believed, by
+moving geometry rather than shrinking it: the support column put back on
+its second hole reports 5.675 mm3, and the seam standoffs shifted half a
+pitch report 26.260 mm3.
 
 `build.py` must end in `all checks passed` for **both** layouts before
 anything is printed.
@@ -206,7 +260,7 @@ static above.
 
 - **The colour match is argued, not measured.** Both boards carry
   `NEO3535_REVERSE` and both will run off the same rail, which is why
-  this is the cheap option to try first. If keys 4-5 read differently,
+  this is the cheap option to try first. If keys 0-1 read differently,
   the fix is per-source tuning, and the Snap-Apart 1x6 is the fallback
   that removes the question entirely.
 - `PILOT_DIA` at 2.50 has still never had an M3 driven into it. That
