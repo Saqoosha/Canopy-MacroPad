@@ -31,17 +31,51 @@ The device enumerates as USB serial only — `usb_hid.disable()` in
 
 Verifiable rather than asserted: `ioreg -w0 -l -r -c IOHIDDevice | grep
 -c 'Canopy MacroPad'` returns 0, and the device's USB descriptor offers
-CDC control, CDC data and mass storage — no HID class at all.
+CDC control and CDC data — no HID class at all.
 
 Two limits worth stating, since the argument above reads as exhaustive
-and is not. **Mass storage stays enumerated**, so `CIRCUITPY` — and
-therefore `code.py` itself — is writable by any process on the host.
-That is a deliberate bring-up affordance, not an oversight, but it means
-the threat model here is "no input injection", not "tamper-proof". And a
-**sandboxed** app would need `com.apple.security.device.serial` to open
-the port; Canopy sidesteps that by not being sandboxed at all (no
+and is not. **Mass storage is one held key away**: boot with a key
+pressed and `CIRCUITPY` — and therefore `code.py` itself — is writable
+by any process on the host. Nothing on the host can trigger that, since
+it takes a finger on the device, but it means the threat model here is
+"no input injection", not "tamper-proof". And a **sandboxed** app would
+need `com.apple.security.device.serial` to open the port; Canopy
+sidesteps that by not being sandboxed at all (no
 `com.apple.security.app-sandbox` key in `Canopy.entitlements`). If that
 changes, this design has to be revisited.
+
+## The CIRCUITPY drive
+
+`boot.py` calls `storage.disable_usb_drive()` unless a key is held while
+the device boots. The reason is mundane: this pad is unplugged the way
+any desk toy is, and a mounted volume disappearing makes macOS say
+*"Disk Not Ejected Properly"* every single time, about a disk nobody was
+using. Ejecting first works and nobody does it.
+
+**Hold any key while plugging in and `CIRCUITPY` mounts as before.**
+That is the deploy path, unchanged apart from the finger.
+
+The gate reads the keypad over I2C, and **every** way that read can fail
+— no Qwiic cable, no `adafruit_neokey` in `lib/`, a seesaw not answering
+yet — leaves the drive **enabled**. That direction is deliberate: the
+filesystem is how a broken board is recovered, and hiding it exactly
+when the board is broken would be the worst possible time. The cost of
+failing this way is that the macOS warning comes back, which is merely
+the annoyance this whole thing exists to remove.
+
+Which way the gate went is recorded in `boot_out.txt`:
+
+```
+usb drive: disabled; hold a key while plugging in for CIRCUITPY
+usb drive: enabled (key held at boot)
+usb drive: enabled (gate failed: ValueError: No I2C device at address: 0x31)
+```
+
+Two other ways back to the files, for when a key cannot be held: from
+the REPL on the console port, `import storage` /
+`storage.remount("/", readonly=False)` makes the filesystem writable to
+the device itself; or unseat the Qwiic cable, which trips the fail-open
+path above and hands the drive straight back.
 
 ## Hardware
 
@@ -266,14 +300,16 @@ What the bench actually taught, none of which was predictable on paper:
    Bundle](https://circuitpython.org/libraries), copy `adafruit_neokey/`
    and `adafruit_seesaw/` into `CIRCUITPY/lib/`. `adafruit_hid` is not
    needed and must not be used.
-3. Copy `firmware/boot.py` to `CIRCUITPY/`, then **hard reset**. `boot.py`
-   only re-runs on a hard reset, and only a hard reset re-enumerates USB,
-   which is what actually applies the CDC interface change. Unplug and
-   replug, or from the REPL on the console port:
-   `import microcontroller` / `microcontroller.reset()`.
+3. Copy `firmware/boot.py` **and** `firmware/code.py` to `CIRCUITPY/`,
+   then **hard reset**. `boot.py` only re-runs on a hard reset, and only
+   a hard reset re-enumerates USB, which is what actually applies the CDC
+   interface change. Unplug and replug, or from the REPL on the console
+   port: `import microcontroller` / `microcontroller.reset()`.
 4. `ls /dev/cu.usbmodem*` — two ports must appear (console and data).
    One port means `boot.py` did not take effect; repeat step 3.
-5. Copy `firmware/code.py` to `CIRCUITPY/`.
+5. `CIRCUITPY` is now gone, which is `boot.py` working as intended — see
+   [The CIRCUITPY drive](#the-circuitpy-drive). Hold any key while
+   plugging in to get it back for the next copy.
 6. `tools/mpad.py --probe` — reports which port is data, plus the VID,
    PID and product string the macOS side matches on.
 7. `tools/mpad.py --demo` — lights all four keys, then turns each key
@@ -304,7 +340,7 @@ First bring-up, 2026-08-08, CircuitPython 10.2.1, board ID
 | VID / PID | `0x239A` / `0x80F8` |
 | console port | `/dev/cu.usbmodem20101` |
 | data port | `/dev/cu.usbmodem20103` |
-| USB interfaces | CDC control (class 2), CDC data (class 10), mass storage (class 8). **No class 3 — no HID.** |
+| USB interfaces | CDC control (class 2), CDC data (class 10), and mass storage (class 8) — the last one only when a key is held at boot. **No class 3 — no HID.** |
 | `IOHIDDevice` entries | none |
 
 The data port took the higher trailing number here, but do not select on
@@ -329,8 +365,10 @@ failure and reconnect in a loop.
 
 ### When nothing enumerates
 
-No `RPI-RP2`, no `CIRCUITPY`, no `/dev/cu.usbmodem*`, and no VID `0x239A`
-in `ioreg -p IOUSB -w0 -l`: the board is not on the bus at all. In
+No `RPI-RP2`, no `/dev/cu.usbmodem*`, and no VID `0x239A` in `ioreg -p
+IOUSB -w0 -l`: the board is not on the bus at all. A missing `CIRCUITPY`
+is *not* part of this symptom — that is the normal state now, and says
+nothing either way; go by the ports. In
 descending order of likelihood — a charge-only USB-C cable (most USB-C
 cables sold with phones carry no data pairs), a hub or dock passing power
 but not data, or a dead cable. Try a known-good data cable straight into

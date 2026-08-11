@@ -140,6 +140,14 @@ on a reprint. `stacked` has not been printed at all.
 - **Never touch `time.monotonic()`.** It is a float whose precision
   decays with uptime, and this device lives plugged in for weeks. All
   timing is integer `monotonic_ns`.
+- **`/Volumes/CIRCUITPY` is not there by default.** `boot.py` disables
+  the USB drive unless a key is held while the device boots, because a
+  mounted volume yanked off the bus is a macOS "Disk Not Ejected
+  Properly" every single unplug. Hold any key while plugging in and the
+  drive comes back; the deploy is otherwise unchanged. Every failure of
+  that check — no cable, no lib, no answer — leaves the drive enabled, so
+  a board too broken to read its own keypad is still one you can copy
+  files to. `boot_out.txt` records which branch ran.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
 
@@ -147,6 +155,7 @@ on a reprint. `stacked` has not been printed at all.
 
 ```
 python3 -m py_compile firmware/*.py tools/mpad.py
+# hold any key while plugging in, or CIRCUITPY will not be mounted
 cp firmware/code.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._code.py
 tools/mpad.py --probe          # expect: PONG 3 4 on the data port
 tools/mpad.py --demo           # LEDs out, key edges in
@@ -169,6 +178,15 @@ console echoes `P` as REPL input and never answers.
 
 Tracebacks land on the **console** port, never the data port. Read them
 by interrupting the REPL there (`\x03`) and reloading (`\x04`).
+
+`\x03` alone does not reach a prompt. It stops `code.py` and prints
+*"Press any key to enter the REPL"*, and that next key is consumed
+opening the prompt — so a command written immediately after the
+interrupt has its first character eaten and the rest goes nowhere,
+silently. A script driving the REPL must send a newline and **wait to
+actually see `>>>`** before sending anything that has to run. This cost
+one wasted reset that reported success on a board that had never
+rebooted.
 
 Canopy holds the data port whenever it is running. Only one process can
 usefully own it — release yours before asking Canopy to connect, and
