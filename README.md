@@ -388,8 +388,14 @@ running rather than dying, so the host sees:
 
 ```
 HELLO 3 0
-ERR i2c bus RuntimeError: No pull up found on SDA or SCL; check your wiring (reset required after fixing)
+ERR i2c setup RuntimeError: No pull up found on SDA or SCL; check your wiring (reset required after fixing)
 ```
+
+The verb is `setup`, not `bus` — this document said `bus` until the
+`ImportError` half of it was captured off a real board, which arrives on
+the same path and reads `ERR i2c setup ImportError: no module named
+'adafruit_neokey' (reset required after fixing)`. `code.py` builds both
+from one `"setup {}: {}"`.
 
 `HELLO <ver> 0` is a valid state meaning "device present, keypad absent".
 The host should hold the connection and paint nothing, not treat it as a

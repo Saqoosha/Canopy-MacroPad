@@ -178,8 +178,11 @@ should say.
 
 There is no hole over BOOT or RESET in either layout. They are needed
 once, to write a CircuitPython UF2; after that a firmware update is a
-file copied to CIRCUITPY. Four screws is a fine price for something done
-once. The buttons are still modelled, and nothing is allowed to press on
+file copied to CIRCUITPY — hold a key while plugging in, or the drive
+does not mount at all (see the root `README.md`). That the gate is a
+*key* and not one of these buttons is what keeps this decision standing:
+the keys are on the outside. Four screws is a fine price for something
+done once. The buttons are still modelled, and nothing is allowed to press on
 them — widen a rail over one and the interference check reports 68.9 mm³
 and fails.
 
