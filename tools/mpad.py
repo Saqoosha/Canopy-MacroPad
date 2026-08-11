@@ -30,7 +30,9 @@ import time
 PROBE_TIMEOUT_S = 1.5
 CANDIDATE_GLOB = "/dev/cu.usbmodem*"
 ADAFRUIT_VID = "9114"  # 0x239A
-DEMO_COLORS = ["ff0000", "00ff00", "0040ff", "ff8000"]
+# Six distinct hues, so a six-key pad has no two neighbours the same.
+# Cycled if the device ever reports more keys than there are entries.
+DEMO_COLORS = ["ff0000", "00ff00", "0040ff", "ff8000", "00ffa0", "ff00ff"]
 # Equal RGB does not come out neutral on these LEDs — the green channel
 # is the weak one, so ffffff reads visibly purple through a clear keycap.
 # Trimming red and blue ~6% is enough; measured as the smallest cut that
@@ -41,7 +43,12 @@ DEMO_HELD = "f0fff0"
 # in the README's status-colour table and are repeated on page 1 here for
 # reference. These pages exist to re-tune against a new keycap, a new
 # diffuser, or a different desk lamp; they are the question, not the
-# answer. Four entries per page because the pad has four keys.
+# answer.
+#
+# A page is a list of candidates, not a picture of the pad: entry n goes
+# on key n and any keys past the end of the page are turned off. Four
+# entries against six keys is fine and arguably better for an A/B -- two
+# dark keys between the samples and nothing else competing.
 PALETTE_PAGES = [
     ("the shipped palette", [
         ("0040ff", "running"),
@@ -310,6 +317,29 @@ def do_probe(verbose=True):
     return data_ports[0] if data_ports else None
 
 
+def read_key_count(reader, timeout=PROBE_TIMEOUT_S):
+    """How many keys the device says it has, or None if it never says.
+
+    `HELLO <ver> <keys>` arrives unprompted on connect and `PONG <ver>
+    <keys>` answers `P`, so either will do and whichever lands first
+    wins. Lines are echoed as they are read because this is a console:
+    swallowing the handshake to parse it would hide the one exchange
+    worth seeing.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for line in reader.poll():
+            print("< {}".format(line))
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] in ("PONG", "HELLO"):
+                try:
+                    return int(parts[2])
+                except ValueError:
+                    pass  # a mangled line is not a key count
+        time.sleep(0.02)
+    return None
+
+
 def console(path, demo=False):
     fd = open_raw(path)
     reader = LineReader(fd)
@@ -318,14 +348,25 @@ def console(path, demo=False):
     try:
         send(fd, "P")
         if demo:
+            # Ask rather than assume. The key count is the second field
+            # of PONG, and carrying it is the whole reason the protocol
+            # has it -- this tool used to paint exactly len(DEMO_COLORS)
+            # keys, which was right only while the pad had four.
+            keys = read_key_count(reader)
+            if keys is None:
+                keys = len(DEMO_COLORS)
+                print("demo: no PONG within {}s - assuming {} keys."
+                      .format(PROBE_TIMEOUT_S, keys))
             # This mode answers "does a press reach the host and light
             # the key". Crossfading a tap into a partial fade is exactly
             # the ambiguity it exists to remove.
             send(fd, "X 0")
-            for idx, color in enumerate(DEMO_COLORS):
-                send(fd, "C {} {}".format(idx, color))
+            for idx in range(keys):
+                send(fd, "C {} {}".format(
+                    idx, DEMO_COLORS[idx % len(DEMO_COLORS)]))
                 time.sleep(0.25)
-            print("demo: keys lit. press them — each press turns its key white.")
+            print("demo: {} keys lit. press them — each press turns its "
+                  "key white.".format(keys))
 
         while True:
             ready, _, _ = select.select([fd, sys.stdin], [], [], 0.1)
@@ -384,6 +425,10 @@ def palette(path, brightness=60):
 
     def show():
         name, entries = PALETTE_PAGES[page % len(PALETTE_PAGES)]
+        # Clear first: a shorter page would otherwise leave the previous
+        # one's colours sitting on the keys past its end, which reads as
+        # part of the comparison rather than as leftovers.
+        send(fd, "R")
         send(fd, "B {}".format(brightness))
         print("\n--- {} --- (brightness {}%)".format(name, brightness))
         for idx, (hexcolor, label) in enumerate(entries):
