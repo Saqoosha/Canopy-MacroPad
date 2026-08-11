@@ -237,11 +237,13 @@ a judgement call, not a finding. Fault injection is what settled it: at
 Ø6.0 the check reports 1.016 mm³ and fails, so it does fire, just not
 where it was credited.
 
-## Stack
+## Stack, in `stacked`
 
-Z is measured from the outside of the bottom plate. Read it bottom-up —
-the USB-C shell is the lowest thing in the case now, and everything above
-is stacked on that one clearance.
+This one is the `stacked` layout, which is where the Z fight is —
+`inline` puts the QT Py beside the keys instead of under them and comes
+out 11.8 tall against 17.5. Z is measured from the outside of the bottom
+plate. Read it bottom-up — the USB-C shell is the lowest thing in the
+case now, and everything above is stacked on that one clearance.
 
 ```
  0.00  ├── bottom plate                    2.40   12 layers; the M3 button
@@ -276,15 +278,22 @@ halves together, and that is every fastener in the design. The 2.5 that
 appears next to the NeoKey is that board's own mounting hole, which takes
 a peg and never a screw — the two threads are unrelated.
 
-The QT Py is carried entirely by the bottom plate, because nothing above
-can reach it — the NeoKey covers the case wall to wall. It rides on two
-rails under its component-free margins and slides forward under two lips,
-entering through the same back-wall opening its USB-C ends up in.
+That much is both layouts. **Who carries the QT Py is not**, and it is
+the only thing the two disagree about.
 
-It is **face down**, and that is the whole reason it is face down: take
-the bottom plate off and BOOT and RESET are facing you. Face up they would
+In `stacked` the bottom plate carries it alone, because nothing above can
+reach it — the NeoKey covers the case wall to wall. It rides on two rails
+under its component-free margins and slides forward under two lips,
+entering through the same back-wall opening its USB-C ends up in. It is
+**face down**, and that is the whole reason it is face down: take the
+bottom plate off and BOOT and RESET are facing you. Face up they would
 point at the underside of the NeoKey across 2.2 mm of air, and reaching
 them would mean getting the QT Py out first.
+
+In `inline` it sits beside the keys in a shell pocket, **face up**, held
+down by two pinch bars on its clear margins with the plate closing
+underneath. There is nothing above it to hide from, so face up costs
+nothing and puts the USB-C out the right end.
 
 Switches go in **from the top, through the plate**, after the case is
 closed — the hot-swap sockets mean they stay removable without opening

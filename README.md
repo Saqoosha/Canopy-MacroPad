@@ -336,8 +336,12 @@ the Mac before suspecting the board.
 
 ## Phase 1 scope
 
-Four keys, USB wired, status out and focus in. Later phases (six keys and
-a printed enclosure, low-profile Choc switches, wireless on nice!nano with
-a MagSafe dock) are documented in [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
-deliberately not built yet — the only requirement now is not to block
+Four keys, USB wired, status out and focus in. The enclosure was a later
+phase and arrived early: `inline` is printed and in use, `stacked` exists
+only as geometry. See [case/](case/).
+
+The rest of the later phases — six keys, low-profile Choc switches,
+wireless on nice!nano with a MagSafe dock — are documented in
+[docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
+deliberately not built yet. The only requirement now is not to block
 them.
