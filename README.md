@@ -31,14 +31,19 @@ The device enumerates as USB serial only — `usb_hid.disable()` in
 
 Verifiable rather than asserted: `ioreg -w0 -l -r -c IOHIDDevice | grep
 -c 'Canopy MacroPad'` returns 0, and the device's USB descriptor offers
-CDC control and CDC data — no HID class at all.
+CDC control and CDC data, plus mass storage in the states described
+under [The CIRCUITPY drive](#the-circuitpy-drive) — no HID class at all,
+in any of them.
 
 Two limits worth stating, since the argument above reads as exhaustive
-and is not. **Mass storage is one held key away**: boot with a key
-pressed and `CIRCUITPY` — and therefore `code.py` itself — is writable
-by any process on the host. Nothing on the host can trigger that, since
-it takes a finger on the device, but it means the threat model here is
-"no input injection", not "tamper-proof". And a **sandboxed** app would
+and is not. **The filesystem is still writable from the host**, and the
+drive gate below does not change that: any process that can open the
+console port has the REPL, and `storage.remount("/", readonly=False)`
+from there rewrites `code.py` with no finger going near the device. A
+plain `/dev/cu.*` open needs no entitlement, which is exactly the
+property this section advertises three paragraphs up. So the threat
+model here is "no input injection", not "tamper-proof" — the gate is a
+convenience, not a boundary. And a **sandboxed** app would
 need `com.apple.security.device.serial` to open the port; Canopy
 sidesteps that by not being sandboxed at all (no
 `com.apple.security.app-sandbox` key in `Canopy.entitlements`). If that
@@ -52,30 +57,46 @@ any desk toy is, and a mounted volume disappearing makes macOS say
 *"Disk Not Ejected Properly"* every single time, about a disk nobody was
 using. Ejecting first works and nobody does it.
 
-**Hold any key while plugging in and `CIRCUITPY` mounts as before.**
-That is the deploy path, unchanged apart from the finger.
+**Hold a key on the first NeoKey board through a boot and `CIRCUITPY`
+mounts as before.** Any hard reset counts — replug, `RST`, or
+`microcontroller.reset()` — since that is when `boot.py` runs. Only
+`0x30` is probed, so if a second board is ever added its four keys will
+not work as the gate. The drive then stays mounted for the rest of the
+session, so an edit-and-copy loop needs the finger only once.
 
-The gate reads the keypad over I2C, and **every** way that read can fail
-— no Qwiic cable, no `adafruit_neokey` in `lib/`, a seesaw not answering
-yet — leaves the drive **enabled**. That direction is deliberate: the
+Rather than enumerate the ways the read can fail, state the property
+that holds by inspection: **`disable_usb_drive()` is reachable on
+exactly one path — a completed read that saw no key held.** Every other
+outcome leaves the drive enabled, whether it raises inside the guard,
+escapes it, or never returns at all. That direction is deliberate: the
 filesystem is how a broken board is recovered, and hiding it exactly
 when the board is broken would be the worst possible time. The cost of
 failing this way is that the macOS warning comes back, which is merely
 the annoyance this whole thing exists to remove.
 
-Which way the gate went is recorded in `boot_out.txt`:
+Which way the gate went is recorded in `boot_out.txt` — transcripts, not
+examples; every line below was captured from a real boot:
 
 ```
 usb drive: disabled; hold a key while plugging in for CIRCUITPY
 usb drive: enabled (key held at boot)
-usb drive: enabled (gate failed: ValueError: No I2C device at address: 0x31)
+usb drive: enabled (gate failed: ImportError: no module named 'adafruit_neokey')
 ```
 
-Two other ways back to the files, for when a key cannot be held: from
-the REPL on the console port, `import storage` /
-`storage.remount("/", readonly=False)` makes the filesystem writable to
-the device itself; or unseat the Qwiic cable, which trips the fail-open
-path above and hands the drive straight back.
+Read that file **from the REPL** on the console port — `print(open(
+"/boot_out.txt").read())`. Reading it off the mounted drive can only
+ever show you the two `enabled` lines, because mounting the drive is
+what makes the gate take the other branch and overwrite the line you
+came for.
+
+Two other ways back to the files, for when a key cannot be held. From
+the REPL, `import storage` / `storage.remount("/", readonly=False)`
+gives *the device* write access — the drive stays gone, so a new
+`code.py` has to be pasted through serial; `os.remove("/boot.py")` and a
+reset is the shorter version of the same idea. Or unseat the Qwiic
+cable **and then hard reset** — the gate fails open on the next boot and
+hands the drive back. Unseating alone changes nothing; `boot.py` does
+not run again until the board does.
 
 ## Hardware
 
@@ -306,10 +327,14 @@ What the bench actually taught, none of which was predictable on paper:
    interface change. Unplug and replug, or from the REPL on the console
    port: `import microcontroller` / `microcontroller.reset()`.
 4. `ls /dev/cu.usbmodem*` — two ports must appear (console and data).
-   One port means `boot.py` did not take effect; repeat step 3.
+   Give it a second or two: the keypad gate runs before USB enumerates
+   and costs about half of one. One port after that means `boot.py` did
+   not take effect; repeat step 3, and note that in *that* failure the
+   gate never ran either, so `CIRCUITPY` is still mounted to repeat it
+   with.
 5. `CIRCUITPY` is now gone, which is `boot.py` working as intended — see
-   [The CIRCUITPY drive](#the-circuitpy-drive). Hold any key while
-   plugging in to get it back for the next copy.
+   [The CIRCUITPY drive](#the-circuitpy-drive). Hold a key through the
+   next hard reset to get it back for the next copy.
 6. `tools/mpad.py --probe` — reports which port is data, plus the VID,
    PID and product string the macOS side matches on.
 7. `tools/mpad.py --demo` — lights all four keys, then turns each key
@@ -340,8 +365,15 @@ First bring-up, 2026-08-08, CircuitPython 10.2.1, board ID
 | VID / PID | `0x239A` / `0x80F8` |
 | console port | `/dev/cu.usbmodem20101` |
 | data port | `/dev/cu.usbmodem20103` |
-| USB interfaces | CDC control (class 2), CDC data (class 10), and mass storage (class 8) — the last one only when a key is held at boot. **No class 3 — no HID.** |
+| USB interfaces | CDC control (class 2), CDC data (class 10), mass storage (class 8). **No class 3 — no HID.** |
 | `IOHIDDevice` entries | none |
+
+That table is what the instrument said on that date, and the drive gate
+did not exist yet — mass storage was unconditional then. It is not any
+more; see [The CIRCUITPY drive](#the-circuitpy-drive) for which boots
+carry it. The port names shift with it, since macOS derives the
+`usbmodem` suffix from the interface layout, which is one more reason
+for the paragraph below.
 
 The data port took the higher trailing number here, but do not select on
 that. `P` → `PONG` is the only reliable discriminator: the console port
@@ -362,6 +394,11 @@ ERR i2c bus RuntimeError: No pull up found on SDA or SCL; check your wiring (res
 `HELLO <ver> 0` is a valid state meaning "device present, keypad absent".
 The host should hold the connection and paint nothing, not treat it as a
 failure and reconnect in a loop.
+
+`CIRCUITPY` comes back in this state, because the same missing keypad
+fails the drive gate open. That is a useful tell rather than a second
+fault: drive present *and* two ports means the gate could not read the
+keypad, and the keypad is what to go and look at.
 
 ### When nothing enumerates
 

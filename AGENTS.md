@@ -141,13 +141,21 @@ on a reprint. `stacked` has not been printed at all.
   decays with uptime, and this device lives plugged in for weeks. All
   timing is integer `monotonic_ns`.
 - **`/Volumes/CIRCUITPY` is not there by default.** `boot.py` disables
-  the USB drive unless a key is held while the device boots, because a
-  mounted volume yanked off the bus is a macOS "Disk Not Ejected
-  Properly" every single unplug. Hold any key while plugging in and the
-  drive comes back; the deploy is otherwise unchanged. Every failure of
-  that check — no cable, no lib, no answer — leaves the drive enabled, so
-  a board too broken to read its own keypad is still one you can copy
-  files to. `boot_out.txt` records which branch ran.
+  the USB drive unless a key on the first NeoKey board is held through a
+  hard reset, because a mounted volume yanked off the bus is a macOS
+  "Disk Not Ejected Properly" every single unplug. Hold a key and the
+  drive comes back — and stays for the rest of the session, so an
+  edit-and-copy loop needs the finger only once. `disable_usb_drive()`
+  sits on exactly one path, a completed read that saw no key held, so
+  every other outcome leaves the drive enabled and a board too broken to
+  read its own keypad is still one you can copy files to. Read
+  `boot_out.txt` **from the REPL**, not off the drive: mounting the
+  drive is what makes the gate take the other branch and overwrite the
+  line you came for.
+- `boot.py` now depends on `adafruit_neokey` in `lib/`, which used to be
+  `code.py`'s alone, and holds its own copy of the `0x30` from
+  `PAD_ADDRESSES` — it cannot import `code.py` without running the whole
+  program. Both fail in the harmless direction: the drive stays enabled.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
 
@@ -155,10 +163,24 @@ on a reprint. `stacked` has not been printed at all.
 
 ```
 python3 -m py_compile firmware/*.py tools/mpad.py
-# hold any key while plugging in, or CIRCUITPY will not be mounted
+# CIRCUITPY is not mounted unless a key was held through the last hard
+# reset. Hold one and replug before the copy.
 cp firmware/code.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._code.py
 tools/mpad.py --probe          # expect: PONG 3 4 on the data port
 tools/mpad.py --demo           # LEDs out, key edges in
+```
+
+A `boot.py` change needs more than that, and the shape of the mistake is
+that it looks like it does not: copying `code.py` triggers auto-reload,
+which is a **soft** reset, so an edited `boot.py` sitting on the drive
+never runs and the probe above reports a healthy board that is still on
+the old USB config.
+
+```
+cp firmware/boot.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._boot.py
+# hard reset -- replug, or from the REPL on the console port:
+#   import microcontroller; microcontroller.reset()
+tools/mpad.py --probe          # expect: PONG 3 4, and CIRCUITPY now gone
 ```
 
 Known-good answers, for telling a healthy board from a sick one:
@@ -166,7 +188,7 @@ Known-good answers, for telling a healthy board from a sick one:
 | State | The device says |
 |---|---|
 | healthy | `HELLO 3 4` on connect, `PONG 3 4` to `P` |
-| keypad or `lib/` missing | `HELLO 3 0` + `ERR i2c setup ...`, connection held |
+| keypad or `lib/` missing | `HELLO 3 0` + `ERR i2c setup ...`, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
 | bus lost while running | `HELLO 3 4` + `ERR i2c lost at runtime: ...` |
 | firmware died past 60 s uptime | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
 | firmware died inside 60 s | `ERR fatal-halted ...` on every later connect, stays red |
@@ -188,27 +210,59 @@ actually see `>>>`** before sending anything that has to run. This cost
 one wasted reset that reported success on a board that had never
 rebooted.
 
-Canopy holds the data port whenever it is running. Only one process can
-usefully own it — release yours before asking Canopy to connect, and
-`lsof` beats `log show` for finding out who has it. Flashing while it is
-held works (the copy is mass storage, not serial), but the soft reset
-that follows drops Canopy's connection.
+Canopy holds the data port whenever it is running, and takes it back on
+its own after a reset — a probe that answered a minute ago can come back
+`console/silent (no PONG)` on **both** ports with nothing wrong at all.
+`lsof /dev/cu.usbmodem*` is the first thing to check, before suspecting
+the firmware; `log show` is not worth the trouble. Only one process can
+usefully own the port, so release yours before asking Canopy to connect.
+Flashing while it is held works — the copy is mass storage, not serial,
+assuming a key was held for that boot — but the soft reset that follows
+drops Canopy's connection.
 
 ## Error paths are only real once you have broken them
 
 Every hardening path in this firmware was wrong the first time, and none
 of the mistakes were visible by reading. The method that found them:
 copy `firmware/code.py`, inject a `raise` where the fault belongs, flash
-the copy, watch, restore. Three separate guards were proven this way —
+the copy, watch, restore. Four separate guards were proven this way —
 the fatal handler (both sides of its 60 s brake), the setup guard (by
-`mv`-ing `lib/adafruit_neokey` aside), and the runtime I2C latch.
+`mv`-ing `lib/adafruit_neokey` aside), the runtime I2C latch, and
+`boot.py`'s drive gate.
 
-Two of those tests failed *as tests* before they failed as code: one
-patched nothing because a `replace()` missed, and one landed on the
-boundary of its own fault window. **A passing error-path test that was
-never actually triggered is the default outcome, not the exception.**
-Make the injected fault prove itself — print from inside it, or assert
-the symptom appears — before believing a clean run.
+The drive gate's watched-to-fire faults, both read out of `boot_out.txt`
+with the drive confirmed mounted afterwards:
+
+```
+addr=0x30 -> 0x31   usb drive: enabled (gate failed: ValueError: No I2C device at address: 0x31)
+mv lib/adafruit_neokey aside   usb drive: enabled (gate failed: ImportError: no module named 'adafruit_neokey')
+```
+
+Three of those tests failed *as tests* before they failed as code: one
+patched nothing because a `replace()` missed, one landed on the boundary
+of its own fault window, and one asked a question the harness could not
+answer. **A passing error-path test that was never actually triggered is
+the default outcome, not the exception.** Make the injected fault prove
+itself — print from inside it, or assert the symptom appears — before
+believing a clean run.
+
+**Run the negative control or the test is worth nothing.** Proving the
+gate did not strand the I2C bus meant showing `code.py` still answered
+`HELLO 3 4` with the fault active. The first harness watched the console
+for `code.py`'s `WARNING: no keypad on I2C` line and reported it absent —
+which looked like a pass, and was not: with the library actually moved
+aside, so that the warning *had* to appear, it stayed absent too. The
+harness was reattaching after the print had already been emitted and
+dropped. Every "the bad thing did not happen" result needs its twin run
+where the bad thing is forced to happen. Here that meant reading the key
+count off the data port instead, where `HELLO 3 0` is observable and so
+`HELLO 3 4` means something.
+
+Canopy holding the data port defeats a probe, which reads exactly like a
+dead board. Beat it by resetting through the console REPL, waiting for
+the console device node to actually **disappear**, then hammering both
+ports until one answers `HELLO`/`PONG` — Canopy reconnects fast, but not
+instantly.
 
 For a receive-path change, the decisive check is a burst larger than
 `MAX_LINE_BYTES` ending in `P`: if the buffer bound is wrong, the `P`
