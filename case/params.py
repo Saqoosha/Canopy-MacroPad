@@ -232,9 +232,7 @@ USB_PLUG_CLEAR = 0.40
 
 # There is deliberately no hole over BOOT or RESET. They are needed once,
 # to write a CircuitPython UF2, and after that a firmware update is a file
-# copied to CIRCUITPY over USB -- with a key held at boot, since the
-# firmware gates the drive on that, and the keys are on the outside where
-# this decision needs them. Four screws is a fine price for something
+# copied to CIRCUITPY over USB. Four screws is a fine price for something
 # done once, and an uninterrupted plate is worth more than a paperclip
 # port. The buttons still exist as far as the checks are concerned --
 # nothing is allowed to press on them.
