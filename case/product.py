@@ -42,7 +42,11 @@ TMP = OUT / "tmp"
 
 # From README.md "Status colors". Left to right: idle, running, awaiting
 # approval, done-unread -- the three that matter plus a resting key.
-KEY_COLORS = ["#273027", "#0040ff", "#ff8000", "#00ff00"]
+# One per key, left to right. The first four keep their indices because
+# STACK and LEGEND below name them by index; the two the breakouts added
+# are appended rather than woven in.
+KEY_COLORS = ["#273027", "#0040ff", "#ff8000", "#00ff00",
+              "#00ffa0", "#ff0000"]
 
 CASE_COLOR = "#858b95"
 BOARD_COLOR = "#14171c"
@@ -122,6 +126,15 @@ def scene():
             BOARD_COLOR, 1.0, 20.0,
         ),
     ]
+    # Same plane, same thickness, same lift: to the eye the three boards
+    # are one strip, which is the point of butting them.
+    for i, (cx, cy) in enumerate(P.BREAKOUT_CENTERS):
+        items.append((
+            f"breakout{i}",
+            board(P.BREAKOUT_W, P.BREAKOUT_D, P.BREAKOUT_CORNER_R,
+                  cx, cy, P.Z_NEOKEY_BOTTOM, P.BREAKOUT_T),
+            BOARD_COLOR, 1.0, 20.0,
+        ))
     for i, (sx, sy) in enumerate(P.SWITCH_XY):
         items.append((
             f"led{i}",
@@ -131,13 +144,22 @@ def scene():
         items.append((f"sw{i}", switch_body(sx, sy), SWITCH_COLOR, 0.45, 46.0))
         items.append((f"cap{i}", keycap(sx, sy), KEY_COLORS[i], 0.86, 56.0))
     # The LEDs sit at the switch centres, so any of them landing off the
-    # board means a board was placed by hand instead of from its origin.
-    # That is exactly how the NeoKey ended up 13 mm out in one layout.
-    for sx, sy in P.SWITCH_XY:
-        assert abs(sx - P.NEOKEY_CENTER[0]) <= P.NEOKEY_W / 2, \
-            f"switch at x={sx:.2f} is off the NeoKey"
-        assert abs(sy - P.NEOKEY_CENTER[1]) <= P.NEOKEY_D / 2, \
-            f"switch at y={sy:.2f} is off the NeoKey"
+    # board it belongs to means a board was placed by hand instead of
+    # from its origin. That is exactly how the NeoKey ended up 13 mm out
+    # in one layout, and three boards is more to get wrong, not less --
+    # so each switch is checked against its own board rather than against
+    # a single outline that used to be the only one there was.
+    owners = (
+        [(cx, cy, P.BREAKOUT_W, P.BREAKOUT_D) for cx, cy in P.BREAKOUT_CENTERS]
+        + [(P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1], P.NEOKEY_W, P.NEOKEY_D)]
+        * len(P.NEOKEY_SWITCH_XY)
+    )
+    assert len(owners) == len(P.SWITCH_XY), "a switch has no board"
+    for (sx, sy), (cx, cy, bw, bd) in zip(P.SWITCH_XY, owners):
+        assert abs(sx - cx) <= bw / 2, \
+            f"switch at x={sx:.2f} is off its board"
+        assert abs(sy - cy) <= bd / 2, \
+            f"switch at y={sy:.2f} is off its board"
     return items
 
 
@@ -193,10 +215,13 @@ def draw(ax, pieces, elev, azim, explode=0.0, title=""):
 
 # Top to bottom, the order the exploded view stacks them in.
 STACK = [
-    ("4 × keycap", "1U, clear ABS", KEY_COLORS[2]),
-    ("4 × Durock Ice King", "linear 52 gf, clear housing", SWITCH_COLOR),
+    ("{} × keycap".format(len(P.SWITCH_XY)), "1U, clear ABS", KEY_COLORS[2]),
+    ("{} × Durock Ice King".format(len(P.SWITCH_XY)),
+     "linear 52 gf, clear housing", SWITCH_COLOR),
     ("shell", "printed, plate face down", CASE_COLOR),
-    ("NeoKey 1x4 QT", "ADA-4980, hot-swap + NeoPixel", BOARD_COLOR),
+    ("{} × NeoKey Breakout".format(P.BREAKOUT_COUNT),
+     "ADA-4978, hot-swap + NeoPixel, on GPIO", BOARD_COLOR),
+    ("NeoKey 1x4 QT", "ADA-4980, hot-swap + NeoPixel, on I2C", BOARD_COLOR),
     ("QT Py RP2040", "ADA-4900, "
      + ("face down under the keys" if P.STACKED else "face up beside them"),
      BOARD_COLOR),

@@ -47,17 +47,23 @@ def envelopes():
     consumed rather than left touching, which would fight just the same.
     """
     e = 0.02
+    neokey_slab = product.board(
+        P.NEOKEY_W + e, P.NEOKEY_D + e, P.NEOKEY_CORNER_R,
+        P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1],
+        P.Z_NEOKEY_BOTTOM - e, P.NEOKEY_T + 2 * e)
+    breakout_slabs = None
+    for cx, cy in P.BREAKOUT_CENTERS:
+        slab = product.board(
+            P.BREAKOUT_W + e, P.BREAKOUT_D + e, P.BREAKOUT_CORNER_R,
+            cx, cy, P.Z_NEOKEY_BOTTOM - e, P.BREAKOUT_T + 2 * e)
+        breakout_slabs = slab if breakout_slabs is None else breakout_slabs + slab
     boards = {
-        "NeoKey + sockets": product.board(
-            P.NEOKEY_W + e, P.NEOKEY_D + e, P.NEOKEY_CORNER_R,
-            P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1],
-            P.Z_NEOKEY_BOTTOM - e, P.NEOKEY_T + 2 * e),
-        # The switch bodies start exactly on the board's top face, so they
-        # need the same slab taken out of them for the same reason.
-        "switch bodies": product.board(
-            P.NEOKEY_W + e, P.NEOKEY_D + e, P.NEOKEY_CORNER_R,
-            P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1],
-            P.Z_NEOKEY_BOTTOM - e, P.NEOKEY_T + 2 * e),
+        "NeoKey + sockets": neokey_slab,
+        "breakouts + sockets": breakout_slabs,
+        # The switch bodies start exactly on a board's top face, so they
+        # need the same slabs taken out of them for the same reason --
+        # and now that is all three boards, not just the one.
+        "switch bodies": neokey_slab + breakout_slabs,
         "QT Py + parts": product.board(
             P.QTPY_PLAN_W + e, P.QTPY_PLAN_D + e, P.QTPY_CORNER_R,
             P.QTPY_CENTER[0], P.QTPY_CENTER[1],
@@ -74,8 +80,8 @@ def dump():
     # interference check actually runs against. Shipping both means the
     # thing on screen can be compared with the thing that was verified,
     # instead of being taken on faith.
-    lift_of = {"NeoKey + sockets": 20.0, "switch bodies": 46.0,
-               "QT Py + parts": 8.0}
+    lift_of = {"NeoKey + sockets": 20.0, "breakouts + sockets": 20.0,
+               "switch bodies": 46.0, "QT Py + parts": 8.0}
     scene = list(product.scene()) + [
         (f"env-{k}", v, ENV_COLOR, 0.34, lift_of[k])
         for k, v in envelopes().items()
