@@ -24,6 +24,25 @@ dimension in the case:
 strictly better — a shorter pad sits closer to keyboard height, a smaller
 one takes less desk.
 
+## The `inline` case, printed
+
+![The inline case, closed with keycaps on, and open with the NeoKey and
+the QT Py seated in the shell above the bottom plate](images/inline-built.jpg)
+
+`inline` is the layout that exists as a physical object. It printed flat,
+without supports, and closed on the first attempt. Four numbers stopped
+being guesses when it did: `SWITCH_HOLE` at 14.15 (a Durock Ice King
+seats correctly), `PEG_DIA` at 2.30 (the NeoKey drops onto the pegs free,
+with a little play), `QTPY_SLOP` at 0.40, and the USB-C opening, where a
+real cable seats fully with about 1 mm around its housing — worth knowing,
+because `USB_PLUG_W/H` were never measured off anything.
+
+Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
+1.00 takes some working at — the Qwiic plug does go in, but a reprint
+would want 1.5–2.0. And `PILOT_DIA` is still open: no M3 has been driven
+into a post yet, which is the one remaining guess that fails
+destructively. **`stacked` has never been printed.**
+
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
 Both parts print flat and **neither needs supports**. If the slicer wants
 supports, something changed — find out what before printing.
@@ -38,10 +57,10 @@ can settle, and getting them wrong costs a two-hour reprint:
 |---|---|---|
 | switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
 | M3 self-tapper into the 2.50 pilot | `PILOT_DIA` | open — tight splits the post, loose strips on the second open |
-| standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | open — the board has to sit flat |
+| standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
-The two open ones are about the same coupon, so they cost nothing extra
-to check on the print that is already in hand.
+`PILOT_DIA` is the last one open, and the only one the coupon can still
+save a reprint on: it is the guess that fails destructively.
 
 Edit the number, rerun `build.py`, print the real thing. The coupon
 carries the real features at their real sizes — the plate is 1.6 mm and

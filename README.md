@@ -4,6 +4,12 @@ Four keys next to the keyboard. Each key mirrors one Canopy pane: its
 LED shows what that pane's Claude session is doing, and pressing it
 focuses that pane and brings Canopy forward.
 
+![The inline case, closed with keycaps on, and open with the NeoKey and
+the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
+
+The enclosure is the `inline` layout, printed on a Bambu A1 mini. It is
+parametric — see [`case/README.md`](case/README.md).
+
 This repository holds the device half. The macOS half lives in the
 [Canopy](https://github.com/saqoosha/Canopy) repository under
 `Sources/Canopy/MacroPad/`.
