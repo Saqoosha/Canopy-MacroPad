@@ -8,7 +8,9 @@ focuses that pane and brings Canopy forward.
 the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
 
 The enclosure is the `inline` layout, printed on a Bambu A1 mini. It is
-parametric — see [`case/README.md`](case/README.md).
+parametric, and it is also **[a model you can turn in a
+browser](https://saqoosha.github.io/Canopy-MacroPad/)** — both layouts,
+orbit, explode, cutaway. How it is built: [`case/README.md`](case/README.md).
 
 This repository holds the device half. The macOS half lives in the
 [Canopy](https://github.com/saqoosha/Canopy) repository under

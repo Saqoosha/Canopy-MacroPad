@@ -102,8 +102,22 @@ The other scripts take the same variable.
     MPAD_LAYOUT=inline .venv/bin/python webgl.py dump
     .venv/bin/python webgl.py page                    # -> out/viewer.html
 
-The viewer is also published, and republishing the same file keeps the
-same address: <https://claude.ai/code/artifact/9eb9c2b4-689a-420f-a597-ef61fb970770>
+**The viewer is live at <https://saqoosha.github.io/Canopy-MacroPad/>**,
+served off the `gh-pages` branch, which holds nothing but this one file
+as `index.html` plus an empty `.nojekyll`. It is a copy, so it goes stale
+on its own — regenerate `out/viewer.html`, then republish it:
+
+    blob=$(git hash-object -w case/out/viewer.html)
+    empty=$(printf '' | git hash-object -w --stdin)
+    tree=$(printf '100644 blob %s\tindex.html\n100644 blob %s\t.nojekyll\n' \
+             $blob $empty | git mktree)
+    git branch -f gh-pages $(git commit-tree $tree -m 'Publish the case viewer')
+    git push -f origin gh-pages
+
+Plumbing rather than a checkout on purpose: nothing here touches the
+working tree, so there is no orphan branch to get stranded on and no
+chance of committing the rest of the repo onto a branch that should
+carry one page.
 
 `out/viewer.html` is the one to actually look at. `product.py` sorts
 triangles by distance and paints them back to front, which is the only
