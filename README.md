@@ -347,3 +347,8 @@ wireless on nice!nano with a MagSafe dock — are documented in
 [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
 deliberately not built yet. The only requirement now is not to block
 them.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The case geometry is covered by it too;
+print it, change a number, sell one.
