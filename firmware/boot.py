@@ -53,10 +53,13 @@ supervisor.set_usb_identification(
 # remove and a perfectly survivable outcome. Proven by injection, not by
 # reading: see AGENTS.md for the two faults that were watched to fire.
 #
-# The key read costs a seesaw software reset before USB finishes
-# enumerating -- 0.5 s flat, from `adafruit_seesaw.Seesaw.sw_reset`'s
-# `post_reset_delay` default, not a bench number -- and code.py pays it
-# again on its own init. Boot-to-enumeration roughly doubles.
+# The I2C half of the read costs a seesaw software reset before USB
+# finishes enumerating -- 0.5 s flat, from
+# `adafruit_seesaw.Seesaw.sw_reset`'s `post_reset_delay` default, not a
+# bench number -- and code.py pays it again on its own init.
+# Boot-to-enumeration roughly doubles. Holding one of the two GPIO keys
+# skips it outright, which is a side effect of reading them first and
+# not the reason for it.
 #
 # `storage` is imported here rather than at module scope so that nothing
 # this feature needs can run before usb_hid.disable() above. A module
@@ -68,23 +71,58 @@ try:
     import storage
 
     import board
-    from adafruit_neokey.neokey1x4 import NeoKey1x4
+    import digitalio
 
-    # 0x30 is the first entry of code.py's PAD_ADDRESSES -- duplicated
-    # here because boot.py cannot import code.py without running the
-    # whole program. Only the first board is probed, so a second board's
-    # keys would not work as the gate; an address that does not answer
-    # costs a boot delay to learn nothing. If that tuple ever changes,
-    # this gate throws forever and the drive is simply always enabled,
-    # which is the failure direction we want anyway.
-    i2c = board.STEMMA_I2C()
-    held = any(NeoKey1x4(i2c, addr=0x30).get_keys())
-    # Tidiness, not necessity: CircuitPython unlocks and deinits the
-    # board busses when the boot VM tears down, so code.py opens the bus
-    # fine even when a raise above skips this line. Measured, because
-    # reading could not settle it -- a gate forced to raise here still
-    # left code.py reporting HELLO 3 4.
-    i2c.deinit()
+    # Keys 4 and 5 first, because they are nearly free: two pin reads
+    # against the seesaw software reset below, which costs 0.5 s flat. A
+    # finger on either one answers the question without the bus being
+    # touched at all -- so a board with no Qwiic cable, or without the
+    # library, can still ask for the drive deliberately instead of only
+    # getting it by failing.
+    #
+    # The pin names are duplicated from code.py's GPIO_KEY_PIN_NAMES for
+    # the same reason 0x30 is duplicated below: boot.py cannot import
+    # code.py without running the whole program. If they drift apart, a
+    # name that does not exist raises and the drive is simply always
+    # enabled; a name that exists but is wrong reads high through its
+    # pull-up, so these two keys quietly stop opening the drive while the
+    # NeoKey's four still do. The second is the one to watch for, because
+    # it looks like nothing at all.
+    held = False
+    switches = []
+    for name in ("MISO", "SCK"):
+        switch = digitalio.DigitalInOut(getattr(board, name))
+        switch.switch_to_input(pull=digitalio.Pull.UP)
+        switches.append(switch)
+    for switch in switches:
+        # Pull-up plus the breakout's diode to ground: pressed reads low.
+        held = held or not switch.value
+    for switch in switches:
+        switch.deinit()
+
+    if not held:
+        # 0x30 is the first entry of code.py's PAD_ADDRESSES -- duplicated
+        # here because boot.py cannot import code.py without running the
+        # whole program. Only the first board is probed, so a second
+        # board's keys would not work as the gate; an address that does
+        # not answer costs a boot delay to learn nothing. If that tuple
+        # ever changes, this gate throws forever and the drive is simply
+        # always enabled, which is the failure direction we want anyway.
+        #
+        # The import sits here rather than at the top of the block so
+        # that a missing library costs only the four keys that need it.
+        from adafruit_neokey.neokey1x4 import NeoKey1x4
+
+        i2c = board.STEMMA_I2C()
+        held = any(NeoKey1x4(i2c, addr=0x30).get_keys())
+        # Tidiness, not necessity: CircuitPython unlocks and deinits the
+        # board busses when the boot VM tears down, so code.py opens the
+        # bus fine even when a raise above skips this line. Measured,
+        # because reading could not settle it -- a gate forced to raise
+        # here still left code.py reporting HELLO 3 4. The pin deinits
+        # above are the same kind of tidiness, and matter a little more:
+        # code.py claims those two pins itself a moment later.
+        i2c.deinit()
     if held:
         print("usb drive: enabled (key held at boot)")
     else:
