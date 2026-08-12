@@ -113,12 +113,15 @@ SWITCH_HOLE = 14.15
 # screw or this plastic and the coupon does, so the coupon wins. Re-run
 # it when the filament or the nozzle changes, exactly as for SWITCH_HOLE.
 #
-# What is NOT known: 2.95 won at the top of the sweep, so nothing above it
-# was tried and the diameter where the thread starts stripping is still
-# unmeasured. That is the failure this number has -- it does not split a
-# post, it lets go on the second or third time the case is opened -- so
-# if a post ever strips, the answer is below 2.95 and the sweep needs
-# re-running downward rather than up.
+# 2.95 won at the top of the sweep, so the diameter where the thread
+# starts stripping was never found, and it is deliberately not being
+# looked for. Finding it means driving screws into posts until they fail,
+# which is a destructive test whose answer changes nothing: 2.95 works,
+# and the response to a post that strips is to come down from 2.95, not
+# to know how far up the cliff was. Recorded so nobody spends a print on
+# it. That failure mode is still the real one -- it does not split a post,
+# it lets go on the second or third time the case is opened -- so if one
+# ever does, re-run the sweep downward.
 PILOT_DIA = 2.95
 POST_DIA = 5.60  # 1.33 of wall around the pilot
 

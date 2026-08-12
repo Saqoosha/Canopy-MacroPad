@@ -168,10 +168,14 @@ arithmetic pointed -- this machine pulls a hole in by ~0.15, the constant
 `SWITCH_HOLE` measures, so 2.95 arrives as ~2.80, which is 0.93x major
 against the 0.83x the tables want. The coupon outranks the tables here
 and that is the whole point of having one. And it won at the **top** of
-the sweep, so the stripping diameter was never found: this number fails
-by letting go on the third opening, not by splitting a post on the first,
-and if that happens the sweep re-runs downward. The reprinted shell has
-2.95 in it and the screw goes in clean.
+the sweep, so the stripping diameter was never found -- and is
+**deliberately not being looked for**, because finding it means driving
+screws into posts until they fail and the answer changes nothing. 2.95
+works, and the response to a strip is to come down from it, not to know
+where the cliff was. The failure mode is still real: this number lets go
+on the third opening rather than splitting a post on the first, and if
+that happens the sweep re-runs downward. The reprinted shell has 2.95 in
+it and the screw goes in clean.
 
 The 0.15 shrink then turned up a third time in the part nobody was
 looking at. **The bottom plate's screw holes are tight** -- Ø3.40 arrives

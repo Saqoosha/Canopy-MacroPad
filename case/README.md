@@ -82,11 +82,13 @@ picked 2.95.
 Two things about that answer are worth carrying. It is **not** where the
 arithmetic pointed: 2.95 prints as ~2.80 here, or 0.93× major, against
 the 0.83× the tables want. The tables do not know this screw or this
-plastic. And it won at the **top** of the range, so nothing above it was
-driven and the diameter that strips is still unmeasured — which matters
-because that is how this number fails, not by splitting a post on the
-first turn but by letting go on the third time the case is opened. If one
-ever does strip, the sweep gets re-run downward.
+plastic. And it won at the **top** of the range, so the diameter that
+strips was never found — **and is deliberately not being looked for**,
+because finding it means driving screws into posts until they fail and
+the answer changes nothing. 2.95 works. The failure mode is still real:
+this number does not split a post on the first turn, it lets go on the
+third time the case is opened. If one ever does, re-run the sweep
+downward from 2.95.
 
 `CLEAR_SWEEP` is the same idea pointed at the other end of the same
 screw, and it took the longest to answer. Its row is a pad raised to the
