@@ -195,9 +195,15 @@ instead, which are switch-gap centres by construction -- 4.20 in the
 **And a column cannot go in the second hole either.** The hot-swap
 socket reaches 15.633 across the board and that hole is at 17.145, so
 `COLUMN_DIA` = 4.50 crosses it by 0.738. Both bottom-plate supports move
-to the front row, at the same x. Only the first lands on a real hole, so
-only it carries a locating peg; one peg, two butted neighbours and 0.40
-of slop across the whole field is enough to place a 19 x 21.6 board.
+to the front row, at the same x.
+
+**Both holes still get a peg**, which is what separates supports from
+pegs: a support is a 4.50 pad the board rests on, a peg is 2.30 and only
+has to reach into a hole. At the second hole the socket leaves 0.362 for
+a 2.30 pillar and nothing for a 4.50 one, so that peg runs up from the
+floor on its own. 0.362 is thin by this design's standards -- the
+boolean reads 0.000 mm3 and the arithmetic is the warning -- but two
+diagonal pegs place a 19 x 21.6 board and one does not.
 
 **`stacked` had to move the QT Py.** With two breakouts ahead of it the
 NeoKey no longer starts at the field's left edge, so its first pair of
@@ -210,8 +216,9 @@ cosmetic property of an unbuilt layout for one that closes.
 
 Both of the new checks were watched to fail before being believed, by
 moving geometry rather than shrinking it: the support column put back on
-its second hole reports 5.675 mm3, and the seam standoffs shifted half a
-pitch report 26.260 mm3.
+its second hole reports 5.675 mm3, the seam standoffs shifted half a
+pitch report 26.260 mm3, and the pegs grown from 2.30 to 4.50 report
+64.796 mm3.
 
 `build.py` must end in `all checks passed` for **both** layouts before
 anything is printed.

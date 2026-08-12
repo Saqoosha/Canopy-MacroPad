@@ -581,16 +581,25 @@ BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
 # front row's y, clears it outright. Watched to fail: putting it back on
 # the hole reports 5.675 mm3 against the breakout mock.
 #
-# Only the first support lands on a real hole, so only it carries a
-# locating peg. One peg, two butted neighbours and 0.40 of slop across
-# the whole field is enough to stop a 19 x 21.6 board wandering; the
-# second support is there to keep it flat, not to place it.
+# Both mounting holes get a locating peg, and the second one is why the
+# supports and the pegs are two different lists. A support is a
+# COLUMN_DIA pad the board rests on; a peg is PEG_DIA and only has to
+# reach into a hole. At the second hole the socket leaves 0.362 for a
+# 2.30 pillar and nothing at all for a 4.50 one, so the peg goes up from
+# the floor on its own there rather than standing on a support.
+#
+# 0.362 is thin by this file's standards. The boolean is the evidence and
+# it reads 0.000 mm3; the arithmetic is the warning. If a printed pillar
+# fouls the socket the board rocks instead of seating, which is loud at
+# assembly and a file stroke to fix -- so the second locating point is
+# worth the risk that the first alone was not.
 BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080)]
 BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
                        for ox, oy in BREAKOUT_ORIGINS
                        for sx, sy in BREAKOUT_SUPPORT_LOCAL]
-BREAKOUT_PEG_XY = [(ox + BREAKOUT_HOLES[0][0], oy + BREAKOUT_HOLES[0][1])
-                   for ox, oy in BREAKOUT_ORIGINS]
+BREAKOUT_PEG_XY = [(ox + hx, oy + hy)
+                   for ox, oy in BREAKOUT_ORIGINS
+                   for hx, hy in BREAKOUT_HOLES]
 
 # Where the shell presses the boards down. The NeoKey gets standoffs in
 # its own four holes; the breakouts cannot, and the arithmetic is worth

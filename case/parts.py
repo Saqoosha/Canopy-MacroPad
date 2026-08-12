@@ -309,13 +309,15 @@ def bottom():
 
     # The same, for the breakouts, but their positions dodge the
     # hot-swap socket rather than following the mounting holes -- see
-    # BREAKOUT_SUPPORT_LOCAL. Only the pair that lands on a real hole
-    # carries a peg, and it points up into the board from below, since
-    # there is no standoff overhead to hang one from.
+    # BREAKOUT_SUPPORT_LOCAL. The pegs point up into the board from
+    # below, since there is no standoff overhead to hang one from, and
+    # each one runs the whole way from the floor: at the second hole
+    # there is no support under it to stand on, and one rule beats
+    # "whichever ones happen to have a column beneath them".
     for x, y in P.BREAKOUT_SUPPORT_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
     for x, y in P.BREAKOUT_PEG_XY:
-        part += _tube(x, y, P.Z_NEOKEY_BOTTOM,
+        part += _tube(x, y, P.BOTTOM_T,
                       P.Z_NEOKEY_BOTTOM + P.PEG_H, P.PEG_DIA)
 
     if P.STACKED:

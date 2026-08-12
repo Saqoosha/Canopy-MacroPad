@@ -83,8 +83,9 @@ one, not necessarily the only one.
   Watched-to-fail numbers so far: cable notch 28.4 mm³, rail over a
   button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
   3.8 mm³, a breakout support column moved back onto its second
-  mounting hole 5.675 mm³, and the seam standoffs shifted half a pitch
-  onto the switches 26.260 mm³.
+  mounting hole 5.675 mm³, the seam standoffs shifted half a pitch onto
+  the switches 26.260 mm³, and the breakout pegs grown from PEG_DIA to
+  COLUMN_DIA 64.796 mm³.
 - **A hole above a counterbore is a ring printed over air.** Ø6.10 of
   counterbore under the Ø3.55 hole of the day leaves 1.275 mm unsupported
   all the way round; it sags into the top of the bore, and the printed
