@@ -2,7 +2,7 @@
 """Host-side console for the Canopy MacroPad firmware.
 
 Stdlib only, so there is nothing to install before bring-up. Serves two
-jobs during Phase 1 — probe, and talk — plus two scripted variants of
+jobs during Phase 1 — probe, and talk — plus three scripted variants of
 talking:
 
     tools/mpad.py                 probe, then open a console on the data port
@@ -16,6 +16,10 @@ talking:
                                   against real ambient light. Prints the
                                   post-brightness 8-bit values, which is
                                   where dark colors fall apart.
+    tools/mpad.py --load          hold every key at full white, brightness
+                                  100. Not for looking at — it is the
+                                  worst case the pixel rail has to
+                                  survive, and the state to meter it in.
 """
 
 import argparse
@@ -340,6 +344,49 @@ def read_key_count(reader, timeout=PROBE_TIMEOUT_S):
     return None
 
 
+def load(path):
+    """Hold every key at full white, which is what a rail is measured under.
+
+    Idle is the flattering case and it is not the case that browns out.
+    The pixels on both board kinds hang off the incoming Qwiic rail rather
+    than off the regulated 3.3 V behind it -- see README "Hardware" -- so
+    what the LEDs see is the QT Py's rail minus whatever 50 mm of thin
+    Qwiic conductor drops under load, and that drop only exists when there
+    is load.
+
+    Probe at the LED end, not at the QT Py: the two differ by exactly the
+    thing being measured. Take the reading at four keys before the
+    breakouts land and again at six afterwards -- one number cannot
+    separate cable drop from a regulator giving up, and two can.
+    """
+    fd = open_raw(path)
+    reader = LineReader(fd)
+    keys = read_key_count(reader)
+    if keys is None:
+        keys = len(DEMO_COLORS)
+        print("no PONG within {}s - assuming {} keys.".format(
+            PROBE_TIMEOUT_S, keys))
+    # No crossfade and no pulse: the point is a steady worst case, not a
+    # transition. Full brightness on purpose -- the shipped 60 is not what
+    # the supply has to survive.
+    send(fd, "X 0")
+    send(fd, "B 100")
+    for idx in range(keys):
+        send(fd, "C {} ffffff".format(idx))
+    print("{} keys at full white, brightness 100.".format(keys))
+    print("meter the pixel VDD at an LED, not at the QT Py.")
+    print("[Ctrl-C] to stop and blank them")
+    try:
+        while True:
+            for line in reader.poll():
+                print("< {}".format(line))
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        send(fd, "R")
+        print("\nblanked.")
+    return 0
+
+
 def console(path, demo=False):
     fd = open_raw(path)
     reader = LineReader(fd)
@@ -484,6 +531,9 @@ def main():
                       help="light all keys, mirror presses to white")
     mode.add_argument("--palette", action="store_true",
                       help="step through candidate status colors")
+    mode.add_argument("--load", action="store_true",
+                      help="every key full white at 100%% — the worst case, "
+                           "for metering the pixel rail")
     args = parser.parse_args()
 
     if args.probe:
@@ -506,6 +556,8 @@ def main():
     try:
         if args.palette:
             return palette(port)
+        if args.load:
+            return load(port)
         return console(port, demo=args.demo)
     except (OSError, termios.error) as err:
         print("cannot open {}: {}\ntry --probe to list ports."

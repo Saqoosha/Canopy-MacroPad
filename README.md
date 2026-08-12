@@ -322,6 +322,32 @@ desk lighting. Values picked on a screen do not survive that trip.
 Global brightness 60. Every period is 2000 ms; only the floor changes,
 and that is what separates "alive" from "answer me".
 
+**These values are tuned against a supply voltage nobody has written
+down.** The pixels sit on the incoming Qwiic rail rather than behind the
+NeoKey's regulator, so the number that produced this table is whatever
+the QT Py hands the cable, minus whatever 50 mm of thin Qwiic conductor
+drops under load. Until it is measured the whole table rests on a
+variable. Measuring it:
+
+```
+tools/mpad.py --load       # every key full white at brightness 100
+```
+
+Three things about that reading, each of which changes what it means:
+
+- **Probe at an LED's `VDD`, not at the QT Py.** The two differ by
+  exactly the cable drop being looked for.
+- **Under full white, not at idle.** Idle is the flattering case and it
+  is not the case that browns out. `--load` exists to produce the other
+  one; the shipped brightness of 60 is not what the supply has to
+  survive.
+- **Take it at four keys and again at six.** One number cannot separate a
+  cable drop from a regulator giving up; two can, because they fail
+  differently — a regulator at its limit lets go all at once, a cable
+  sags gradually and shifts colour on the way. If six reads much below
+  four, suspect the cable first: it is the cheapest thing in the stack to
+  replace, and a shorter or thicker one needs no redesign.
+
 What the bench actually taught, none of which was predictable on paper:
 
 - **Hue does all the state separation, amplitude does the ranking.** The
