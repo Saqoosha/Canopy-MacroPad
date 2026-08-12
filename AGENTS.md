@@ -116,12 +116,26 @@ one, not necessarily the only one.
   the label still lands on the pad -- which was watched failing at -4.327
   with `LABEL_SIZE` pushed to 12.0. Same disease as the standoff story
   below, caught one step earlier.
-- **The standoff story is the reason for the rule above.** Its diameter
-  was cut on the stated grounds that the check had flagged it, and it
-  never had — the 0.009 mm³ came from the plate-hole corner instead. A
-  check nobody has watched fail proves nothing, and a *credited* catch
-  that never happened is worse, because it launders the reasoning that
-  came with it.
+- **The standoff story is the reason for "prove a check fires".** Named
+  rather than pointed at: this bullet used to say "the rule above", and
+  the list has grown three times since, each insertion quietly moving
+  what "above" meant. Its diameter was cut on the stated grounds that
+  the check had flagged it, and it never had -- the 0.009 mm³ came from
+  the plate-hole corner instead. A check nobody has watched fail proves
+  nothing, and a *credited* catch that never happened is worse, because
+  it launders the reasoning that came with it.
+- **A diff cannot show a contradiction**, because a contradiction is a
+  relationship between two places and a diff only ever shows one of them.
+  This section introduced the pilot mouth as derived from
+  `SCREW_CLEAR_DIA` and, three paragraphs later, explained that the
+  derivation had been broken and the number pinned. Both sentences were
+  correct in the commit that wrote them; they landed a round apart, and
+  neither commit's diff contained the other. So: **when two commits a
+  round apart touch the same section, review the section, not the
+  diffs.** The reader who can see it is one going end to end with no
+  memory of which round wrote what -- which is not a skill but a
+  position, and the author never has it. Worth deliberately taking, or
+  handing to someone who already has it.
 - Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
   settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
   in PLA Basic, so the 0.15 over nominal is this machine's hole shrink
