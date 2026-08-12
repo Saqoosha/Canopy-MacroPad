@@ -314,6 +314,14 @@ connectors and not bare receptacles:
 - the NeoKey's support columns growing with the screws, because they were
   sized off `POST_DIA` and are not screws at all. They have their own
   `COLUMN_DIA` now.
+- **a NeoKey support column standing through the middle of the QT Py** in
+  `stacked`, 116 mm³ of it, the moment the key field grew to three
+  boards. The NeoKey stopped starting at the field's left edge, so its
+  first pair of mounting holes landed at case `x = 0` — where the QT Py
+  had always sat. Nothing about the change looked like it was near the
+  QT Py; the boolean is the only reason it was not printed that way. The
+  QT Py now sits at `x = 19.05`, the centre of the widest gap the columns
+  leave, and USB-C is no longer centred on the back wall as a result.
 - **the bottom plate blocking the USB plug** — and this one the checks
   did *not* find, a person looking at the render did. The opening's lower
   edge lands exactly on the seam between the two printed halves, and the

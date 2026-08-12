@@ -40,6 +40,13 @@ the confirmation print. This has bitten in `firmware/code.py` and again in
 exactly the kind of mismatch eyes skip. Once it produced a "test passed"
 for a fault that had never been injected.
 
+**Restore from a copy, never from git.** `git checkout -- <file>` after
+an injection restores the *committed* file, so any uncommitted work in it
+is gone -- which is how a session lost a finished `case/params.py` while
+tidying up a fault it had just proved. Either commit before injecting, so
+git really is the backup, or copy the file aside and copy it back. The
+reverse substitution works too and has the advantage of asserting.
+
 ## Editing the case
 
 Environment is a venv at `case/.venv`, Python 3.12 (`uv venv --python
@@ -149,6 +156,28 @@ one, not necessarily the only one.
   "the bullet after this one" in here has been replaced with the name of
   what it means -- four of them, all correct on the day they were
   written, none of them robust to the next insertion.
+- **A part added to `mock.everything()` reaches four files, and three of
+  them fail loudly only if you run them.** `build.py` picks the new part
+  up on its own; `section.py` has its own colour table keyed by the mock's
+  names and dies `KeyError`; `product.py` asserts every switch sits on the
+  NeoKey and cannot survive a second board kind; `webgl.py` carries a
+  hardcoded group regex and a `lift_of` dict, and a name missing from
+  either shows up as a raw mesh name in the viewer's legend rather than as
+  an error. Run all five after touching the mock, not just `build.py`.
+- **`build.py` only rewrites the STLs and STEPs.** Every PNG in `out/`
+  comes from `product.py`, `render.py` and `section.py`, so a geometry
+  change leaves the figures showing the old design -- which is the worst
+  kind of stale, because a finished-looking render reads as a verified
+  one. The full sweep, per layout:
+
+  ```
+  MPAD_LAYOUT=<layout> .venv/bin/python build.py     # must say all checks passed
+  MPAD_LAYOUT=<layout> .venv/bin/python product.py
+  MPAD_LAYOUT=<layout> .venv/bin/python render.py
+  MPAD_LAYOUT=<layout> .venv/bin/python section.py
+  MPAD_LAYOUT=<layout> .venv/bin/python webgl.py dump
+  .venv/bin/python webgl.py page                     # once, after both dumps
+  ```
 - Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
   settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
   in PLA Basic, so the 0.15 over nominal is this machine's hole shrink
@@ -162,11 +191,20 @@ one, not necessarily the only one.
 `webgl.py page`. Two ways to verify it, and both are worth doing because
 they cover different halves:
 
-- **The data half, without a browser.** Decode the base64 back out of the
-  page in Python and compare bounds, vertex count and part offsets
-  against `out/<layout>/geom.json`. Round-trip error should be 0.0000 mm
-  and every part offset divisible by 3, or a part draws another's
-  triangles.
+- **The data half, without a browser.** Decode `geom.json`'s base64 in
+  Python and check it against the parts table beside it. `count` is a
+  **vertex** count, not a number of int16, so the payload holds three
+  int16 per count -- getting that backwards makes a healthy page look
+  like a 3x mismatch. Parts are concatenated with no offsets, so each
+  `count` has to be divisible by 3 or one part draws another's triangles.
+  Confirm the same payload is embedded in `viewer.html`. Quantisation is
+  `max(span) / 65534`, about 0.0021-0.0025 mm here, and that is the whole
+  round-trip error.
+- **Regenerating the page does not refresh an open tab.** `webgl.py page`
+  writes the file and nothing else; a Chrome window already showing it
+  keeps the old geometry, and it looks entirely convincing. Reload after
+  every regeneration -- `mcp__chrome-devtools__navigate_page` with
+  `type: reload`.
 - **The rendered half, in Chrome.** `mcp__chrome-devtools__*` attaches to
   a running Chrome — it needs one actually open, or it fails with
   `Could not find DevToolsActivePort`. Drive the rail with
@@ -237,8 +275,15 @@ the label position is derived from the counterbore's rim rather than the
 pad edge, after a fixed offset put the top of the digits exactly on it;
 and `coupon_layout()` exists because a probe holding its own copy of the
 row positions kept measuring where the posts used to be, passing every
-"this hole is open" assertion by finding nothing at all. Also
-noted: the Qwiic plug goes into the `inline` pocket but takes some
+"this hole is open" assertion by finding nothing at all.
+
+Still open: **`BREAKOUT_T` (1.57) is the NeoKey's measured thickness
+assumed for the 4978**, because a `.brd` carries no thickness. It has to
+*equal* `NEOKEY_T` rather than be close -- one plate spans all three
+boards and `PLATE_TOP_TO_PCB` is a single number -- so a difference is a
+design decision rather than a constant to nudge.
+
+Also noted: the Qwiic plug goes into the `inline` pocket but takes some
 working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
 on a reprint. `stacked` has not been printed at all.
 

@@ -480,11 +480,19 @@ geometry and **has never been assembled** — the two 4978 boards are not
 bought yet, so nothing below the protocol has been seen working. The
 `inline` case in the photo above is the four-key one.
 
-The rest of the later phases — low-profile Choc switches,
-wireless on nice!nano with a MagSafe dock — are documented in
+The rest of the later phases — low-profile Choc switches, and wireless on
+a MagSafe charger — are sketched in
 [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
 deliberately not built yet. The only requirement now is not to block
 them.
+
+The wireless one has since been costed properly, without anything being
+built:
+[docs/wireless-and-magsafe-findings.md](docs/wireless-and-magsafe-findings.md)
+carries Apple's own magnet-ring dimensions, why the Qi coil rather than
+the magnets is what decides the case depth, why Qi is pointless without
+BLE, and why the board to move to is a XIAO nRF52840 rather than the
+nice!nano the handoff names.
 
 ## License
 
