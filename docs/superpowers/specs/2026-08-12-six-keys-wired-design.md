@@ -194,8 +194,17 @@ instead, which are switch-gap centres by construction -- 4.20 in the
 
 **And a column cannot go in the second hole either.** The hot-swap
 socket reaches 15.633 across the board and that hole is at 17.145, so
-`COLUMN_DIA` = 4.50 crosses it by 0.738. Both bottom-plate supports move
-to the front row, at the same x.
+`COLUMN_DIA` = 4.50 crosses it by 0.738. So three of the four corners
+get a bearing pad and the back right does not -- the socket spans
+4.733 .. 15.633 across the board and 11.653 .. 17.553 up it, and that is
+the only corner it reaches.
+
+Three corners rather than two, because the NeoKey's sandwich cannot be
+copied here. Its columns sit directly under its standoffs, so the force
+path is a straight line through the board and there is no moment
+anywhere. Nothing can stand above a breakout except at the seams, so its
+push-down and push-up are never collinear; supporting three corners is
+how that is paid for.
 
 **Both holes still get a peg**, which is what separates supports from
 pegs: a support is a 4.50 pad the board rests on, a peg is 2.30 and only

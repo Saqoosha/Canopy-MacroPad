@@ -573,13 +573,21 @@ BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
                     for ox, oy in BREAKOUT_ORIGINS
                     for hx, hy in BREAKOUT_HOLES]
 
-# Where the bottom plate holds a breakout up. Both sit in the strip in
-# front of the hot-swap socket, and that is the constraint: the socket
-# reaches 15.633 across the board, the second mounting hole is at 17.145,
-# and COLUMN_DIA wants 2.25 of radius -- so a column in that hole crosses
-# the socket by 0.738. Moving the support forward, to the same x but the
-# front row's y, clears it outright. Watched to fail: putting it back on
-# the hole reports 5.675 mm3 against the breakout mock.
+# Where the bottom plate holds a breakout up. Three of the board's four
+# corners, and the socket is what picks them: it spans 4.733 .. 15.633
+# across the board and 11.653 .. 17.553 up it, so a COLUMN_DIA pad clears
+# everywhere except the back right. There it would cross by 0.738, which
+# is why the back-right corner gets only the slim peg and no pad.
+# Watched to fail: putting a pad back on that hole reports 5.675 mm3
+# against the breakout mock.
+#
+# Three is worth the third entry rather than two. The NeoKey is held in a
+# sandwich -- a column under every hole and a standoff directly above it
+# -- so its force path is a straight line through the board and there is
+# no moment anywhere. A breakout cannot have that: nothing can stand
+# above it except at the seams (see SEAM_XY), so the push down and the
+# push up are never collinear. Supporting three corners is how that is
+# paid for.
 #
 # Both mounting holes get a locating peg, and the second one is why the
 # supports and the pegs are two different lists. A support is a
@@ -593,7 +601,7 @@ BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
 # fouls the socket the board rocks instead of seating, which is loud at
 # assembly and a file stroke to fix -- so the second locating point is
 # worth the risk that the first alone was not.
-BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080)]
+BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080), (1.905, 16.510)]
 BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
                        for ox, oy in BREAKOUT_ORIGINS
                        for sx, sy in BREAKOUT_SUPPORT_LOCAL]
