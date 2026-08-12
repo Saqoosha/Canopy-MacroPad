@@ -96,7 +96,7 @@ def breakouts():
     # reading as the collision it would be.
     for x, y in P.BREAKOUT_HOLE_XY:
         part -= Pos(x, y, P.Z_NEOKEY_BOTTOM + P.BREAKOUT_T / 2) * Cylinder(
-            radius=1.27, height=P.BREAKOUT_T + 0.2
+            radius=P.BREAKOUT_HOLE_DIA / 2, height=P.BREAKOUT_T + 0.2
         )
     return part
 
@@ -136,7 +136,7 @@ def neokey():
     # about the one thing it is supposed to let through.
     for x, y in P.MOUNT_XY:
         part -= Pos(x, y, (P.Z_NEOKEY_BOTTOM + P.Z_NEOKEY_TOP) / 2) * Cylinder(
-            radius=1.25, height=P.NEOKEY_T + 0.2
+            radius=P.NEOKEY_HOLE_DIA / 2, height=P.NEOKEY_T + 0.2
         )
     return part
 

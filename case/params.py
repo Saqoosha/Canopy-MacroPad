@@ -33,8 +33,12 @@ NEOKEY_D = 21.59
 NEOKEY_T = 1.57
 NEOKEY_CORNER_R = 2.54
 
-# M2.5 mounting holes, PCB-local, origin at the front-left corner.
+# M2.5 mounting holes, PCB-local, origin at the front-left corner. The
+# diameter lives here rather than in the mock that draws them: the peg
+# fit is checked against these holes, and a number the check depends on
+# should not be the only copy of itself.
 NEOKEY_HOLES = [(19.05, 2.54), (57.15, 2.54), (19.05, 19.05), (57.15, 19.05)]
+NEOKEY_HOLE_DIA = 2.50  # MOUNTINGHOLE_2.5_PLATED in the .brd
 
 # Switch centres, PCB-local. Pitch is exactly 19.05 and the board is 4x that.
 NEOKEY_SW_Y = 10.795
@@ -59,6 +63,9 @@ BREAKOUT_SW = (9.525, 10.795)
 # 2.54 drill against the NeoKey's 2.5 plated, so PEG_DIA has 0.24 of play
 # here instead of 0.20. The peg locates, it does not grip.
 BREAKOUT_HOLES = [(1.905, 5.080), (17.145, 16.510)]
+# Drill 2.540 in the .brd, and Ø2.540 again measured off the STEP's own
+# board solid -- two independent sources, exact agreement.
+BREAKOUT_HOLE_DIA = 2.54
 BREAKOUT_COUNT = 2
 
 # Measured off ref/neokey-breakout.step, and it comes out at exactly the
