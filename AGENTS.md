@@ -114,8 +114,8 @@ one, not necessarily the only one.
   a guard that cannot go red is worse than no guard: it reads as
   coverage. What replaced it is the part that is *not* derived -- whether
   the label still lands on the pad -- which was watched failing at -4.327
-  with `LABEL_SIZE` pushed to 12.0. Same disease as the standoff story
-  below, caught one step earlier.
+  with `LABEL_SIZE` pushed to 12.0. Same disease as the standoff story,
+  caught one step earlier.
 - **The standoff story is the reason for "prove a check fires".** Named
   rather than pointed at: this bullet used to say "the rule above", and
   the list has grown three times since, each insertion quietly moving
@@ -136,6 +136,13 @@ one, not necessarily the only one.
   memory of which round wrote what -- which is not a skill but a
   position, and the author never has it. Worth deliberately taking, or
   handing to someone who already has it.
+
+  The general form, which is the useful half: **a reference is only as
+  stable as the thing it points at is named.** Position is a property of
+  the document, not of the fact. Every "see above", "the rule below" and
+  "the bullet after this one" in here has been replaced with the name of
+  what it means -- four of them, all correct on the day they were
+  written, none of them robust to the next insertion.
 - Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
   settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
   in PLA Basic, so the 0.15 over nominal is this machine's hole shrink
@@ -176,8 +183,9 @@ never measured off anything, just chosen generously.
 2.50 is the tight one the built shell has, 2.95 is the one that bites
 without a fight. Every mouth also got a Ø3.40 x 0.60 lead-in so the screw
 has somewhere to start. That 3.40 was derived from `SCREW_CLEAR_DIA` when
-it was written and is a pinned number now -- see below, where the
-clearance hole moved and the derivation did not survive it.
+it was written and is a pinned number now -- the clearance hole moved
+and the derivation did not survive it, which the bottom plate's own
+paragraph covers.
 
 Two things about 2.95 are worth keeping. It is **not** where the
 arithmetic pointed -- this machine pulls a hole in by ~0.15, the constant
@@ -197,9 +205,12 @@ The 0.15 shrink then turned up a third time in the part nobody was
 looking at. **The bottom plate's screw holes are tight** -- Ø3.40 arrives
 as ~3.25 against an M3's 3.00, so they pass a screw while guiding it,
 which is not what a clearance hole is for. The first answer was 3.55 on
-the shrink arithmetic, and it was wrong -- see the ring bullet above, and
+the shrink arithmetic, and it was wrong -- see "a hole above a
+counterbore is a ring printed over air" -- and
 `SCREW_CLEAR_DIA` is now 3.70 with `CLEAR_CHAMFER` at 0.60. The built
-plate keeps the old Ø3.40 holes and is usable as is. Widening it also
+plate has since been reprinted at 3.70 with the chamfer and it is
+right -- clean bores, no filament in them, screws going in easily -- so
+this is proven on a part and not only on a coupon. Widening it also
 broke a derivation: `PILOT_MOUTH_DIA` used to read `SCREW_CLEAR_DIA`,
 on an argument that only held while the two happened
 to agree, and it is now pinned at 3.40 because what the funnel has to

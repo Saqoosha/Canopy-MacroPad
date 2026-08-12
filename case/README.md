@@ -41,17 +41,19 @@ Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
 1.00 takes some working at — the Qwiic plug does go in, but a reprint
 would want 1.5–2.0. And the M3 has now been driven into a post: it goes,
 but hard enough to be the first thing anyone says about the part. That
-sent `PILOT_DIA` to the coupon, which settled it at 2.95 — see below —
-and put a Ø3.40 × 0.60 lead-in at every mouth. The reprinted shell has
-both and the screw goes in clean.
+sent `PILOT_DIA` to the coupon, which settled it at 2.95 — the how is
+under "Print the coupon first" — and put a Ø3.40 × 0.60 lead-in at every
+mouth. The reprinted shell has both and the screw goes in clean.
 
 Then the part nobody was looking at: the bottom plate's screw holes are
 tight. They pass a screw, but they guide it, and a clearance hole is
 supposed to be free. The obvious answer was the same 0.15 shrink a third
-time, and it was wrong — see the coupon section, where two rows of holes
-found the real cause under the counterbore. The plate is now Ø3.70 with a
-0.60 chamfer, and **the built plate keeps the old Ø3.40 holes, which are
-usable.** `stacked` has never been printed at all.
+time, and it was wrong — see "Print the coupon first", where two rows of
+holes found the real cause under the counterbore. **A plate has been
+printed at Ø3.70 with the 0.60 chamfer and it is right**: the bores come
+out clean, with no filament hanging in them, and the screws go in easily.
+That is the last number on this case to stop being a prediction.
+`stacked` has never been printed at all.
 
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
 Both parts print flat and **neither needs supports**. If the slicer wants
@@ -67,7 +69,7 @@ can settle, and getting them wrong costs a two-hour reprint:
 |---|---|---|
 | switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
 | M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
-| M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
+| M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled, and confirmed on a printed plate** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
 `PILOT_DIA` was the last one open, and the only one the coupon could
