@@ -127,7 +127,8 @@ def dump():
 LABELS = {
     "shell": ("Shell", "printed"),
     "bottom": ("Bottom plate", "printed"),
-    "neokey": ("NeoKey 1x4 QT", "ADA-4980"),
+    "neokey": ("NeoKey 1x4 QT", "ADA-4980, keys 2-5 on I2C"),
+    "breakout": ("NeoKey Breakout \u00d72", "ADA-4978, keys 0-1 on GPIO"),
     "qtpy": ("QT Py RP2040", "ADA-4900"),
     "sw": ("Switches", "Durock Ice King"),
     "cap": ("Keycaps", "1U clear ABS"),
@@ -509,7 +510,7 @@ function resize(w, h){
 function hex(h){ return [parseInt(h.slice(1,3),16)/255,
   parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]; }
 function group(name){
-  const m = name.match(/^(shell|bottom|neokey|qtpy|sw|cap|led)/);
+  const m = name.match(/^(shell|bottom|neokey|breakout|qtpy|sw|cap|led)/);
   return m ? m[1] : name;
 }
 
