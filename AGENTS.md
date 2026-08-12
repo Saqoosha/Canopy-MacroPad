@@ -160,8 +160,10 @@ never measured off anything, just chosen generously.
 `PILOT_DIA` is settled at **2.95**, on a coupon that carries one post per
 `PILOT_SWEEP` entry, engraved, driven with the same M3 minutes apart --
 2.50 is the tight one the built shell has, 2.95 is the one that bites
-without a fight. Every mouth also got a Ø3.40 x 0.60 lead-in, derived
-from `SCREW_CLEAR_DIA`, so the screw has somewhere to start.
+without a fight. Every mouth also got a Ø3.40 x 0.60 lead-in so the screw
+has somewhere to start. That 3.40 was derived from `SCREW_CLEAR_DIA` when
+it was written and is a pinned number now -- see below, where the
+clearance hole moved and the derivation did not survive it.
 
 Two things about 2.95 are worth keeping. It is **not** where the
 arithmetic pointed -- this machine pulls a hole in by ~0.15, the constant
@@ -183,8 +185,9 @@ as ~3.25 against an M3's 3.00, so they pass a screw while guiding it,
 which is not what a clearance hole is for. The first answer was 3.55 on
 the shrink arithmetic, and it was wrong -- see the ring bullet above, and
 `SCREW_CLEAR_DIA` is now 3.70 with `CLEAR_CHAMFER` at 0.60. The built
-plate keeps the old Ø3.40 holes and is usable as is. Widening it also broke a derivation: `PILOT_MOUTH_DIA` used to read
-`SCREW_CLEAR_DIA`, on an argument that only held while the two happened
+plate keeps the old Ø3.40 holes and is usable as is. Widening it also
+broke a derivation: `PILOT_MOUTH_DIA` used to read `SCREW_CLEAR_DIA`,
+on an argument that only held while the two happened
 to agree, and it is now pinned at 3.40 because what the funnel has to
 catch is the screw tip, not the plate's hole. `build.py` gained
 "counterbore ring under the head" at the same time, since widening the
