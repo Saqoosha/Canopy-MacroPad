@@ -149,11 +149,26 @@ internal pull-up supplies is about 0.45 V, under the RP2040's 0.8 V
 V<sub>IL</sub> but not by much: a key stuck reading pressed is the
 symptom of that being wrong, and an external pull-up is the fix.
 
-Both boards carry the same `NEO3535_REVERSE` pixel, and the NeoKey runs
-its pixels straight off the STEMMA QT rail through a level shifter —
-which is the argument that the tuned colours below carry over to
-breakouts powered from the QT Py's `3V`. It is an argument, not a
-measurement. **Not yet checked on hardware.**
+Both boards carry the same pixel — the schematics name it `_SK6812E`,
+same device on both — and on the NeoKey it runs off `VCC`, the incoming
+Qwiic rail, *ahead* of the `AP2112K-3.3` that feeds the seesaw. A
+`74*1G125` shifts the seesaw's data up to that same rail. So the pixels
+see whatever the cable brings, and the status colours below were tuned at
+whatever that is.
+
+That is the argument for the colours carrying over: identical part, and
+the breakouts on the QT Py's `3V`, which is the rail the Qwiic connector
+already hands the NeoKey. It is an argument, not a measurement, and
+**the rail has not been metered.**
+
+One consequence worth knowing before anyone "fixes" it. An SK6812's
+datasheet floor is 3.5 V and its green and blue dies drop out first, so a
+3.3 V rail shows up as a warm shift rather than as darkness. If that is
+what this is, all six keys are equally under it and equally warm, which
+is the outcome that makes them match — so **do not feed the breakouts 5 V
+on their own.** That would fix two keys, break the match, and leave the
+breakouts needing a level shifter the NeoKey already has. Both rails or
+neither.
 
 Key count is never hardcoded in Canopy — the device reports it in
 `HELLO` — and `tools/mpad.py` now reads it from `PONG` rather than
