@@ -1,5 +1,5 @@
 #!/bin/sh
-# Adafruit's own STEP models for the two boards. Every board dimension in
+# Adafruit's own STEP models for the three boards. Every board dimension in
 # params.py was read out of these, so this is where those numbers came
 # from -- not a datasheet, not a product page. The files themselves are
 # not committed (3.5 MB of third-party CAD the build does not need) and
@@ -15,4 +15,8 @@ base=https://raw.githubusercontent.com/adafruit/Adafruit_CAD_Parts/main
 
 curl -fsSL -o qtpy-rp2040.step "$base/4900%20QTPy%20RP2040/4900%20QTPY-RP2040.step"
 curl -fsSL -o neokey-1x4.step  "$base/4980%20NeoKey%201x4%20QT/4980%20NeoKey%201x4%20QT.step"
+# The breakout's model is the only one of the three that includes its
+# hot-swap socket, which is why BREAKOUT_T and the socket footprint could
+# be measured rather than assumed.
+curl -fsSL -o neokey-breakout.step "$base/4978%20NeoKey%20Breakout/4978%20NeoKey%20Breakout.step"
 ls -la ./*.step

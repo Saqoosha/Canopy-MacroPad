@@ -172,11 +172,12 @@ no verb changes and no behaviour a host has to negotiate.
 numbers and derive the field from both:
 
 - `BREAKOUT_W = 19.05`, `BREAKOUT_D = 21.59`, both out of the `.brd`.
-  `BREAKOUT_T` is not in the `.brd` and Adafruit publishes no STEP for
-  this board: start at the NeoKey's measured 1.57 on the grounds of the
-  same fab and stackup, and put calipers on it when it arrives. It is
-  the one board number here that is a guess, and `params.py` has to say
-  so.
+  `BREAKOUT_T = 1.57`, measured off `ref/neokey-breakout.step` -- the
+  same 1.570 as the NeoKey, which matters because one plate spans all
+  three boards and each is clamped between a column and a standoff. This
+  started as a guess on the grounds of the same fab and stackup, on the
+  false premise that Adafruit publishes no model for the board. They do,
+  in the repository `ref/fetch.sh` already uses.
 - `BREAKOUT_HOLES = [(1.905, 5.080), (17.145, 16.510)]`
 - key field width `76.20 + 2 x 19.05 = 114.30`
 - switch centres `9.525 + n x 19.05`, n = 0..5

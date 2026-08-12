@@ -61,15 +61,18 @@ BREAKOUT_SW = (9.525, 10.795)
 BREAKOUT_HOLES = [(1.905, 5.080), (17.145, 16.510)]
 BREAKOUT_COUNT = 2
 
-# Adafruit publishes no STEP for this board and a .brd carries no
-# thickness, so this is the NeoKey's measured 1.57 on the grounds of the
-# same fab and the same stackup. **The one board number in this file that
-# is a guess.** It has to *equal* NEOKEY_T rather than merely be close:
-# one plate spans both boards and PLATE_TOP_TO_PCB is a single number, so
-# a difference puts two of the six switches at the wrong height. Measure
-# it when the boards arrive; if it differs, that is a design decision to
-# take, not a constant to nudge.
-BREAKOUT_T = NEOKEY_T
+# Measured off ref/neokey-breakout.step, and it comes out at exactly the
+# NeoKey's 1.570 -- which matters, because one plate spans all three
+# boards and every board is clamped between a column at Z_NEOKEY_BOTTOM
+# and a standoff at Z_NEOKEY_TOP. A board of a different thickness either
+# rattles in that gap or does not go into it.
+#
+# This was a guess for a while, on the grounds of the same fab and the
+# same stackup, and the guess was right. It stopped being one when
+# somebody looked for the model instead of taking the earlier "Adafruit
+# publishes no STEP for this board" at face value: they publish one, in
+# the same repository ref/fetch.sh already pulls the other two from.
+BREAKOUT_T = 1.57
 
 # They go to the *left* of the NeoKey, and that is forced rather than
 # preferred. A mated Qwiic plug stands 2.50 proud of the board edge it is

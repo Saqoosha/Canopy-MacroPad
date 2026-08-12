@@ -156,6 +156,15 @@ one, not necessarily the only one.
   "the bullet after this one" in here has been replaced with the name of
   what it means -- four of them, all correct on the day they were
   written, none of them robust to the next insertion.
+- **Look for the STEP before assuming there isn't one.** `BREAKOUT_T`
+  sat as a documented guess -- "Adafruit publishes no STEP for this
+  board" -- through a whole session, and they publish one, in the same
+  `Adafruit_CAD_Parts` repository `ref/fetch.sh` already pulls the other
+  two boards from. The 4978's model also turned out to be the only one of
+  the three that includes its hot-swap socket, so the footprint the
+  support columns dodge is measured now instead of carried over. The
+  guess was right to three decimals, which is exactly why it survived:
+  nothing downstream ever disagreed with it.
 - **A part added to `mock.everything()` reaches four files, and three of
   them fail loudly only if you run them.** `build.py` picks the new part
   up on its own; `section.py` has its own colour table keyed by the mock's
@@ -276,12 +285,6 @@ pad edge, after a fixed offset put the top of the digits exactly on it;
 and `coupon_layout()` exists because a probe holding its own copy of the
 row positions kept measuring where the posts used to be, passing every
 "this hole is open" assertion by finding nothing at all.
-
-Still open: **`BREAKOUT_T` (1.57) is the NeoKey's measured thickness
-assumed for the 4978**, because a `.brd` carries no thickness. It has to
-*equal* `NEOKEY_T` rather than be close -- one plate spans all three
-boards and `PLATE_TOP_TO_PCB` is a single number -- so a difference is a
-design decision rather than a constant to nudge.
 
 Also noted: the Qwiic plug goes into the `inline` pocket but takes some
 working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
