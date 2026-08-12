@@ -16,14 +16,17 @@ losing 25 mm of depth.
 """
 
 from build123d import (
+    Align,
     Axis,
     Box,
     Circle,
+    Cone,
     Cylinder,
     Plane,
     Pos,
     Rectangle,
     RectangleRounded,
+    Text,
     chamfer,
     extrude,
 )
@@ -34,6 +37,28 @@ import params as P
 # --- small helpers ------------------------------------------------------
 def _tube(x, y, z0, z1, dia):
     return Pos(x, y, (z0 + z1) / 2) * Cylinder(radius=dia / 2, height=z1 - z0)
+
+
+def _lead_in(x, y, z_mouth, depth, d_mouth, d_tip):
+    """The conical mouth of a pilot hole, as a solid to subtract.
+
+    Opens at `z_mouth` and narrows `depth` into the part -- positive cuts
+    upward, negative downward, so the same call serves the shell's posts
+    (mouth on the floor, screw coming up) and the coupon's (mouth on top).
+    The cone is run 0.1 past the mouth on its own slope rather than stopped
+    flush, because a cut face coplanar with the face it opens onto is the
+    kind of boolean OCCT is entitled to be unhappy about.
+    """
+    over = 0.1
+    slope = (d_mouth - d_tip) / 2 / abs(depth)
+    r_mouth = (d_mouth + 2 * slope * over) / 2
+    up = depth > 0
+    return Pos(x, y, z_mouth - over if up else z_mouth + depth) * Cone(
+        bottom_radius=r_mouth if up else d_tip / 2,
+        top_radius=d_tip / 2 if up else r_mouth,
+        height=abs(depth) + over,
+        align=(Align.CENTER, Align.CENTER, Align.MIN),
+    )
 
 
 def _block(x0, x1, y0, y1, z0, z1):
@@ -159,6 +184,9 @@ def shell():
     for x, y in P.POST_XY:
         part += _tube(x, y, P.Z_FLOOR, P.Z_PLATE_BOTTOM, P.POST_DIA)
         part -= _tube(x, y, P.Z_FLOOR - 0.1, P.Z_PLATE_BOTTOM - 1.0, P.PILOT_DIA)
+        part -= _lead_in(
+            x, y, P.Z_FLOOR, P.PILOT_MOUTH_H, P.PILOT_MOUTH_DIA, P.PILOT_DIA
+        )
 
     # Switch holes.
     for x, y in P.SWITCH_XY:
@@ -300,24 +328,54 @@ def coupon():
 
     Three fits, nothing else:
       1. a switch into the plate hole, at the real plate thickness
-      2. an M2.5 self-tapper into the real post
+      2. an M3 self-tapper into the real post -- one post per PILOT_SWEEP
+         entry, at the real post height, each engraved with its diameter
       3. a standoff and peg against a real NeoKey mounting hole
+
+    The posts are a sweep rather than a single hole because the answer is
+    a feel, not a measurement: the screw that goes in too easily and the
+    one that needs a fight are only distinguishable side by side, with the
+    same screw, in the same plastic, minutes apart. Drive an M3 into each
+    from the labelled end and keep the one that bites without a struggle.
     """
-    w, d = 36.0, 24.0
+    pitch = P.POST_DIA + 5.4  # the labels are what sets this, not the posts
+    n = len(P.PILOT_SWEEP)
+    margin = 3.0
+    block_w = P.SWITCH_HOLE + 2 * margin  # the switch's share of the plate
+    w = block_w + margin + (n - 1) * pitch + P.POST_DIA + 2 * margin
+    d = 26.0
+    x0 = -w / 2
+    switch_x = x0 + block_w / 2
+    post_x = [
+        x0 + block_w + margin + P.POST_DIA / 2 + i * pitch for i in range(n)
+    ]
+
     part = _slab(w, d, 2.0, 0.0, P.PLATE_T)
 
-    part -= Pos(-8.0, 0.0, -0.1) * extrude(
+    part -= Pos(switch_x, 0.0, -0.1) * extrude(
         RectangleRounded(P.SWITCH_HOLE, P.SWITCH_HOLE, P.PLATE_HOLE_R),
         amount=P.PLATE_T + 0.2,
     )
 
     post_h = P.Z_PLATE_BOTTOM - P.Z_FLOOR
-    part += _tube(10.0, -6.0, P.PLATE_T, P.PLATE_T + post_h, P.POST_DIA)
-    part -= _tube(10.0, -6.0, P.PLATE_T + 0.5, P.PLATE_T + post_h + 0.1, P.PILOT_DIA)
+    post_top = P.PLATE_T + post_h
+    for x, dia in zip(post_x, P.PILOT_SWEEP):
+        part += _tube(x, -6.0, P.PLATE_T, post_top, P.POST_DIA)
+        # Blind at 0.5 above the plate, open at the top, so the screw goes
+        # in from the labelled face and the mouth is the one being tested.
+        part -= _tube(x, -6.0, P.PLATE_T + 0.5, post_top + 0.1, dia)
+        part -= _lead_in(
+            x, -6.0, post_top, -P.PILOT_MOUTH_H, P.PILOT_MOUTH_DIA, dia
+        )
+        part -= Pos(x, 2.0, P.PLATE_T - 0.4) * extrude(
+            Text(f"{dia:.2f}", font_size=4.0,
+                 align=(Align.CENTER, Align.CENTER)),
+            amount=0.5,
+        )
 
     so_h = P.Z_PLATE_BOTTOM - P.Z_NEOKEY_TOP
-    part += _tube(10.0, 6.0, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
+    part += _tube(post_x[0], 8.0, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
     part += _tube(
-        10.0, 6.0, P.PLATE_T + so_h, P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA
+        post_x[0], 8.0, P.PLATE_T + so_h, P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA
     )
     return part

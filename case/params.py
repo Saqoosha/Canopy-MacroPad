@@ -99,8 +99,34 @@ SWITCH_HOLE = 14.15
 # Note the two thread sizes are unrelated. M3 is the case fastener; the
 # 2.5 below is the NeoKey's own mounting hole, which the peg sits in and
 # no screw ever enters.
-PILOT_DIA = 2.50  # ~0.83x major, for M3 into PLA; a coupon variable
-POST_DIA = 5.60  # 1.55 of wall around the pilot
+#
+# Settled on the coupon against a real M3, like SWITCH_HOLE and for the
+# same reason: 2.50 was the arithmetic answer and the printed shell said
+# otherwise, hard enough that it was the first thing anyone noticed about
+# the part. Four posts, 2.50 through 2.95, same screw minutes apart --
+# 2.95 is the one that bites without a fight.
+#
+# It is worth being clear that this is not where the arithmetic pointed.
+# This machine pulls a hole in by about 0.15, which is what SWITCH_HOLE's
+# 14.15 measures, so 2.95 arrives as ~2.80 -- 0.93x major, well above the
+# 0.83x the tables want for M3 into PLA. The tables do not know this
+# screw or this plastic and the coupon does, so the coupon wins. Re-run
+# it when the filament or the nozzle changes, exactly as for SWITCH_HOLE.
+#
+# What is NOT known: 2.95 won at the top of the sweep, so nothing above it
+# was tried and the diameter where the thread starts stripping is still
+# unmeasured. That is the failure this number has -- it does not split a
+# post, it lets go on the second or third time the case is opened -- so
+# if a post ever strips, the answer is below 2.95 and the sweep needs
+# re-running downward rather than up.
+PILOT_DIA = 2.95
+POST_DIA = 5.60  # 1.33 of wall around the pilot
+
+# One post per entry on the coupon, each engraved with its own diameter.
+# This is the range that was actually driven, kept as the record of it --
+# a future re-run wants to move it, not repeat it, since 2.50 is now known
+# tight and the open question sits above the top end.
+PILOT_SWEEP = (2.50, 2.65, 2.80, 2.95)
 
 # The columns that hold the NeoKey up are spacers, not fasteners, and
 # sizing them off POST_DIA quietly grew them with the screws until they
@@ -111,7 +137,42 @@ POST_DIA = 5.60  # 1.55 of wall around the pilot
 # wall -- not a collision, and not clearance either once the printer
 # has had its say.
 COLUMN_DIA = 4.50
-SCREW_CLEAR_DIA = 3.40  # through the bottom plate
+# Through the bottom plate, and 3.55 for the same reason the pilot is not
+# 2.50: this machine pulls a hole in by ~0.15, so the 3.40 that was here
+# arrives as ~3.25. Against an M3's 3.00 major that is 0.125 a side --
+# a close fit, not a clearance one, and the built plate says so: the
+# screws pass, but they are guided by the hole they are supposed to be
+# free in. 3.55 lands at ~3.40, which is the normal clearance for M3 and
+# what the number was always meant to be.
+#
+# Unlike the pilot, this one is plain arithmetic and the shrink explains
+# it exactly, because nothing is cutting a thread here. The pilot needed
+# far more than shrink alone, which is why it went to a coupon and this
+# did not.
+SCREW_CLEAR_DIA = 3.55
+
+# A lead-in at the mouth of every pilot hole, so the screw has somewhere
+# to sit before it starts cutting. A self-tapper meeting a sharp-edged
+# hole either wanders or has to be held straight while it bites, which is
+# the other half of what "hard to screw in" was -- the diameter above is
+# only the first half.
+#
+# This used to read SCREW_CLEAR_DIA, on the argument that a mouth wider
+# than the plate's own hole only opens space the plate already covers.
+# That was true while the two numbers agreed and it stopped being true the
+# moment the clearance hole moved for a reason of its own -- following it
+# to 3.55 would thin the post mouth to 1.03 to chase a screw that is 3.00
+# across. What the funnel actually has to catch is the screw's tip, so the
+# number belongs to the screw, and 3.40 is the 0.40 of margin around it
+# that has always been here. Pinned, and no longer derived from a
+# neighbour that turned out to be unrelated.
+PILOT_MOUTH_DIA = 3.40
+
+# The depth is the only free number in the funnel: 0.60 puts the flank 21
+# degrees off the axis, where a plain 45-degree chamfer would need only
+# 0.225, so it is the longer and gentler of the two and still leaves
+# engagement above 2x the M3 major. build.py reports what is left.
+PILOT_MOUTH_H = 0.60
 SCREW_HEAD_DIA = 6.10  # ISO 7380 M3 button head is 5.70
 SCREW_HEAD_H = 1.65
 

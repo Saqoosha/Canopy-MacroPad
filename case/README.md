@@ -39,9 +39,18 @@ because `USB_PLUG_W/H` were never measured off anything.
 
 Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
 1.00 takes some working at — the Qwiic plug does go in, but a reprint
-would want 1.5–2.0. And `PILOT_DIA` is still open: no M3 has been driven
-into a post yet, which is the one remaining guess that fails
-destructively. **`stacked` has never been printed.**
+would want 1.5–2.0. And the M3 has now been driven into a post: it goes,
+but hard enough to be the first thing anyone says about the part. That
+sent `PILOT_DIA` to the coupon, which settled it at 2.95 — see below —
+and put a Ø3.40 × 0.60 lead-in at every mouth. The reprinted shell has
+both and the screw goes in clean.
+
+The same 0.15 then turned up a third time, in the part nobody was looking
+at: the bottom plate's screw holes are tight. They pass a screw, but they
+guide it, and a clearance hole is supposed to be free. Ø3.40 arrives as
+~3.25 against an M3's 3.00, which is a close fit by the tables. That sent
+`SCREW_CLEAR_DIA` to 3.55 — **unproven, and the built plate keeps the old
+holes, which are usable.** `stacked` has never been printed at all.
 
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
 Both parts print flat and **neither needs supports**. If the slicer wants
@@ -49,23 +58,40 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-`out/<layout>/coupon.stl` is 36 × 24 mm and takes about fifteen minutes.
+`out/<layout>/coupon.stl` is 68 × 26 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
 
 | Test | What it settles | Status |
 |---|---|---|
 | switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
-| M3 self-tapper into the 2.50 pilot | `PILOT_DIA` | open — tight splits the post, loose strips on the second open |
+| M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
-`PILOT_DIA` is the last one open, and the only one the coupon can still
-save a reprint on: it is the guess that fails destructively.
+`PILOT_DIA` was the last one open, and the only one the coupon could
+still save a reprint on: it is the guess that fails destructively. So it
+is the one test the coupon runs more than once. `PILOT_SWEEP` puts a post
+down for every candidate, each engraved with its own diameter, because
+the answer is a feel rather than a measurement — the screw that goes in
+too easily and the one that needs a fight only separate side by side,
+same screw, same plastic, minutes apart. Driving an M3 into all four
+picked 2.95.
 
-Edit the number, rerun `build.py`, print the real thing. The coupon
-carries the real features at their real sizes — the plate is 1.6 mm and
-the post is whatever that layout's post is, 7.8 mm inline and 13.5 mm
-stacked — so a fit that works here works in the case.
+Two things about that answer are worth carrying. It is **not** where the
+arithmetic pointed: 2.95 prints as ~2.80 here, or 0.93× major, against
+the 0.83× the tables want. The tables do not know this screw or this
+plastic. And it won at the **top** of the range, so nothing above it was
+driven and the diameter that strips is still unmeasured — which matters
+because that is how this number fails, not by splitting a post on the
+first turn but by letting go on the third time the case is opened. If one
+ever does strip, the sweep gets re-run downward.
+
+To re-settle it after a filament or nozzle change: print the coupon, drive
+a screw into each post, set `PILOT_DIA` to the smallest one that bites
+without a struggle, rerun `build.py`, print the real thing. The coupon
+carries the real features at their real sizes — the
+plate is 1.6 mm and the post is whatever that layout's post is, 7.8 mm
+inline and 13.5 mm stacked — so a fit that works here works in the case.
 
 ## Cable, per layout
 
@@ -354,7 +380,7 @@ NeoKey covers the case wall to wall and nothing above can reach it.
 | Part | Qty | Note |
 |---|---|---|
 | STEMMA QT / Qwiic cable | 1 | 100 mm for `stacked`; the existing 50 mm for `inline` |
-| M3 × 10 self-tapping, button head | 4 | into Ø2.50 pilots; counterbored 1.00 so the feet still clear the dome |
+| M3 × 10 self-tapping, button head | 4 | into Ø2.95 pilots with a Ø3.40 lead-in, through Ø3.55 clearance; counterbored 1.00 so the feet still clear the dome |
 | Ø8 × 2 rubber feet | 4 | 0.5 recess, so they stand 1.5 proud |
 | PLA Basic | ~19 g | shell 10.6 cm³, bottom 7.9 cm³ |
 

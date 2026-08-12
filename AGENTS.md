@@ -120,9 +120,34 @@ by assembly: `SWITCH_HOLE` at 14.15 (a Durock Ice King seats right),
 about 1 mm around its housing, which matters because `USB_PLUG_W/H` were
 never measured off anything, just chosen generously.
 
-Still open: **`PILOT_DIA` (2.50) has never had an M3 driven into it.**
-That is the last guess in the file, and the one that fails destructively
--- too small splits a post, too large strips on the second open. Also
+`PILOT_DIA` is settled at **2.95**, on a coupon that carries one post per
+`PILOT_SWEEP` entry, engraved, driven with the same M3 minutes apart --
+2.50 is the tight one the built shell has, 2.95 is the one that bites
+without a fight. Every mouth also got a Ø3.40 x 0.60 lead-in, derived
+from `SCREW_CLEAR_DIA`, so the screw has somewhere to start.
+
+Two things about 2.95 are worth keeping. It is **not** where the
+arithmetic pointed -- this machine pulls a hole in by ~0.15, the constant
+`SWITCH_HOLE` measures, so 2.95 arrives as ~2.80, which is 0.93x major
+against the 0.83x the tables want. The coupon outranks the tables here
+and that is the whole point of having one. And it won at the **top** of
+the sweep, so the stripping diameter was never found: this number fails
+by letting go on the third opening, not by splitting a post on the first,
+and if that happens the sweep re-runs downward. The reprinted shell has
+2.95 in it and the screw goes in clean.
+
+The 0.15 shrink then turned up a third time in the part nobody was
+looking at. **The bottom plate's screw holes are tight** -- Ø3.40 arrives
+as ~3.25 against an M3's 3.00, so they pass a screw while guiding it,
+which is not what a clearance hole is for. `SCREW_CLEAR_DIA` is now 3.55
+and is **unproven**; the built plate keeps the old holes and is usable as
+is. Widening it also broke a derivation: `PILOT_MOUTH_DIA` used to read
+`SCREW_CLEAR_DIA`, on an argument that only held while the two happened
+to agree, and it is now pinned at 3.40 because what the funnel has to
+catch is the screw tip, not the plate's hole. `build.py` gained
+"counterbore ring under the head" at the same time, since widening the
+clearance hole eats the ring the head bears on and nothing else would
+have noticed. Also
 noted: the Qwiic plug goes into the `inline` pocket but takes some
 working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
 on a reprint. `stacked` has not been printed at all.

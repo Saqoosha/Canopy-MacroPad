@@ -133,9 +133,25 @@ def main():
             - ((P.USB_CY if P.STACKED else P.USB_CX) + P.USB_OVERHANG)
         ),
         "plate web between switches": P.SWITCH_PITCH - P.SWITCH_HOLE,
-        "screw post bite depth": P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0,
-        "post wall around the pilot": (P.POST_DIA - P.PILOT_DIA) / 2,
+        # Thread only. The 1.0 is the blind end the hole stops short of,
+        # and the mouth is a funnel that does not hold anything, so both
+        # come off or this reports engagement the screw never gets.
+        "screw post bite depth": (
+            P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
+        ),
+        # At the mouth, which is where the post is thinnest -- measuring
+        # the wall around the pilot instead would report 1.48 for a ring
+        # that is really 1.10.
+        "post wall at the pilot mouth": (P.POST_DIA - P.PILOT_MOUTH_DIA) / 2,
         "plate left under the screw head": P.BOTTOM_T - P.SCREW_SINK,
+        # The counterbore floor the head actually sits on is a ring, and
+        # widening the clearance hole eats it from the inside. Nothing
+        # else notices if it goes to nothing -- the plate keeps its
+        # thickness and the head keeps its diameter, and the screw just
+        # pulls through.
+        "counterbore ring under the head": (
+            (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2
+        ),
         # A proud button head on the underside is only fine while the feet
         # are taller than it is.
         "feet clear the screw heads": (
