@@ -128,6 +128,63 @@ POST_DIA = 5.60  # 1.33 of wall around the pilot
 # tight and the open question sits above the top end.
 PILOT_SWEEP = (2.50, 2.65, 2.80, 2.95)
 
+# What the hole-only coupon drills, one hole per entry per row. 3.40 is
+# kept as the first entry deliberately -- it is the one on the built
+# plate, so it is the known-tight reference the others are felt against,
+# exactly as 2.50 was for the pilot. A screw dropped through the right
+# one falls through under its own weight and still has its head fully
+# caught by the counterbore.
+#
+# Worth knowing on a re-run: this reads as a diameter sweep and is really
+# a ring-width sweep, since the ring narrows as the hole grows. That is
+# why it needed a second row before it meant anything.
+CLEAR_SWEEP = (3.40, 3.55, 3.70, 3.85)
+
+# The counterbore is a void Ø6.10 across and the hole above it is smaller,
+# so the layer that closes the counterbore is a ring printed over air,
+# all the way round. It sags, and what it sags into is the top of the
+# bore. That is what put filament in every hole of the first clearance
+# coupon, and the built bottom plate has the same feature -- so it was
+# always a better candidate than hole shrink for why the screws were
+# guided rather than cleared.
+#
+# A chamfer trades bearing area for printability: c of 45-degree cone
+# above the counterbore shortens the unsupported ring by c and lets the
+# rest of the transition climb at an angle the printer can hold. It
+# cannot be taken all the way -- the ring *is* the seat the head bears
+# on, so at c = (SCREW_HEAD_DIA - dia) / 2 there is nothing left to bear
+# on at all. This is the one number here that is squeezed from both ends.
+#
+# 0.60 is what the two-row coupon settled on: the C0.60 row ran clean at
+# 3.70 and 3.85 where the C0.00 row had filament in all four holes.
+# CLEAR_CHAMFER_SWEEP is kept as the record of that comparison, and it is
+# the shape a re-run wants -- one row per transition, identical diameters
+# across them. A single row cannot tell a diameter answer from a sag
+# answer, and will confidently give one of them.
+CLEAR_CHAMFER = 0.60
+CLEAR_CHAMFER_SWEEP = (0.00, 0.60)
+
+# What the coupon actually measured, and the reason both rows behaved the
+# way they did. The unsupported ring is what is left of the counterbore's
+# ceiling once the chamfer has eaten into it:
+#
+#     ring = (SCREW_HEAD_DIA - dia) / 2 - chamfer
+#
+# and the eight holes sort by it perfectly, in an order neither diameter
+# nor chamfer alone produces:
+#
+#     0.525, 0.600  clean          (3.85 and 3.70 at C0.60)
+#     0.675         a little sag   (3.55 at C0.60)
+#     0.750 and up  filament in the bore  (3.40 at C0.60, all of C0.00)
+#
+# So 0.60 is this machine's limit for an annular ceiling printed over
+# air, the same kind of constant as SWITCH_HOLE's 0.15 shrink and it
+# re-measures with it. CLEAR_RING_MAX is that number and build.py holds
+# the design to it -- note it is an upper bound, unlike every other
+# clearance here, because the ring is also the seat the screw head bears
+# on and shrinking it is not free.
+CLEAR_RING_MAX = 0.60
+
 # The columns that hold the NeoKey up are spacers, not fasteners, and
 # sizing them off POST_DIA quietly grew them with the screws until they
 # pushed through the shell's front wall. They have nothing to do with
@@ -137,19 +194,20 @@ PILOT_SWEEP = (2.50, 2.65, 2.80, 2.95)
 # wall -- not a collision, and not clearance either once the printer
 # has had its say.
 COLUMN_DIA = 4.50
-# Through the bottom plate, and 3.55 for the same reason the pilot is not
-# 2.50: this machine pulls a hole in by ~0.15, so the 3.40 that was here
-# arrives as ~3.25. Against an M3's 3.00 major that is 0.125 a side --
-# a close fit, not a clearance one, and the built plate says so: the
-# screws pass, but they are guided by the hole they are supposed to be
-# free in. 3.55 lands at ~3.40, which is the normal clearance for M3 and
-# what the number was always meant to be.
+# Settled on the coupon, and it took two goes to ask the right question.
 #
-# Unlike the pilot, this one is plain arithmetic and the shrink explains
-# it exactly, because nothing is cutting a thread here. The pilot needed
-# far more than shrink alone, which is why it went to a coupon and this
-# did not.
-SCREW_CLEAR_DIA = 3.55
+# 3.40 was tight on the built plate. The first answer was 3.55, on the
+# arithmetic that this machine pulls a hole in by ~0.15 so 3.40 arrives
+# as ~3.25 against an M3's 3.00. That reasoning is not wrong and it was
+# not the cause. The printed coupon came back with filament hanging in
+# every bore, which sent the question to CLEAR_CHAMFER below -- and the
+# real variable turned out to be neither diameter nor chamfer but what
+# they leave between them.
+#
+# 3.70 is the smallest hole that came out clean AND free with the 0.60
+# chamfer under it. 3.85 also passes and was not taken: it buys nothing
+# and costs 0.075 more of the seat the screw head sits on.
+SCREW_CLEAR_DIA = 3.70
 
 # A lead-in at the mouth of every pilot hole, so the screw has somewhere
 # to sit before it starts cutting. A self-tapper meeting a sharp-edged

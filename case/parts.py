@@ -29,6 +29,7 @@ from build123d import (
     Text,
     chamfer,
     extrude,
+    mirror,
 )
 
 import params as P
@@ -309,6 +310,11 @@ def bottom():
     for x, y in P.POST_XY:
         part -= _tube(x, y, -0.1, P.BOTTOM_T + 0.1, P.SCREW_CLEAR_DIA)
         part -= _tube(x, y, -0.1, P.SCREW_SINK, P.SCREW_HEAD_DIA)
+        if P.CLEAR_CHAMFER > 0:
+            part -= _lead_in(
+                x, y, P.SCREW_SINK, P.CLEAR_CHAMFER,
+                P.SCREW_CLEAR_DIA + 2 * P.CLEAR_CHAMFER, P.SCREW_CLEAR_DIA,
+            )
 
     for x, y in P.FOOT_XY:
         part -= _tube(x, y, -0.1, P.FOOT_RECESS, P.FOOT_DIA)
@@ -323,59 +329,254 @@ def bottom():
 
 
 # --- coupon -------------------------------------------------------------
-def coupon():
-    """The 10-minute print that decides SWITCH_HOLE and PILOT_DIA.
+def _clear_row(xs, hole_y, label_y, chamfer):
+    """The clearance sweep, as one solid to subtract from a pad.
 
-    Three fits, nothing else:
-      1. a switch into the plate hole, at the real plate thickness
-      2. an M3 self-tapper into the real post -- one post per PILOT_SWEEP
-         entry, at the real post height, each engraved with its diameter
-      3. a standoff and peg against a real NeoKey mounting hole
+    Shared by both coupons rather than written twice, because the two
+    exist to answer the same question and a row that drifts on one of
+    them answers it differently depending on which one got printed.
 
-    The posts are a sweep rather than a single hole because the answer is
-    a feel, not a measurement: the screw that goes in too easily and the
-    one that needs a fight are only distinguishable side by side, with the
-    same screw, in the same plastic, minutes apart. Drive an M3 into each
-    from the labelled end and keep the one that bites without a struggle.
+    The counterbore goes on the bed side, where bottom() puts it, and
+    that is not cosmetic: with it down, the through-hole starts 1.00 up
+    and never meets the squashed first layer; with it up, the hole would
+    begin at the bed and read tighter than the plate it stands in for.
+    A coupon that prints the feature the other way up measures a
+    different hole. Labels sit on that same face and are mirrored, since
+    a face is seen from the other direction once the part is in a hand.
+    """
+    cut = None
+    for x, dia in zip(xs, P.CLEAR_SWEEP):
+        one = _tube(x, hole_y, -0.1, P.BOTTOM_T + 0.1, dia)
+        one += _tube(x, hole_y, -0.1, P.SCREW_SINK, P.SCREW_HEAD_DIA)
+        if chamfer > 0:
+            # Same cone the pilot mouths get, turned to a different job:
+            # here it is not guiding a screw, it is giving the layer that
+            # closes the counterbore something to climb rather than a
+            # 1.275 mm ledge to hang off.
+            #
+            # It sits ABOVE the counterbore, not inside it. Put below, it
+            # lands in space the counterbore has already removed and does
+            # nothing at all -- which is how it was written first, and the
+            # two rows would have printed identical while reporting that
+            # the chamfer does not help. The flat the head seats on is
+            # what is left outside the cone at this height: 1.275 - c.
+            one += _lead_in(
+                x, hole_y, P.SCREW_SINK, chamfer, dia + 2 * chamfer, dia,
+            )
+        one += Pos(x, label_y, -0.1) * extrude(
+            _label(f"{dia:.2f}", flip=True), amount=0.5
+        )
+        cut = one if cut is None else cut + one
+    return cut
+
+
+LABEL_SIZE = 4.0
+
+
+def _label(txt, flip=False):
+    """An engraved number, as a sketch. `flip` for a face seen from below."""
+    t = Text(txt, font_size=LABEL_SIZE, align=(Align.CENTER, Align.CENTER))
+    return mirror(t, about=Plane.YZ) if flip else t
+
+
+def coupon_layout():
+    """Where everything on the coupon sits.
+
+    Split out of coupon() so that anything measuring the printed solid
+    reads the same numbers the solid was built from. It is a test part, so
+    the only thing checking it is a script holding coordinates of its own,
+    and a second copy of a y value is a check that quietly moves to empty
+    air when the layout shifts. That happened: the posts were raised to
+    make room for the clearance pad, a probe kept looking at the old row,
+    and every "this hole is open" assertion passed by finding nothing at
+    all.
     """
     pitch = P.POST_DIA + 5.4  # the labels are what sets this, not the posts
     n = len(P.PILOT_SWEEP)
     margin = 3.0
     block_w = P.SWITCH_HOLE + 2 * margin  # the switch's share of the plate
     w = block_w + margin + (n - 1) * pitch + P.POST_DIA + 2 * margin
-    d = 26.0
     x0 = -w / 2
-    switch_x = x0 + block_w / 2
     post_x = [
         x0 + block_w + margin + P.POST_DIA / 2 + i * pitch for i in range(n)
     ]
+    # Two bands. The upper one is the original coupon, moved up bodily to
+    # make room; the lower one is the clearance pad, which is a second
+    # thickness and so cannot share a surface with anything above it.
+    lift = 10.0
+    pad_y0, pad_y1 = -20.0, -6.0
+    hole_y = pad_y1 - 5.5
+    # Measured off the glyphs rather than assumed, because the counterbore
+    # is Ø6.10 and reaches further across the pad than anything else on
+    # it. Placing the label a fixed distance from the pad edge instead put
+    # the top of the digits exactly on the counterbore's rim -- a label
+    # with its head cut off, on a part whose only job is to be read.
+    label_h = max(
+        _label(f"{d:.2f}").bounding_box().size.Y for d in P.CLEAR_SWEEP
+    )
+    clear_label_y = hole_y - P.SCREW_HEAD_DIA / 2 - label_h / 2 - 1.0
+    return {
+        "label_h": label_h,
+        "clear_label_gap": (
+            (hole_y - P.SCREW_HEAD_DIA / 2) - (clear_label_y + label_h / 2)
+        ),
+        "clear_label_edge": (clear_label_y - label_h / 2) - pad_y0,
+        "w": w,
+        "d": 46.0,
+        "switch_x": x0 + block_w / 2,
+        "switch_y": lift,
+        "post_x": post_x,
+        "post_y": -6.0 + lift,
+        "label_y": 2.0 + lift,
+        "standoff_y": 8.0 + lift,
+        "post_top": P.PLATE_T + (P.Z_PLATE_BOTTOM - P.Z_FLOOR),
+        "pad_x0": post_x[0] - P.POST_DIA / 2 - margin,
+        "pad_x1": post_x[-1] + P.POST_DIA / 2 + margin,
+        "pad_y0": pad_y0,
+        "pad_y1": pad_y1,
+        "pitch": pitch,
+        "hole_y": hole_y,
+        "clear_label_y": clear_label_y,
+    }
+
+
+def coupon():
+    """The 20-minute print that decides the numbers a printer owns.
+
+    Four fits, nothing else:
+      1. a switch into the plate hole, at the real plate thickness
+      2. an M3 self-tapper into the real post -- one post per PILOT_SWEEP
+         entry, at the real post height, each engraved with its diameter
+      3. an M3 dropped through a clearance hole -- one per CLEAR_SWEEP
+         entry, through a pad at the real BOTTOM_T with the real
+         counterbore, because a hole's fit is a property of how many
+         layers it passes through and the plate is not the bottom
+      4. a standoff and peg against a real NeoKey mounting hole
+
+    Two of those are sweeps rather than single holes because the answer is
+    a feel, not a measurement: the screw that goes in too easily and the
+    one that needs a fight are only distinguishable side by side, with the
+    same screw, in the same plastic, minutes apart. Both sweeps keep their
+    known-bad entry as the first one -- 2.50 and 3.40, the two on the
+    built case -- so there is something to feel the others against.
+
+    The two rows face opposite ways on purpose. The posts are driven into
+    from the top; the clearance pad is what a screw is dropped through,
+    counterbore up, so the head lands where it would on the real plate.
+    """
+    L = coupon_layout()
+    w, d = L["w"], L["d"]
+    switch_x, post_x = L["switch_x"], L["post_x"]
+    post_y, label_y = L["post_y"], L["label_y"]
+    post_top, hole_y = L["post_top"], L["hole_y"]
 
     part = _slab(w, d, 2.0, 0.0, P.PLATE_T)
 
-    part -= Pos(switch_x, 0.0, -0.1) * extrude(
+    part -= Pos(switch_x, L["switch_y"], -0.1) * extrude(
         RectangleRounded(P.SWITCH_HOLE, P.SWITCH_HOLE, P.PLATE_HOLE_R),
         amount=P.PLATE_T + 0.2,
     )
 
-    post_h = P.Z_PLATE_BOTTOM - P.Z_FLOOR
-    post_top = P.PLATE_T + post_h
     for x, dia in zip(post_x, P.PILOT_SWEEP):
-        part += _tube(x, -6.0, P.PLATE_T, post_top, P.POST_DIA)
+        part += _tube(x, post_y, P.PLATE_T, post_top, P.POST_DIA)
         # Blind at 0.5 above the plate, open at the top, so the screw goes
         # in from the labelled face and the mouth is the one being tested.
-        part -= _tube(x, -6.0, P.PLATE_T + 0.5, post_top + 0.1, dia)
+        part -= _tube(x, post_y, P.PLATE_T + 0.5, post_top + 0.1, dia)
         part -= _lead_in(
-            x, -6.0, post_top, -P.PILOT_MOUTH_H, P.PILOT_MOUTH_DIA, dia
+            x, post_y, post_top, -P.PILOT_MOUTH_H, P.PILOT_MOUTH_DIA, dia
         )
-        part -= Pos(x, 2.0, P.PLATE_T - 0.4) * extrude(
-            Text(f"{dia:.2f}", font_size=4.0,
-                 align=(Align.CENTER, Align.CENTER)),
-            amount=0.5,
+        part -= Pos(x, label_y, P.PLATE_T - 0.4) * extrude(
+            _label(f"{dia:.2f}"), amount=0.5
         )
 
-    so_h = P.Z_PLATE_BOTTOM - P.Z_NEOKEY_TOP
-    part += _tube(post_x[0], 8.0, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
-    part += _tube(
-        post_x[0], 8.0, P.PLATE_T + so_h, P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA
+    # The clearance pad, brought up from the plate's 1.60 to the bottom
+    # plate's real BOTTOM_T. A clearance hole that is free through 8 layers
+    # is not necessarily free through 12, and it is the 12 that ships.
+    part += _block(
+        L["pad_x0"], L["pad_x1"], L["pad_y0"], L["pad_y1"], 0.0, P.BOTTOM_T
     )
+    part -= _clear_row(post_x, hole_y, L["clear_label_y"], P.CLEAR_CHAMFER)
+
+    so_h = P.Z_PLATE_BOTTOM - P.Z_NEOKEY_TOP
+    sy = L["standoff_y"]
+    part += _tube(post_x[0], sy, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
+    part += _tube(
+        post_x[0], sy, P.PLATE_T + so_h,
+        P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA,
+    )
+    return part
+
+
+def clear_coupon_layout():
+    """Where the hole-only coupon puts its rows.
+
+    Exposed for the same reason coupon_layout() is: the only thing that
+    checks a test part is a script, and a script holding its own copy of
+    these numbers is a check that silently relocates when a row moves.
+    """
+    L = coupon_layout()
+    n = len(P.CLEAR_SWEEP)
+    rows = len(P.CLEAR_CHAMFER_SWEEP)
+    pitch = L["pitch"]
+    margin = 3.0
+    row_d = L["pad_y1"] - L["pad_y0"]
+    # A column down the left for the row's own label, so the rows are told
+    # apart by what is written on them and not by which way up the part
+    # was picked up.
+    tag_w = 12.0
+    w = tag_w + (n - 1) * pitch + P.SCREW_HEAD_DIA + 2 * margin
+    d = rows * row_d
+    x_left = -w / 2
+    xs = [
+        x_left + tag_w + margin + P.SCREW_HEAD_DIA / 2 + i * pitch
+        for i in range(n)
+    ]
+    # Rows keep the big coupon's internal spacing exactly; only the pad
+    # around them is new.
+    hole_off = L["hole_y"] - L["pad_y0"]
+    label_off = L["clear_label_y"] - L["pad_y0"]
+    rows_y = []
+    for r in range(rows):
+        y0 = d / 2 - (r + 1) * row_d
+        rows_y.append({
+            "chamfer": P.CLEAR_CHAMFER_SWEEP[r],
+            "hole_y": y0 + hole_off,
+            "label_y": y0 + label_off,
+            "tag_x": x_left + tag_w / 2 + margin / 2,
+        })
+    return {"w": w, "d": d, "xs": xs, "rows": rows_y}
+
+
+def clear_coupon():
+    """The clearance sweep on its own, once per transition shape.
+
+    The full coupon answers four questions and three of them are settled,
+    so reprinting it to re-ask the fourth spends twenty minutes and a
+    switch-sized hole on nothing. This is the same row, at the same pitch
+    and the same relative positions, on a pad of its own.
+
+    It is printed twice, once per CLEAR_CHAMFER_SWEEP entry, because the
+    first one printed came out with filament hanging in every bore and
+    there are two candidate explanations -- the hole is simply too small,
+    or the layer that closes the counterbore sags into it. Sweeping the
+    diameter alone cannot separate them: it would find a diameter that
+    works and leave the reason unknown, which is the same answer a wrong
+    theory gives. Two rows at identical diameters, differing only in the
+    transition, does separate them. If the chamfered row runs clean at a
+    diameter the flat row does not, the sag was the cause.
+
+    Same handling as the row on the big coupon, because it *is* that row:
+    counterbore and labels on the bed face, so this prints features-down
+    and is read and used from underneath. Each row carries its own chamfer
+    engraved at the left, `C0.00` and `C0.60`.
+    """
+    L = clear_coupon_layout()
+    part = _slab(L["w"], L["d"], 2.0, 0.0, P.BOTTOM_T)
+    for row in L["rows"]:
+        part -= _clear_row(
+            L["xs"], row["hole_y"], row["label_y"], row["chamfer"]
+        )
+        part -= Pos(row["tag_x"], row["hole_y"], -0.1) * extrude(
+            _label(f"C{row['chamfer']:.2f}", flip=True), amount=0.5
+        )
     return part

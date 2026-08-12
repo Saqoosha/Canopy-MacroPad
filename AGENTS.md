@@ -80,6 +80,42 @@ one, not necessarily the only one.
   Watched-to-fail numbers so far: cable notch 28.4 mm³, rail over a
   button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
   3.8 mm³.
+- **A hole above a counterbore is a ring printed over air.** Ø6.10 of
+  counterbore under the Ø3.55 hole of the day leaves 1.275 mm unsupported
+  all the way round; it sags into the top of the bore, and the printed
+  coupon has filament in every hole. The built bottom plate has the same
+  feature, so this is a better candidate than hole shrink for why the
+  clearance holes guide the screw instead of clearing it. `coupon-clear`
+  prints the row twice, `C0.00` and `C0.60`, identical diameters
+  differing only in the transition, because a diameter sweep alone would
+  have found a number that works and left the reason unknown -- the same
+  answer a wrong theory gives. **Both explanations were right and neither
+  was the variable.** The eight holes sort by the ring left unsupported,
+  `(SCREW_HEAD_DIA - dia) / 2 - chamfer`: clean at 0.600 and below, a
+  little sag at 0.675, filament in the bore at 0.750 and up. So 0.60 is
+  this machine's limit for an annular ceiling printed over air --
+  `CLEAR_RING_MAX`, the same kind of constant as the 0.15 shrink -- and
+  the plate is now Ø3.70 chamfered 0.60, landing exactly on it. That ring
+  is also the screw head's seat, so it is the one dimension here with a
+  maximum as well as a minimum, and `build.py` checks it outside the
+  margins table because that table can only express floors.
+- **A cut placed inside a void does nothing, and looks like it worked.**
+  The chamfer above was first written below the counterbore top, where
+  the counterbore had already removed the material. `build.py` passed,
+  the part built, and the two coupon rows would have printed *identical*
+  while the experiment reported that chamfering does not help. What
+  caught it was a probe asking the rows to disagree at a stated height,
+  not a check asking whether the part was valid. When a feature is meant
+  to change a shape, measure the shape, not the exit code.
+- **A check positioned from the thing it measures cannot fail.** The
+  coupon's clearance label is placed 1.00 from the counterbore's rim, so
+  a margin on that gap reported 1.000 forever and would have gone on
+  reporting it through any change. It was added and then deleted, because
+  a guard that cannot go red is worse than no guard: it reads as
+  coverage. What replaced it is the part that is *not* derived -- whether
+  the label still lands on the pad -- which was watched failing at -4.327
+  with `LABEL_SIZE` pushed to 12.0. Same disease as the standoff story
+  below, caught one step earlier.
 - **The standoff story is the reason for the rule above.** Its diameter
   was cut on the stated grounds that the check had flagged it, and it
   never had — the 0.009 mm³ came from the plate-hole corner instead. A
@@ -89,8 +125,9 @@ one, not necessarily the only one.
 - Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
   settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
   in PLA Basic, so the 0.15 over nominal is this machine's hole shrink
-  and holds until the filament or nozzle changes. `PILOT_DIA` (2.50) is
-  still a guess until an M3 has actually been driven into a post.
+  and holds until the filament or nozzle changes. Every other number it
+  tests is settled too, and when the clearance row is the only question
+  `out/<layout>/coupon-clear.stl` asks it in a few minutes instead.
 
 ## Checking the viewer
 
@@ -139,15 +176,30 @@ and if that happens the sweep re-runs downward. The reprinted shell has
 The 0.15 shrink then turned up a third time in the part nobody was
 looking at. **The bottom plate's screw holes are tight** -- Ø3.40 arrives
 as ~3.25 against an M3's 3.00, so they pass a screw while guiding it,
-which is not what a clearance hole is for. `SCREW_CLEAR_DIA` is now 3.55
-and is **unproven**; the built plate keeps the old holes and is usable as
-is. Widening it also broke a derivation: `PILOT_MOUTH_DIA` used to read
+which is not what a clearance hole is for. The first answer was 3.55 on
+the shrink arithmetic, and it was wrong -- see the ring bullet above, and
+`SCREW_CLEAR_DIA` is now 3.70 with `CLEAR_CHAMFER` at 0.60. The built
+plate keeps the old Ø3.40 holes and is usable as is. Widening it also broke a derivation: `PILOT_MOUTH_DIA` used to read
 `SCREW_CLEAR_DIA`, on an argument that only held while the two happened
 to agree, and it is now pinned at 3.40 because what the funnel has to
 catch is the screw tip, not the plate's hole. `build.py` gained
 "counterbore ring under the head" at the same time, since widening the
 clearance hole eats the ring the head bears on and nothing else would
-have noticed. Also
+have noticed.
+
+The coupon now settles that one too: `CLEAR_SWEEP` is a second row, on a
+pad raised to the real `BOTTOM_T` with the counterbore on the **bed**
+face where `bottom()` puts it. Both details are load-bearing -- a hole is
+as free as the number of layers it passes through, and printed
+counterbore-up the through-hole would start at the squashed first layer
+and read tighter than the plate it stands in for. Its labels are on that
+same face and mirrored, because a face is seen from the other side once
+the part is in your hand. Two things this cost, both worth remembering:
+the label position is derived from the counterbore's rim rather than the
+pad edge, after a fixed offset put the top of the digits exactly on it;
+and `coupon_layout()` exists because a probe holding its own copy of the
+row positions kept measuring where the posts used to be, passing every
+"this hole is open" assertion by finding nothing at all. Also
 noted: the Qwiic plug goes into the `inline` pocket but takes some
 working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
 on a reprint. `stacked` has not been printed at all.

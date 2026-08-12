@@ -45,12 +45,13 @@ sent `PILOT_DIA` to the coupon, which settled it at 2.95 — see below —
 and put a Ø3.40 × 0.60 lead-in at every mouth. The reprinted shell has
 both and the screw goes in clean.
 
-The same 0.15 then turned up a third time, in the part nobody was looking
-at: the bottom plate's screw holes are tight. They pass a screw, but they
-guide it, and a clearance hole is supposed to be free. Ø3.40 arrives as
-~3.25 against an M3's 3.00, which is a close fit by the tables. That sent
-`SCREW_CLEAR_DIA` to 3.55 — **unproven, and the built plate keeps the old
-holes, which are usable.** `stacked` has never been printed at all.
+Then the part nobody was looking at: the bottom plate's screw holes are
+tight. They pass a screw, but they guide it, and a clearance hole is
+supposed to be free. The obvious answer was the same 0.15 shrink a third
+time, and it was wrong — see the coupon section, where two rows of holes
+found the real cause under the counterbore. The plate is now Ø3.70 with a
+0.60 chamfer, and **the built plate keeps the old Ø3.40 holes, which are
+usable.** `stacked` has never been printed at all.
 
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
 Both parts print flat and **neither needs supports**. If the slicer wants
@@ -58,7 +59,7 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-`out/<layout>/coupon.stl` is 68 × 26 mm and takes about twenty minutes.
+`out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
 
@@ -66,6 +67,7 @@ can settle, and getting them wrong costs a two-hour reprint:
 |---|---|---|
 | switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
 | M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
+| M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
 `PILOT_DIA` was the last one open, and the only one the coupon could
@@ -86,10 +88,71 @@ because that is how this number fails, not by splitting a post on the
 first turn but by letting go on the third time the case is opened. If one
 ever does strip, the sweep gets re-run downward.
 
-To re-settle it after a filament or nozzle change: print the coupon, drive
-a screw into each post, set `PILOT_DIA` to the smallest one that bites
-without a struggle, rerun `build.py`, print the real thing. The coupon
-carries the real features at their real sizes — the
+`CLEAR_SWEEP` is the same idea pointed at the other end of the same
+screw, and it took the longest to answer. Its row is a pad raised to the
+bottom plate's real `BOTTOM_T`, not the 1.6 the rest of the coupon is:
+how free a hole is depends on how many layers it passes through, and it
+is the 12 that ships. The counterbore is on the **bed** face, where
+`bottom()` puts it, so the through-hole starts 1.00 up and never meets
+the squashed first layer — printed the other way up, the coupon would
+read tighter than the plate it stands in for and the answer would be
+wrong in the safe-looking direction. The labels are on that same face and
+mirrored, so the side you read is the side the screw goes in. **Turn the
+coupon over for this row.** The right hole is the smallest one a screw
+falls through under its own weight while its head is still fully caught
+by the counterbore.
+
+When the clearance row is the *only* thing open — which is where this
+sits today — print `out/<layout>/coupon-clear.stl` instead. Same holes,
+same pitch, same relative positions, on a 57 × 28 × 2.4 pad of its own:
+minutes rather than the full coupon's twenty, and no switch-sized hole
+spent on a fit that was settled months ago. It shares the row with the
+big coupon rather than restating it, so the two cannot drift.
+
+It prints the row **twice**, and that is what settled the number. The
+first one printed came back with filament hanging in every bore, and the
+geometry says why: the counterbore is a Ø6.10 void and the hole above it
+was Ø3.55 at the time, so the layer closing it is a ring 1.275 mm
+wide printed over air, all the way round. It sags, and what it sags into
+is the top of the hole. **The built bottom plate has exactly this
+feature** — the coupon did not invent it, it made it visible — which
+means it is a better candidate for why the screws are guided rather than
+cleared than the 0.15 hole shrink is.
+
+Sweeping the diameter alone cannot separate those two explanations: it
+would find a diameter that works and leave the reason unknown, which is
+the same answer a wrong theory gives. So the rows differ only in the
+transition — `C0.00` is the plate as it shipped, `C0.60` puts a 45° cone
+above the counterbore. **Do not add supports** — the plate prints without
+them, so a supported coupon stands in for nothing.
+
+**Both explanations were right, and neither was the variable.** The eight
+holes sort perfectly by the width of the ring left unsupported over the
+counterbore, which is `(SCREW_HEAD_DIA - dia) / 2 - chamfer` and which
+neither the diameter nor the chamfer sets on its own:
+
+| ring | holes | result |
+|---|---|---|
+| 0.525, 0.600 | 3.85 and 3.70 at `C0.60` | clean |
+| 0.675 | 3.55 at `C0.60` | a little sag |
+| 0.750 and up | 3.40 at `C0.60`, all of `C0.00` | filament in the bore |
+
+So **0.60 is this machine's limit for an annular ceiling printed over
+air** — `CLEAR_RING_MAX`, a constant about the printer in the same way
+`SWITCH_HOLE`'s 0.15 shrink is, and it re-measures with it. The plate now
+runs Ø3.70 with a 0.60 chamfer, which lands exactly on that limit. 3.85
+also passes and was not taken: it buys nothing and costs 0.075 more of
+the seat.
+
+That ring is the one dimension in the case squeezed from both ends — it
+is *also* the flat the screw head bears on — so `build.py` checks it
+against a maximum as well as a minimum, the only clearance here that
+gets both.
+
+To re-settle any of it after a filament or nozzle change: print the
+coupon, drive a screw into each post, drop one through each hole, set the
+numbers to the smallest ones that pass, rerun `build.py`, print the real
+thing. The coupon carries the real features at their real sizes — the
 plate is 1.6 mm and the post is whatever that layout's post is, 7.8 mm
 inline and 13.5 mm stacked — so a fit that works here works in the case.
 
@@ -380,7 +443,7 @@ NeoKey covers the case wall to wall and nothing above can reach it.
 | Part | Qty | Note |
 |---|---|---|
 | STEMMA QT / Qwiic cable | 1 | 100 mm for `stacked`; the existing 50 mm for `inline` |
-| M3 × 10 self-tapping, button head | 4 | into Ø2.95 pilots with a Ø3.40 lead-in, through Ø3.55 clearance; counterbored 1.00 so the feet still clear the dome |
+| M3 × 10 self-tapping, button head | 4 | into Ø2.95 pilots with a Ø3.40 lead-in, through Ø3.70 clearance chamfered 0.60; counterbored 1.00 so the feet still clear the dome |
 | Ø8 × 2 rubber feet | 4 | 0.5 recess, so they stand 1.5 proud |
 | PLA Basic | ~19 g | shell 10.6 cm³, bottom 7.9 cm³ |
 

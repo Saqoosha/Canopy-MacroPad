@@ -48,6 +48,10 @@ def main():
         "shell": parts.shell(),
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
+        # The clearance row on its own. Three of the coupon's four fits
+        # are settled, so re-asking the fourth should not cost a reprint
+        # of the other three.
+        "coupon-clear": parts.clear_coupon(),
     }
 
     print("exported")
@@ -109,6 +113,18 @@ def main():
           f"{'bottom plate fits under the shell':<38} {bh:8.3f}  "
           f"(limit {P.Z_PLATE_BOTTOM:.3f})")
 
+    # The one clearance in the design with a ceiling as well as a floor.
+    # The ring left over the counterbore is both the screw head's seat and
+    # a piece of unsupported printing, so it has to stay wide enough to
+    # bear on and narrow enough not to sag into the bore. The margins
+    # below are all minimums and cannot express the second half.
+    ring = (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2 - P.CLEAR_CHAMFER
+    good = 0.25 <= ring <= P.CLEAR_RING_MAX + 1e-6
+    ok.append(good)
+    print(f"\n  [{'ok ' if good else 'BAD'}] "
+          f"{'ring over the counterbore':<38} {ring:8.3f}  "
+          f"(0.250 to {P.CLEAR_RING_MAX:.3f})")
+
     # Clearances that are not derived from anything, so nothing else fails
     # first if they go negative.
     margins = {
@@ -151,6 +167,33 @@ def main():
         # pulls through.
         "counterbore ring under the head": (
             (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2
+        ),
+        # The coupon drills wider than the case does, and a swept hole
+        # that eats its own counterbore tests nothing -- the screw falls
+        # straight through and the entry reads as "free" for the wrong
+        # reason.
+        "counterbore ring at the widest swept hole": (
+            (P.SCREW_HEAD_DIA - max(P.CLEAR_SWEEP)) / 2
+        ),
+        # The plate's own ring is checked above instead, where it can be
+        # held to a maximum as well. This is the coupon's worst row, and
+        # it gets the minimum only on purpose: the coupon exists to print
+        # rings outside the limit -- its C0.00 row is at 1.200 and that
+        # row is the control.
+        "seat left on the coupon's worst row": (
+            (P.SCREW_HEAD_DIA - max(P.CLEAR_SWEEP)) / 2
+            - max(P.CLEAR_CHAMFER_SWEEP)
+        ),
+        # A swept hole nobody can name is not a test, and the counterbore
+        # is the widest thing on the pad -- it reached the top of the
+        # digits once already, which reads as a clean part right up until
+        # the label comes out with its head cut off. The gap to the
+        # counterbore is not checked here on purpose: the label is now
+        # positioned from that edge, so a check on it would report the
+        # constant it was built from and could never fail. What is left
+        # over, and can, is whether the label still lands on the pad.
+        "coupon label inside the pad": (
+            parts.coupon_layout()["clear_label_edge"]
         ),
         # A proud button head on the underside is only fine while the feet
         # are taller than it is.
