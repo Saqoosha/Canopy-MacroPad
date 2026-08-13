@@ -313,6 +313,32 @@ Ordered so that nothing expensive waits on something cheap.
 - **RP2350A.** This pad does not need a newer core, and choosing it
   gives up the largest single advantage on offer -- that a released UF2
   boots the board.
+
+- **RP2354A, which stacks the flash into the package.** The real
+  temptation, and the closest call here. It is an RP2350A die plus a
+  Winbond `W25Q16JVWI` in one QFN-60, pin-identical to the flashless
+  part, for $0.20 -- so it deletes the SOIC-8 and its six QSPI traces
+  outright.
+
+  It was declined because **the flash chip is not charging us in a
+  currency we are short of.** The socket has already bought 1.85 of
+  height and the part is 1.75; the free band is 114 x 11 and the part is
+  5 x 6. What RP2354 saves is surplus. What it costs is not: 2 MB is the
+  whole stacked device, no released CircuitPython build targets it, and
+  authoring a board definition turns the firmware into an artefact this
+  project owns and has to rebuild on every CircuitPython release. That
+  is a standing obligation traded for a part that fits in space nothing
+  else wants.
+
+  **The condition under which it wins is worth naming**, because it may
+  arrive: if a custom CircuitPython build ever becomes necessary for
+  some other reason, the released-UF2 advantage is already gone, the
+  flash chip becomes pure cost, and RP2354A is then the right part.
+
+  Not a reason either way: **erratum RP2350-E9**. It latches a pin
+  configured as a **pull-down**, and every key input here is a pull-up
+  with the switch to ground -- the opposite arrangement. A3 and A4
+  stepping address it regardless, and RP2354 is built on those.
 - **A key matrix.** Six keys, eleven pins. A matrix adds diodes and a
   ghosting argument to save nothing.
 - **Two board revisions, one per switch.** The combo footprint costs
