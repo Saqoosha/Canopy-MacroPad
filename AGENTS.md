@@ -415,11 +415,35 @@ on a reprint. `stacked` has not been printed at all.
   because the host maps index to pane and a silent renumbering focuses
   the wrong session. That is also why `NUM_KEYS` is a constant 6 and
   `HELLO <ver> 0` can no longer happen.
-- **A dead Qwiic cable must cost exactly four keys.** The GPIO reads sit
-  outside every guard and each pad's `get_keys()` and each pixel group's
-  `show()` is guarded separately. Collapsing those back into one `try`
-  would take the two keys that do not use the bus down with it, which is
-  the whole reason they are on GPIO.
+- **One line is the whole four-key build.** Empty `GPIO_KEY_PIN_NAMES`
+  and `SEESAW_BASE` falls to 0, `NUM_KEYS` to 4, and the GPIO setup is
+  skipped whole -- the NeoKey goes back to being keys 0-3. There is
+  deliberately no autodetection: an absent breakout is electrically
+  identical to a present one nobody is pressing, pulled high either way,
+  with no readback on the pixel line and no capacitive sense on an
+  RP2040. Any automatic answer would be a guess, and a wrong guess
+  renumbers every key silently -- the one failure this file is built to
+  prevent. Flashing is one file copy, so the person doing the copy is
+  the only honest source of truth. The guard around the setup is not
+  cosmetic: `NeoPixel(pin, 0)` would either raise, giving a four-key
+  board an `ERR gpio pixels` on every connect forever about hardware it
+  never had, or leave an empty group nobody writes to.
+- **A dead NeoKey costs exactly four keys. A dead *cable* costs all
+  six.** The GPIO reads sit outside every guard and each pad's
+  `get_keys()` and each pixel group's `show()` is guarded separately, so
+  every I2C fault that leaves the cable plugged in -- a missing library,
+  a wrong address, a seesaw that stops answering -- costs only the four
+  keys behind it, and collapsing those back into one `try` would take
+  the other two down with it. The cable is the exception, and it is a
+  wiring fact rather than a firmware one: the built unit takes the
+  breakouts' `VDD` and `GND` off the NeoKey's `JP1`/`JP5` header, which
+  is the incoming Qwiic rail, so unplugging it removes their power *and*
+  their ground reference. The pixels go dark, `SWITCHA` floats high
+  through its pull-up, and keys 0 and 1 report as never pressed. The
+  device stays up and still says `HELLO 3 6`. That was traded knowingly,
+  for two fewer wires through the one 4.8 mm lane under the boards, and
+  it is the single place where the wiring promises less than the
+  firmware does.
 - **The device is dumb on purpose.** It reports key edges and paints what
   it is told. Which pane, which status, when to pulse — all host-side.
   Resist moving policy down here; the split is what keeps the protocol
@@ -489,7 +513,8 @@ Known-good answers, for telling a healthy board from a sick one:
 | healthy | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
 | NeoKey or `adafruit_neokey` missing | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
 | `neopixel` missing | `HELLO 3 6` + `ERR gpio pixels ...`, keys 0-1 dark but still reporting presses |
-| bus lost while running | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
+| bus lost while running, cable still in | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
+| Qwiic cable unplugged | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, and keys 0-1 dark and stuck unpressed — they draw `VDD` and `GND` off the NeoKey, so the cable carries their power too |
 | firmware died past 60 s uptime | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
 | firmware died inside 60 s | `ERR fatal-halted ...` on every later connect, stays red |
 

@@ -106,6 +106,19 @@ SEESAW_KEYS = KEYS_PER_PAD * len(PAD_ADDRESSES)
 # In physical left-to-right order, which here means these come *before*
 # the NeoKey's four. All three pins sit on the QT Py's 3V/GND edge, so
 # the harness does not have to cross the board.
+#
+# Empty this tuple for a board with no breakouts and the whole file
+# becomes the four-key firmware: `SEESAW_BASE` falls to 0 so the NeoKey
+# is 0-3 again, `NUM_KEYS` falls to 4, and the setup below is skipped
+# whole. That one line is the entire difference between the two builds.
+#
+# There is deliberately no detection and no strap. An absent breakout is
+# electrically identical to a present one nobody is pressing -- pulled
+# high either way, with no readback on the pixel line and no capacitive
+# sense on an RP2040 -- so any automatic answer would be a guess. A
+# wrong guess renumbers every key silently, which is the one failure
+# this file is built to prevent, and the flash is one file copy. The
+# person doing the copy is the only honest source of truth.
 GPIO_KEY_PIN_NAMES = ("MISO", "SCK")
 GPIO_PIXEL_PIN_NAME = "MOSI"
 GPIO_KEYS = len(GPIO_KEY_PIN_NAMES)
@@ -116,8 +129,9 @@ GPIO_KEYS = len(GPIO_KEY_PIN_NAMES)
 # breakout's switch body and the NeoKey's socket ends up 114 mm from a
 # QT Py holding a 50 mm cable. See case/params.py, BREAKOUT_ORIGINS_LOCAL.
 #
-# So the GPIO pair is 0-1 and the NeoKey is 2-5. These two constants are
-# the only place that knows which way round it goes.
+# So the GPIO pair is 0-1 and the NeoKey is 2-5 -- or, with the tuple
+# above emptied, there is no pair and the NeoKey is 0-3. These two
+# constants are the only place that knows which way round it goes.
 GPIO_BASE = 0
 SEESAW_BASE = GPIO_KEYS
 
@@ -266,34 +280,43 @@ if i2c is not None:
 # must not cost these two keys their presses, so the switches are built
 # first and separately -- the half that needs nothing stays working when
 # the half that needs something does not.
+#
+# Skipped whole when GPIO_KEY_PIN_NAMES is empty, and the skip is not
+# cosmetic: `NeoPixel(pin, 0)` is a zero-length strip, which is either
+# an exception -- and then a four-key board reports `ERR gpio pixels` on
+# every single connect, forever, about hardware it was never built with
+# -- or an empty group nothing will ever write to. Neither is worth
+# carrying, and the first would teach a host to ignore that error.
 gpio_switches = []
 gpio_errors = []
-try:
-    import digitalio
+if GPIO_KEYS:
+    try:
+        import digitalio
 
-    for name in GPIO_KEY_PIN_NAMES:
-        switch = digitalio.DigitalInOut(getattr(board, name))
-        switch.switch_to_input(pull=digitalio.Pull.UP)
-        gpio_switches.append(switch)
-except Exception as err:  # noqa: BLE001
-    gpio_errors.append("keys {}: {}".format(type(err).__name__, err))
-try:
-    from neopixel import NeoPixel
+        for name in GPIO_KEY_PIN_NAMES:
+            switch = digitalio.DigitalInOut(getattr(board, name))
+            switch.switch_to_input(pull=digitalio.Pull.UP)
+            gpio_switches.append(switch)
+    except Exception as err:  # noqa: BLE001
+        gpio_errors.append("keys {}: {}".format(type(err).__name__, err))
+    try:
+        from neopixel import NeoPixel
 
-    # GRB is the WS2812 family's wire order and what the NeoKey's seesaw
-    # driver already assumes, so the breakouts carrying the same
-    # NEO3535_REVERSE part should match. If keys 0 and 1 come up with red
-    # and green swapped while 0-3 look right, this is the line -- it is a
-    # property of the LED, and nothing in the .brd files states it.
-    gpio_pixels = NeoPixel(
-        getattr(board, GPIO_PIXEL_PIN_NAME), GPIO_KEYS,
-        auto_write=False, brightness=DEFAULT_BRIGHTNESS,
-        pixel_order="GRB")
-    gpio_pixels.fill(0x000000)
-    gpio_pixels.show()
-    pixel_groups.append((gpio_pixels, GPIO_BASE, GPIO_KEYS))
-except Exception as err:  # noqa: BLE001
-    gpio_errors.append("pixels {}: {}".format(type(err).__name__, err))
+        # GRB is the WS2812 family's wire order and what the NeoKey's
+        # seesaw driver already assumes, so the breakouts carrying the
+        # same NEO3535_REVERSE part should match. If keys 0 and 1 come up
+        # with red and green swapped while 2-5 look right, this is the
+        # line -- it is a property of the LED, and nothing in the .brd
+        # files states it.
+        gpio_pixels = NeoPixel(
+            getattr(board, GPIO_PIXEL_PIN_NAME), GPIO_KEYS,
+            auto_write=False, brightness=DEFAULT_BRIGHTNESS,
+            pixel_order="GRB")
+        gpio_pixels.fill(0x000000)
+        gpio_pixels.show()
+        pixel_groups.append((gpio_pixels, GPIO_BASE, GPIO_KEYS))
+    except Exception as err:  # noqa: BLE001
+        gpio_errors.append("pixels {}: {}".format(type(err).__name__, err))
 # Two variables on purpose. `boot_i2c_error` is what setup found and
 # never changes; `i2c_error` is what is true *now*, so the connect
 # branch reports the current state instead of a snapshot taken before
@@ -415,9 +438,12 @@ def flush_pixels():
     """Push staged writes to hardware. Returns the first error, or None.
 
     Guarded per group rather than inside the loop's single try. The
-    groups fail independently, and the whole reason keys 0 and 1 hang
-    off GPIO is that they do not need the Qwiic cable -- letting a dead
-    bus stop them painting would give that away for nothing.
+    groups fail independently: a bus that cannot paint the NeoKey must
+    not stop the breakout chain painting, which is the whole reason keys
+    0 and 1 hang off GPIO. That holds for every I2C fault with the cable
+    still in it. It does not hold for the cable itself -- the built unit
+    draws the breakouts' VDD off the NeoKey's header, so an unplugged
+    cable takes their pixels with it whatever this function does.
     """
     first_err = None
     for g in range(len(pixel_groups)):
@@ -717,10 +743,14 @@ try:
         # a board that never booted looks like.
         #
         # Several guards now rather than one, because half the keypad no
-        # longer touches the bus. A dead Qwiic cable has to cost exactly
-        # the keys that hang off it and no others -- otherwise putting
-        # keys 0 and 1 on GPIO bought nothing. Every arm records into
-        # `tick_err` and the accounting below stays in one place.
+        # longer touches the bus. An I2C fault has to cost exactly the
+        # keys behind it and no others -- otherwise putting keys 0 and 1
+        # on GPIO bought nothing. The cable is the one exception and it
+        # is a wiring fact rather than a firmware one: the built unit
+        # draws the breakouts' VDD and GND off the NeoKey's header, so
+        # unplugging it costs all six however carefully this loop is
+        # split. Every arm records into `tick_err` and the accounting
+        # below stays in one place.
         tick_err = None
         try:
             if now - last_pulse_at >= PULSE_STEP_NS:

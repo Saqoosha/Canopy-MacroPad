@@ -135,8 +135,8 @@ the board and the switch stands above it, so that pair was never in the
 same space. Booleaned since, and then assembled: a plug in the NeoKey's
 left socket clears the breakouts, the switches and both printed parts,
 and there is a photograph of one sitting in there with both breakouts
-butted on. That socket is not blocked — it is where the power comes
-from.
+butted on. The socket is not blocked; the built unit simply leaves it
+empty, because power ended up coming off the headers instead.
 
 Five wires and no per-key soldering — the breakouts ship with Kailh
 sockets and their NeoPixels already fitted:
@@ -155,30 +155,33 @@ edges, `INT D C - 3 VIN`, and that `VIN` is the `VCC` net — the one the
 STEMMA receptacles' `V+` lands on. The pin marked `3` is the `AP2112K`'s
 output and feeds no pixel anywhere.
 
-The NeoKey's spare STEMMA socket carries the same net and is closer to
-the boards, and it was the plan for a while. A header wins on parts: it
-is a solder joint instead of a connector, and the second Qwiic cable's
-other pair would have been `SDA`/`SCL`, live and terminated in nothing.
+The NeoKey's spare STEMMA socket carries the same net and sits closer to
+the boards, and it was the plan for a while. The schematic has both
+receptacles fully parallel — `V+`, `GND`, `SDA` and `SCL` all common —
+so the left one is the same node as the right, and a plug goes into it
+with both breakouts butted on, which there is a photograph of. It is a
+real option and it is not the one taken. A header wins on parts: a
+solder joint instead of a connector, and the second cable's other pair
+would have been `SDA`/`SCL`, live and terminated in nothing — 50 mm of
+unterminated stub on a 100 kHz bus, harmless, but better decided on than
+discovered.
 
-Five wires reach the breakouts but only **three of them cross the case**.
-`3V` and `GND` are taken at the NeoKey's *left* STEMMA socket, which is
-the nearest point on that net to the boards that need it — a second
-Qwiic cable in the receptacle facing the breakouts. The schematic has
-both receptacles fully parallel, `V+`, `GND`, `SDA` and `SCL` all
-common, so the left one is the same node as the right and no board
-modification is involved.
+Neither tap relaxes the wire channel. Both sit at or beyond the NeoKey's
+left edge and the narrowest point in the case is immediately left of
+that, so all five wires are still abreast where it matters. What the tap
+buys is length, not width.
 
-Two consequences of that being a Qwiic cable rather than two wires. Its
-other pair is `SDA`/`SCL`, live and going nowhere — 50 mm of unterminated
-stub on a 100 kHz bus, which is harmless but should be understood rather
-than discovered. And it does **not** relax the wire channel: the tap is
-at the NeoKey's left edge and the narrowest point in the case is
-immediately left of it, so all five are still abreast where it matters.
-
-The `JP1`/`JP5` headers at the NeoKey's midpoint are the alternative,
-carrying `INT D C - 3 VIN` on the long edges. `VIN` there is the same
-`VCC` net again. The pin marked `3` is the `AP2112K`'s output and feeds
-no pixel anywhere — if these headers are used, take `VIN`.
+**Taking power off the NeoKey means the Qwiic cable carries it.** Pull
+that cable and keys 0 and 1 lose their supply and their ground reference
+together: the pixels go dark, `SWITCHA` floats high through its pull-up,
+and they report as never pressed. The device stays up and still says
+`HELLO 3 6`. Every *other* I2C fault — a missing library, a wrong
+address, a seesaw that stops answering — still costs exactly the four
+keys behind it, which is what the firmware's separate guards are for. So
+the promise is narrower than it reads elsewhere: **a dead NeoKey costs
+four keys, a dead cable costs six.** Running `3V` and `GND` from the QT
+Py instead buys the wider promise back, for two more wires through that
+lane.
 
 Each breakout carries a 1N4148 from `SWITCHA` to `SWITCHC`, so grounding
 `SWITCHC` makes a press read low. The forward drop at the ~55 µA an
