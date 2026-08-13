@@ -314,6 +314,14 @@ connectors and not bare receptacles:
 - the NeoKey's support columns growing with the screws, because they were
   sized off `POST_DIA` and are not screws at all. They have their own
   `COLUMN_DIA` now.
+- **two bottom-plate columns standing through a breakout's hot-swap
+  socket** — and this one the checks did *not* find, the assembled part
+  did. The stand-in drew the socket as one box around its body, so it
+  missed the solder wing off each end; and the back face was never
+  mirrored for the fact that the board is turned over to put its switch
+  side up, so the whole of it sat on the wrong side. Both are fixed at
+  the source: `BREAKOUT_BACK_PARTS` is every part on that face as the
+  STEP has them, mirrored once on the way into case space.
 - **a NeoKey support column standing through the middle of the QT Py** in
   `stacked`, 116 mm³ of it, the moment the key field grew to three
   boards. The NeoKey stopped starting at the field's left edge, so its
