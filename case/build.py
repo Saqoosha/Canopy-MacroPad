@@ -52,6 +52,12 @@ def main():
         # are settled, so re-asking the fourth should not cost a reprint
         # of the other three.
         "coupon-clear": parts.clear_coupon(),
+        # The seam joint on its own. It is the one feature here that has
+        # to spring, and springiness is not calculable at this wall
+        # thickness -- so it gets asked the same way every other fit in
+        # this case was, on a part that costs two minutes instead of
+        # twenty.
+        "coupon-seam": parts.seam_coupon(),
     }
 
     print("exported")
@@ -90,8 +96,11 @@ def main():
               (P.SWITCH_XY[0][1] + P.SWITCH_XY[-1][1]) / 2,
               P.NEOKEY_ORIGIN[1] + P.NEOKEY_SW_Y),
         check("plate thickness", P.Z_PLATE_TOP - P.Z_PLATE_BOTTOM, P.PLATE_T),
+        # From the top of the plate down to the bottom of the skirt, which
+        # reaches below the seam so the two halves overlap rather than
+        # butting. The skirt is why this is not simply CASE_H - Z_FLOOR.
         check("shell height", built["shell"].bounding_box().size.Z,
-              P.CASE_H - P.Z_FLOOR),
+              P.CASE_H - P.Z_FLOOR + P.SEAM_STEP_H),
     ]
     if P.STACKED:
         ok += [

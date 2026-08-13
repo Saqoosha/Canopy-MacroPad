@@ -422,6 +422,60 @@ QWIIC_PLUG_L = 2.50
 
 PCB_SLOP = 0.40  # total, so 0.20 a side
 
+# How much shorter the shell's standoffs are than the space they sit in.
+# Without it the stack from the floor to the plate underside -- column,
+# board, standoff -- adds up to exactly the height available, so the case
+# closes only if every board is exactly NEOKEY_T and every layer prints
+# exactly 0.20. FR4 is 1.6 nominal with a real tolerance, and the first
+# printed six-key unit came out with a 0.2 gap at the centre of the seam,
+# pressing down to 0.1: the two halves were being held apart by the boards
+# themselves. The screws close it at both ends, and there is no screw
+# within 60 mm of the middle.
+#
+# The columns still set the board's height from below; this only stops the
+# standoff turning into a jack. The board gains this much vertical play,
+# which costs nothing -- a plate-mount switch clips into the plate and
+# holds the board through its socket, which is what actually locates it.
+BOARD_CLAMP_SLACK = 0.20
+
+# --- how the two printed halves close on each other --------------------
+# A butt joint at Z_FLOOR was all there was, and it does not survive being
+# 158 mm long with a screw only at each end: the first six-key unit came
+# out with 0.2 of gap at the centre, and giving the board stack slack
+# above only took it to 0.1. What is left is the parts themselves not
+# being flat -- a 158 x 26 plate and a 158 mm shell both bow a little off
+# the bed -- and a butt joint has nothing to pull them together with.
+#
+# Two features, and they are not alternatives. The step aligns the halves
+# and hides whatever gap remains inside the joint; the snap is the only
+# one that actually pulls. Together the step also gives the snap
+# something to grab, so no tab has to pass through the plate and nothing
+# shows on the underside.
+#
+# The plate's top SEAM_STEP_H becomes a tongue inset by SEAM_STEP_W, and
+# the shell's walls come down beside it. 1.00 x 1.20 keeps 1.00 of wall
+# outboard of the tongue at WALL 2.00.
+SEAM_STEP_W = 1.00
+SEAM_STEP_H = 1.20
+
+# Barbs on the inside of that skirt, and a groove round the tongue for
+# them to drop into. Only where the plate's own columns leave room: the
+# screws sit at +/-63.05 and the true mid-span at x=0 is a NeoKey column,
+# so these go either side of it, in the 15.05 and 33.60 wide clear spans.
+SEAM_SNAP_X = (-9.53, 19.05)
+SEAM_SNAP_W = 4.00     # along the wall
+SEAM_SNAP_HOOK = 0.40  # how far the barb reaches into the groove
+SEAM_SNAP_H = 0.60     # its height, and the groove's
+SEAM_FIT = 0.20        # total clearance between skirt and tongue
+
+# What the seam coupon asks. Engagement -- how far the barb actually
+# reaches into the groove -- is SEAM_SNAP_HOOK minus half the fit, and it
+# is the only number that matters: it sets how far the skirt has to
+# spring to let the tongue past, and how hard the joint is to pull open
+# again. Sweeping the hook with the fit held is therefore a sweep of one
+# variable and not two.
+SEAM_SNAP_SWEEP = (0.30, 0.40, 0.55, 0.70)
+
 # --- inline layout only -------------------------------------------------
 # Beside the keys, the NeoKey fills the cavity front to back, so a screw
 # post has nowhere to stand except off the ends of it. One bay at the left

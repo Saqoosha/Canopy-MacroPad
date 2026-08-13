@@ -175,10 +175,36 @@ def shell():
     )
     part = outer - cavity
 
+    # The skirt: the walls carry on down past the seam, beside the
+    # tongue the bottom plate has been given, so the halves locate on
+    # each other instead of meeting edge to edge. Its inner face is the
+    # tongue's outline plus a hair of clearance.
+    skirt_z0 = P.Z_FLOOR - P.SEAM_STEP_H
+    part += (
+        _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R, skirt_z0, P.Z_FLOOR)
+        - _slab(P.CASE_W - 2 * P.SEAM_STEP_W + P.SEAM_FIT,
+                P.CASE_D - 2 * P.SEAM_STEP_W + P.SEAM_FIT,
+                max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
+                skirt_z0 - 0.1, P.Z_FLOOR + 0.1)
+    )
+
+    # ...and a barb on the inside of it, at each of the few places along
+    # the wall where the plate's own columns leave room. This is the part
+    # that pulls: the step only aligns.
+    for sx in P.SEAM_SNAP_X:
+        for sign in (-1, 1):
+            y_in = sign * (P.CASE_D / 2 - P.SEAM_STEP_W + P.SEAM_FIT / 2)
+            part += _block(
+                sx - P.SEAM_SNAP_W / 2, sx + P.SEAM_SNAP_W / 2,
+                min(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
+                max(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
+                skirt_z0, skirt_z0 + P.SEAM_SNAP_H,
+            )
+
     # Standoffs that set the board height, each ending in a locating peg.
     # These two features are the entire NeoKey mount -- there is no screw.
     for x, y in P.MOUNT_XY:
-        part += _tube(x, y, P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
+        part += _tube(x, y, P.Z_NEOKEY_TOP + P.BOARD_CLAMP_SLACK, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
         part += _tube(x, y, P.Z_NEOKEY_TOP - P.PEG_H, P.Z_NEOKEY_TOP, P.PEG_DIA)
 
     # The breakouts are pressed at the seams between boards rather than
@@ -187,14 +213,14 @@ def shell():
     # boards meet, so there is nothing to locate into. Placing them is
     # the bottom plate's job.
     for x, y in P.SEAM_XY:
-        part += _tube(x, y, P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
+        part += _tube(x, y, P.Z_NEOKEY_TOP + P.BOARD_CLAMP_SLACK, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
 
     # ...and a rib down the field's outer left edge, which has no seam to
     # stand on. It grows off the plate, so on a shell printed plate face
     # down it is not an overhang.
     _rx, _ry = P.FIELD_ORIGIN
     part += _block(_rx, _rx + P.EDGE_RIB_W, _ry, _ry + P.BREAKOUT_D,
-                   P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM)
+                   P.Z_NEOKEY_TOP + P.BOARD_CLAMP_SLACK, P.Z_PLATE_BOTTOM)
 
     # Corner posts for the bottom plate's screws, full interior height.
     for x, y in P.POST_XY:
@@ -242,7 +268,12 @@ def shell():
     # end when it lies face up beside them.
     part -= _usb_opening()
 
-    part = part & outer
+    # Trim to the outer envelope, which now has to reach down over the
+    # skirt as well: intersecting with `outer` alone silently deleted it,
+    # and nothing complained -- the part built, every check passed, and
+    # the feature was simply not there.
+    part = part & _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R,
+                        P.Z_FLOOR - P.SEAM_STEP_H, P.CASE_H)
 
     # The plate face is the bed face, so its perimeter is where elephant
     # foot shows up. Chamfering it means the squash lands on a slope that
@@ -308,7 +339,28 @@ def bottom():
     on two rails under its component-free margins and slides in under two
     lips, entering through the same wall opening its USB-C comes out of.
     """
-    part = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R, 0.0, P.BOTTOM_T)
+    # The top SEAM_STEP_H is a tongue, inset all round, so the shell's
+    # skirt comes down outside it and the seam stops being a butt joint.
+    part = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R,
+                 0.0, P.BOTTOM_T - P.SEAM_STEP_H)
+    part += _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
+                  max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
+                  P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
+
+    # A groove round the tongue for the shell's barbs to drop into. Cut
+    # the whole way round rather than only where a barb is: a continuous
+    # groove prints as one clean overhang, and four short pockets are
+    # four chances to have put one in the wrong place.
+    gz = P.BOTTOM_T - P.SEAM_STEP_H
+    part -= (
+        _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
+              max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
+              gz, gz + P.SEAM_SNAP_H)
+        - _slab(P.CASE_W - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
+                P.CASE_D - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
+                max(P.OUTER_CORNER_R - P.SEAM_STEP_W - P.SEAM_SNAP_HOOK, 0.5),
+                gz - 0.1, gz + P.SEAM_SNAP_H + 0.1)
+    )
 
     # Columns that push the NeoKey up against the shell's standoffs.
     for x, y in P.MOUNT_XY:
@@ -538,6 +590,84 @@ def coupon():
         post_x[0], sy, P.PLATE_T + so_h,
         P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA,
     )
+    return part
+
+
+def seam_coupon_layout():
+    """Where the seam coupon puts each pair.
+
+    Same reason as the other two layouts: the only thing that checks a
+    test part is a script, and a script holding its own copy of these
+    numbers is a check that quietly moves to empty air.
+    """
+    n = len(P.SEAM_SNAP_SWEEP)
+    span = 20.0        # along the wall, per pair
+    gap = 4.0          # between the shell piece and its plate piece
+    pitch = span + 6.0
+    w = n * pitch
+    return {
+        "n": n, "span": span, "gap": gap, "pitch": pitch, "w": w,
+        "xs": [(-w / 2) + pitch / 2 + i * pitch for i in range(n)],
+        # Both pieces are printed the way their real part is: the shell
+        # fragment with its plate face on the bed, the plate fragment
+        # features up. A snap tested in the wrong orientation is a snap
+        # whose overhang printed differently from the one that ships.
+        "wall_h": 6.0,
+    }
+
+
+def seam_coupon():
+    """One shell fragment and one plate fragment per SEAM_SNAP_SWEEP entry.
+
+    The joint is the one part of this case that has to *spring*, and the
+    number that decides whether it does is engagement -- the barb's reach
+    minus half the fit. Too little and the halves come apart in the hand;
+    too much and the skirt either will not go on or splits. Neither end
+    is calculable from PLA's datasheet at this wall thickness, and the
+    whole case is a twenty-minute print to ask a question a two-minute
+    one can answer.
+
+    Each pair is engraved with its hook. Snap them together by hand: the
+    one that goes on with a click and needs a deliberate pull to come off
+    is the answer, and it goes into SEAM_SNAP_HOOK.
+    """
+    L = seam_coupon_layout()
+    part = None
+    for hook, x in zip(P.SEAM_SNAP_SWEEP, L["xs"]):
+        y0 = -L["gap"] / 2
+
+        # --- the shell side: wall, skirt, barb -- lying the way the
+        # shell lies on the bed, so the barb's ledge prints as it will.
+        wall = _block(x - L["span"] / 2, x + L["span"] / 2,
+                      y0 - P.WALL, y0, 0.0, L["wall_h"])
+        skirt_t = P.SEAM_STEP_W - P.SEAM_FIT / 2
+        wall += _block(x - L["span"] / 2, x + L["span"] / 2,
+                       y0 - skirt_t, y0,
+                       L["wall_h"], L["wall_h"] + P.SEAM_STEP_H)
+        wall += _block(x - P.SEAM_SNAP_W / 2, x + P.SEAM_SNAP_W / 2,
+                       y0 - skirt_t - hook, y0 - skirt_t,
+                       L["wall_h"] + P.SEAM_STEP_H - P.SEAM_SNAP_H,
+                       L["wall_h"] + P.SEAM_STEP_H)
+        part = wall if part is None else part + wall
+
+        # --- the plate side: base, tongue, groove.
+        y1 = L["gap"] / 2
+        plate = _block(x - L["span"] / 2, x + L["span"] / 2,
+                       y1, y1 + P.WALL + 2.0,
+                       0.0, P.BOTTOM_T - P.SEAM_STEP_H)
+        plate += _block(x - L["span"] / 2, x + L["span"] / 2,
+                        y1 + P.SEAM_STEP_W, y1 + P.WALL + 2.0,
+                        P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
+        plate -= _block(x - L["span"] / 2, x + L["span"] / 2,
+                        y1 + P.SEAM_STEP_W, y1 + P.SEAM_STEP_W + hook,
+                        P.BOTTOM_T - P.SEAM_STEP_H,
+                        P.BOTTOM_T - P.SEAM_STEP_H + P.SEAM_SNAP_H)
+        part += plate
+
+        # The number, on the plate piece's top face where it stays
+        # readable once the pair is snapped together.
+        part -= Pos(x, y1 + P.WALL + 0.5, P.BOTTOM_T - 0.3) * extrude(
+            _label("%.2f" % hook), amount=0.4)
     return part
 
 

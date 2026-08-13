@@ -40,6 +40,14 @@ the confirmation print. This has bitten in `firmware/code.py` and again in
 exactly the kind of mismatch eyes skip. Once it produced a "test passed"
 for a fault that had never been injected.
 
+**Never chain the resolution to `git add`.** A script that resolves
+conflicts and a command that stages the result belong in separate calls
+with a `grep -c '<<<<<<<'` between them. Joined with `;`, a script that
+died on its own assertion still let `git add` and `git rebase --continue`
+run, and conflict markers went into four commits of a rebase before
+anyone looked. The tree at the end was correct, which is what makes it
+easy to miss -- only the intermediate commits carried them.
+
 **Restore from a copy, never from git.** `git checkout -- <file>` after
 an injection restores the *committed* file, so any uncommitted work in it
 is gone -- which is how a session lost a finished `case/params.py` while
@@ -75,29 +83,38 @@ one, not necessarily the only one.
   still seal it off, or leave a port a millimetre short of seating. That
   same shape of mistake happened four times, on both Qwiic sockets and
   the USB-C port, and every stand-in models plugs because of it.
-- **A stand-in summarised by hand is a check that agrees with you.**
-  `mock.py` drew the hot-swap socket as one 10.9 x 5.9 box, read off the
-  breakout's STEP. The real socket is a body *plus a solder wing off each
-  end*, 15.9 across, and the wings are what a column runs into. The
-  boolean said the back-left column cleared by 0.586; the printed plate
-  put it through the left wing. Nothing was wrong with the file -- the
-  wings are two separate solids in it and the summary took the biggest
-  one. Anything that decides where a column may stand now comes out of
-  the model as a list of boxes, `BREAKOUT_BACK_PARTS`, and includes the
-  reverse-mount NeoPixel and the diode, which the old summary also had
-  no idea about. Watched to fail: the three old supports against the real
-  shape report 15.659 mm³.
-- **A model read for one face has to be turned over to be used for the
-  other.** The 4978's STEP draws the switch on -z; the case puts the
-  switch side up, so the board is turned over about its long axis and
-  everything on the back face **mirrors left to right**. The z flip was
-  implicit and the in-plane one was simply missing, so the socket, the
-  NeoPixel and the diode were all modelled on the wrong side of the
-  board -- which is why the columns that fouled were the left-hand pair
-  rather than the right. The mirror is one function applied once, at the
-  point the tables become case geometry, so the tables still read as the
-  file does and can be checked against it. Watched to fail: the third
-  support pad left on the side it used to be reports 1.672 mm³.
+- **A stand-in is only as true as what it was told, and the boolean
+  cannot tell you otherwise.** The first assembled six-key unit found
+  four separate versions of this in one afternoon, every one of them
+  green in `build.py` beforehand:
+  - **Summarised by hand.** The hot-swap socket was drawn as one
+    10.9 x 5.9 box. It is a body *plus a solder wing off each end*, 15.9
+    across, and the wings are what a column runs into -- the summary took
+    the biggest of three solids and dropped the rest. The reverse-mount
+    NeoPixel and the diode were not in it at all.
+  - **On the wrong face.** The STEP draws the switch on -z and the case
+    puts the switch side up, so the board is turned over and its
+    component face **mirrors left to right**. The z flip was implicit in
+    placing parts below the board; the in-plane one was missing.
+  - **Feature by feature instead of board by board.** Which way a board
+    sits is *one* fact. It was decided separately for the socket, the
+    components and the STEMMA receptacles, each time to satisfy the last
+    thing someone had pointed at, and the three answers contradicted each
+    other for six rounds. `BOARD_FLIP_X`/`BOARD_FLIP_Y` are that one fact
+    now and everything derives from them.
+  - **The deepest part is not the one you remember.** `SOCKET_CLEARANCE`
+    was a hand-written 2.80 whose comment reasoned from the socket's
+    1.85. The deepest thing under a board is the STEMMA receptacle at
+    2.96 -- modelled on the far side, so nothing had to clear it. The
+    printed case closes on a NeoKey pressed into the bottom plate by
+    0.16, which is too little to feel and was enough to strain the boards.
+    It is `UNDER_BOARD_MAX + 0.40` now.
+
+  So: `BREAKOUT_BACK_PARTS` is every part on that face as boxes out of
+  the STEP, mirrored once on the way into case space, and the tables
+  still read as the file does so they can be checked against it. Watched
+  to fail: the old supports against the real shape 15.659 mm³, the third
+  pad left on the old side 1.672 mm³.
 - **A margin check is not a boolean.** The M3 post landed on the Qwiic
   plug while the margin that existed to prevent exactly that read green,
   because it measured to the board edge and the plug sticks out past it.
@@ -143,15 +160,20 @@ one, not necessarily the only one.
   caught it was a probe asking the rows to disagree at a stated height,
   not a check asking whether the part was valid. When a feature is meant
   to change a shape, measure the shape, not the exit code.
-- **A check positioned from the thing it measures cannot fail.** The
-  coupon's clearance label is placed 1.00 from the counterbore's rim, so
-  a margin on that gap reported 1.000 forever and would have gone on
-  reporting it through any change. It was added and then deleted, because
-  a guard that cannot go red is worse than no guard: it reads as
-  coverage. What replaced it is the part that is *not* derived -- whether
-  the label still lands on the pad -- which was watched failing at -4.327
-  with `LABEL_SIZE` pushed to 12.0. Same disease as the standoff story,
-  caught one step earlier.
+- **A check drifts away from the geometry it was written for, and goes
+  on reporting.** Two shapes of it. One: a check *positioned from the
+  thing it measures* -- the coupon's clearance label sits 1.00 from the
+  counterbore's rim, so a margin on that gap reported 1.000 forever and
+  would have through any change. It was added and deleted, because a
+  guard that cannot go red reads as coverage; what replaced it measures
+  the part that is not derived, whether the label still lands on the pad,
+  watched failing at -4.327 with `LABEL_SIZE` at 12.0. Two: a check
+  measuring a feature *that no longer exists* -- "board columns inside
+  the cavity" used `COLUMN_DIA` for every column after the field pads had
+  been given their own smaller one, and put a pad 0.06 outside the cavity
+  that is really 0.44 inside it. Whenever a constant stops being the only
+  one of its kind, grep the checks for it. Same disease as the standoff
+  story, caught one step earlier.
 - **The standoff story is the reason for "prove a check fires".** Named
   rather than pointed at: this bullet used to say "the rule above", and
   the list has grown three times since, each insertion quietly moving

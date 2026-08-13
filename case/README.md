@@ -322,6 +322,15 @@ connectors and not bare receptacles:
   side up, so the whole of it sat on the wrong side. Both are fixed at
   the source: `BREAKOUT_BACK_PARTS` is every part on that face as the
   STEP has them, mirrored once on the way into case space.
+- **the whole board stack sitting 0.16 too low**, the same disease one
+  level up. The deepest thing under a board is not the hot-swap socket at
+  1.85 but the STEMMA receptacle at 2.96, and that was modelled on the
+  other face where nothing had to clear it. `SOCKET_CLEARANCE` had been a
+  hand-written 2.80 reasoned from the socket; it comes from
+  `UNDER_BOARD_MAX` now. The printed case closes on a NeoKey pressed into
+  the bottom plate — too little to feel, enough to strain the boards, and
+  invisible to every check because the model had the part on the far
+  side. The case grows 0.56 to fix it.
 - **a NeoKey support column standing through the middle of the QT Py** in
   `stacked`, 116 mm³ of it, the moment the key field grew to three
   boards. The NeoKey stopped starting at the field's left edge, so its
