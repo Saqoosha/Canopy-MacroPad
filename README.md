@@ -149,6 +149,22 @@ sockets and their NeoPixels already fitted:
 | NeoKey `JP1`/`JP5` `VIN` | both breakouts' `VDD` |
 | NeoKey `JP1`/`JP5` `G` | both breakouts' `GND`, and `SWITCHC` |
 
+![The same wiring drawn on the assembled boards: every pad named, the
+three signal wires on the top row and the two power wires on the bottom
+one](docs/wiring/wiring-six-key.jpg)
+
+The photograph is the shell turned over, so the face in it is the one the
+wires go on. Pad names and positions in it come out of Adafruit's Eagle
+`.brd` files for the 4978 and the 4980, **not** off the silk in the photo
+— the boards sit rotated in the case, so that silk runs the opposite way
+from the table above, and reading left to right off the picture is how
+you get the wiring mirrored.
+
+`docs/wiring/` holds the photograph and the script that draws on it;
+`python3 docs/wiring/annotate.py` redraws the image. Every coordinate in
+it is a pixel position on `boards.jpg` at its native size, so replacing
+that photograph means re-reading all of them — nothing derives a scale.
+
 Power comes off the NeoKey rather than the QT Py, so only three wires
 cross the case. `JP1` and `JP5` are the headers on the NeoKey's long
 edges, `INT D C - 3 VIN`, and that `VIN` is the `VCC` net — the one the
