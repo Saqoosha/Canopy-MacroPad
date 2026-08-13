@@ -9,9 +9,9 @@ Print target: Bambu A1 mini, 0.4 nozzle, 0.2 layer, PLA Basic.
 
 Two layouts share this file, chosen with MPAD_LAYOUT:
 
-  stacked  (default)  the QT Py lies under the keys, face down.
+  stacked             the QT Py lies under the keys, face down.
                       97.6 x 27.6 x 17.5 -- compact and tall.
-  inline              the QT Py sits beside the keys, face up, USB-C out
+  inline   (default)  the QT Py sits beside the keys, face up, USB-C out
                       the right edge. Long and low instead.
 
 Everything above the "Derived" line is common to both; the split is only
@@ -20,7 +20,7 @@ in where the QT Py goes and what that does to the Z stack.
 
 import os
 
-LAYOUT = os.environ.get("MPAD_LAYOUT", "stacked")
+LAYOUT = os.environ.get("MPAD_LAYOUT", "inline")
 if LAYOUT not in ("stacked", "inline"):
     raise SystemExit(f"MPAD_LAYOUT must be 'stacked' or 'inline', got {LAYOUT!r}")
 STACKED = LAYOUT == "stacked"
@@ -438,6 +438,27 @@ PCB_SLOP = 0.40  # total, so 0.20 a side
 # holds the board through its socket, which is what actually locates it.
 BOARD_CLAMP_SLACK = 0.20
 
+# --- the wire route ----------------------------------------------------
+# Five wires have to get from the QT Py at one end to the far breakout at
+# the other: 3V, GND, MOSI for the pixel chain, and one switch line per
+# breakout. Nothing in the case was ever shaped for them, and a scan of
+# the space under the boards says why that nearly did not work.
+#
+# There is exactly one lane. The plate's columns block outright; a board
+# component blocks if it hangs lower than the wire is tall. A hot-swap
+# socket leaves 1.53 and a wire passes under it; a STEMMA receptacle
+# leaves 0.40 and nothing does. What survives is a band at case y +0.55
+# to +5.85, and at its tightest -- x -32.1, the NeoKey's left edge -- it
+# is 5.30 wide. Four 26AWG wires abreast, and the fifth has nowhere.
+#
+# So the plate carries a channel along it. Depth buys the second layer
+# that headroom alone does not: 1.53 + WIRE_CHANNEL_D clears two 1.30
+# wires stacked, which is what makes five fit with room to spare. It also
+# gives the bundle somewhere to stay while the case is closed, which the
+# design had no answer for at all.
+WIRE_LANE_Y = (0.55, 5.85)
+WIRE_CHANNEL_D = 1.20   # leaves 1.20 of plate under it
+
 # --- how the two printed halves close on each other --------------------
 # A butt joint at Z_FLOOR was all there was, and it does not survive being
 # 158 mm long with a screw only at each end: the first six-key unit came
@@ -520,11 +541,32 @@ SOCKET_CLEARANCE = UNDER_BOARD_MAX + 0.40
 QTPY_SLOP = 0.40
 QTPY_FRAME_W = 1.60  # pocket wall around the QT Py, on the bottom plate
 QTPY_RAIL_W = 3.00  # posts under the board's clear margins
+
+# How far the plate's rails hold off the board's own edge. The clear
+# strips are clear of *components*, which is what they were chosen for --
+# but they are also where the castellated pads are, and this case has
+# five wires soldered to them. A rail directly under a pad means the
+# solder fillet and the wire have nowhere to be and the board will not
+# sit down. 1.80 leaves the outer 1.80 of each strip open, which is pad
+# and fillet, and keeps 1.10 of ledge to rest on.
+QTPY_RAIL_INSET = 1.80
+
+# ...and how far it holds off the components at the other end, which is
+# the end the hand-written strip got wrong.
+QTPY_RAIL_CLEAR = 0.30
 QTPY_LIP = 1.00  # ledge the board slides in under, so it cannot lift
 
 # The two strips of the QT Py with nothing on either face, board-local X.
 # Everything -- USB shell, both buttons, the STEMMA socket on one side,
-# and all four underside parts on the other -- sits between them.
+# and every underside part -- sits between them.
+#
+# QTPY_UNDER_X is where the underside parts really begin and end, read
+# out of ref/qtpy-rp2040.step: 40 solids hang below the board face and
+# they span 3.700 to 14.414. The strips below were written by hand and
+# the second one starts at 14.40, which is 0.014 *inside* that -- a
+# hand-drawn envelope that disagreed with the model by a hair, and did
+# not matter until a rail was narrowed onto exactly that boundary.
+QTPY_UNDER_X = (3.700, 14.414)
 QTPY_CLEAR_X = ((0.40, 3.30), (14.40, 17.40))
 
 # STEMMA QT socket footprint, board-local, for the pocket to keep clear.
