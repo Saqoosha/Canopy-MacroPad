@@ -8,6 +8,7 @@ it is the only way to catch a parameter edit that quietly moved a hole,
 since nothing here is dimensioned on a drawing anyone reads.
 """
 
+import math
 import re
 import sys
 from pathlib import Path
@@ -60,6 +61,20 @@ def _head_seat_probe():
                             height=P.BOTTOM_T - z0 + 0.2))
         part = ring if part is None else part + ring
     return part
+
+
+def _circ_rect(cx, cy, r, x0, x1, y0, y1):
+    """True clearance from a circle to an axis-aligned rectangle.
+
+    Not the four-way separating-axis form used for the channel: a column
+    is round, and treating it as its bounding square reported a socket
+    wing as a hit at -0.017 when the real clearance is +0.699. Where the
+    answer is a number somebody will act on, the square is not close
+    enough.
+    """
+    nx = min(max(cx, x0), x1)
+    ny = min(max(cy, y0), y1)
+    return math.hypot(cx - nx, cy - ny) - r
 
 
 def _rect_gap(xs, ys, cx, cy, r):
@@ -322,6 +337,26 @@ def main():
                 if _rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y,
                              x, y, P.FOOT_DIA / 2) < 0
             ]
+        ),
+        # A plate column rises the whole way to a board's underside, so
+        # whatever hangs off that face it has to dodge sideways. The
+        # interference boolean says whether it touches; this says by how
+        # much, which is the number that decides whether a printed column
+        # 0.1 fat still misses. Both boards, every column, every part on
+        # the face -- the NeoKey's was invisible here until its face went
+        # into the mock.
+        "column to a board's components": min(
+            [_circ_rect(cx, cy, dia / 2,
+                        ox + x0, ox + x1, oy + y0, oy + y1)
+             for cx, cy, dia in (
+                 [(x, y, P.COLUMN_DIA) for x, y in P.MOUNT_XY]
+                 + [(x, y, P.FIELD_SUPPORT_DIA)
+                    for x, y in P.SEAM_XY + P.BREAKOUT_SUPPORT_XY])
+             for ox, oy, table in (
+                 [(P.NEOKEY_ORIGIN[0], P.NEOKEY_ORIGIN[1], P.NEOKEY_BACK_PARTS)]
+                 + [(o[0], o[1], P.BREAKOUT_BACK_PARTS)
+                    for o in P.BREAKOUT_ORIGINS])
+             for x0, x1, y0, y1, _pr in table]
         ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening

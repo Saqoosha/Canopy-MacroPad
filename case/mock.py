@@ -99,6 +99,33 @@ def _back_parts(ox, oy):
     return out
 
 
+def _neokey_face(ox, oy):
+    """Everything on the NeoKey's component face that nothing else places.
+
+    The sockets and the two receptacles are placed by their own helpers,
+    for the same reasons the breakout's are: the sockets are shared
+    geometry and a receptacle's mated plug is a fact about the cable.
+    What is left is fifty-two parts that had no representation at all --
+    small, none of them deeper than 1.400, and therefore invisible to
+    every clearance the case has in Z.
+
+    They matter in *plan*. A plate column rises the whole way to the
+    board's underside, so it has to dodge whatever is there sideways, and
+    the closest thing in the model to a column is one of these: 0.141 from
+    the back-row seam column. That was measured against the STEP by hand
+    and could not be checked by anything, because the model did not have
+    the part in it.
+    """
+    out = None
+    for x0, x1, y0, y1, proud in P.NEOKEY_BACK_PARTS:
+        if proud >= P.NEOKEY_SOCKET_DROP - 0.01:
+            continue          # a socket or a receptacle; placed elsewhere
+        b = _block(ox + x0, ox + x1, oy + y0, oy + y1,
+                   P.Z_NEOKEY_BOTTOM - proud, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
+
+
 def breakouts():
     """The two 4978 boards, their sockets, and their real mounting holes.
 
@@ -140,6 +167,7 @@ def neokey():
     # 10.9 x 5.9 and offset in both axes, not centred on the switch.
     for sx, sy in P.NEOKEY_SWITCH_XY:
         part += _socket(sx, sy)
+    part += _neokey_face(*P.NEOKEY_ORIGIN)
     # STEMMA QT receptacles with a mated Qwiic plug standing off each.
     # Stacked, either end may carry the cable, so both are claimed. Inline
     # the QT Py is at the right end and the cable can only come from the

@@ -72,12 +72,23 @@ def _flip_y(y0, y1, depth):
     return (depth - y1, depth - y0) if BOARD_FLIP_Y else (y0, y1)
 
 
-def _back_flip(part):
+def _face_flip(part, w, d):
+    """A component-face box, as the file draws it, into case space.
+
+    Both boards are turned over to put their switch side up, so the face
+    that carries everything mirrors left to right. Written once and
+    applied per board width, because the NeoKey needs it too now and a
+    second copy of this arithmetic is a second chance to get the
+    orientation wrong -- which this file has a section about.
+    """
     x0, x1, y0, y1, proud = part
-    fx0, fx1 = ((BREAKOUT_W - x1, BREAKOUT_W - x0) if BOARD_FLIP_X
-                else (x0, x1))
-    fy0, fy1 = _flip_y(y0, y1, BREAKOUT_D)
+    fx0, fx1 = (w - x1, w - x0) if BOARD_FLIP_X else (x0, x1)
+    fy0, fy1 = _flip_y(y0, y1, d)
     return (fx0, fx1, fy0, fy1, proud)
+
+
+def _back_flip(part):
+    return _face_flip(part, BREAKOUT_W, BREAKOUT_D)
 
 
 def _socket_flip(part):
@@ -116,6 +127,90 @@ _SOCKET_PARTS_AS_DRAWN = [
     (6.116, 8.616, 1.315, 3.815),
 ]
 
+
+# Every solid on the NeoKey's component face, board-local, out of
+# ref/neokey-1x4.step and not summarised: 66 of them, deepest first.
+# Generated rather than typed, and the file is the check -- re-run the
+# enumeration in ref/fetch.sh's docstring and the numbers have to come
+# back the same.
+#
+# The two 2.960 rows are the STEMMA receptacles and the twelve 1.830 rows
+# are the hot-swap sockets; mock.py places both of those itself, the
+# receptacles because a mated plug is a fact about the cable rather than
+# the board, and the sockets because the same three boxes serve the
+# breakout. Everything below 1.830 had no representation at all, and one
+# of those -- a 0.300-proud part at board-local x 1.048..2.636 -- is the
+# closest thing in the whole model to a plate column, at 0.141.
+_NEOKEY_FACE_AS_DRAWN = [
+    (   0.065,    5.015,   4.620,  10.620, 2.960),
+    (  71.185,   76.135,   4.620,  10.620, 2.960),
+    (   2.233,    4.733,  14.623,  17.123, 1.830),
+    (   4.733,   15.633,  11.653,  17.553, 1.830),
+    (  15.633,   18.133,  12.083,  14.583, 1.830),
+    (  21.283,   23.783,  14.623,  17.123, 1.830),
+    (  23.783,   34.683,  11.653,  17.553, 1.830),
+    (  34.683,   37.183,  12.083,  14.583, 1.830),
+    (  40.333,   42.833,  14.623,  17.123, 1.830),
+    (  42.833,   53.733,  11.653,  17.553, 1.830),
+    (  53.733,   56.233,  12.083,  14.583, 1.830),
+    (  59.383,   61.883,  14.623,  17.123, 1.830),
+    (  61.883,   72.783,  11.653,  17.553, 1.830),
+    (  72.783,   75.283,  12.083,  14.583, 1.830),
+    (  55.840,   58.840,   7.200,  10.200, 1.400),
+    (  59.841,   62.841,   3.136,   6.136, 1.400),
+    (  13.936,   16.036,   7.255,   9.255, 1.100),
+    (  37.499,   41.498,   6.127,  10.126, 1.000),
+    (   8.052,   11.252,   4.315,   7.115, 0.950),
+    (  26.975,   30.175,   4.315,   7.115, 0.950),
+    (  46.152,   49.352,   4.315,   7.115, 0.950),
+    (  65.075,   68.275,   4.315,   7.115, 0.950),
+    (   6.154,    7.054,   7.963,   9.563, 0.800),
+    (  19.393,   20.993,   6.281,   7.181, 0.800),
+    (  23.870,   24.770,   4.978,   6.578, 0.800),
+    (  49.556,   51.156,   7.742,   8.642, 0.800),
+    (  57.176,   58.776,   5.392,   6.292, 0.800),
+    (  57.302,   58.902,  10.980,  11.880, 0.800),
+    (  63.368,   64.268,   8.026,   9.626, 0.800),
+    (  73.558,   75.158,  15.171,  16.071, 0.800),
+    (  73.812,   74.904,  16.688,  17.476, 0.709),
+    (  13.334,   16.384,   3.264,   4.864, 0.500),
+    (  73.558,   74.002,  16.701,  17.463, 0.306),
+    (  74.714,   75.158,  16.701,  17.463, 0.306),
+    (  73.564,   75.152,  16.688,  17.476, 0.300),
+    (   6.712,    8.052,   4.569,   5.249, 0.264),
+    (   6.712,    8.052,   6.181,   6.861, 0.264),
+    (  11.252,   12.592,   6.181,   6.861, 0.264),
+    (  11.252,   12.592,   4.569,   5.249, 0.264),
+    (  25.635,   26.975,   4.569,   5.249, 0.264),
+    (  25.635,   26.975,   6.181,   6.861, 0.264),
+    (  30.175,   31.515,   6.181,   6.861, 0.264),
+    (  30.175,   31.515,   4.569,   5.249, 0.264),
+    (  44.812,   46.152,   4.569,   5.249, 0.264),
+    (  44.812,   46.152,   6.181,   6.861, 0.264),
+    (  49.352,   50.692,   6.181,   6.861, 0.264),
+    (  49.352,   50.692,   4.569,   5.249, 0.264),
+    (  63.735,   65.075,   4.569,   5.249, 0.264),
+    (  63.735,   65.075,   6.181,   6.861, 0.264),
+    (  68.275,   69.615,   6.181,   6.861, 0.264),
+    (  68.275,   69.615,   4.569,   5.249, 0.264),
+    (  37.496,   37.997,   8.728,   9.028, 0.200),
+    (  37.496,   37.997,   8.228,   8.528, 0.200),
+    (  37.496,   37.997,   7.728,   8.028, 0.200),
+    (  37.496,   37.997,   7.228,   7.528, 0.200),
+    (  37.496,   37.997,   6.728,   7.028, 0.200),
+    (  37.496,   37.997,   9.228,   9.528, 0.200),
+    (  38.097,   38.397,   9.628,  10.129, 0.200),
+    (  38.597,   38.897,   9.628,  10.129, 0.200),
+    (  39.097,   39.397,   9.628,  10.129, 0.200),
+    (  39.597,   39.897,   9.628,  10.129, 0.200),
+    (  40.097,   40.397,   9.628,  10.129, 0.200),
+    (  40.597,   40.897,   9.628,  10.129, 0.200),
+    (  53.822,   55.272,   7.276,   9.474, 0.100),
+    (  59.868,   62.066,   7.404,   8.854, 0.100),
+    (  74.104,   74.612,  16.789,  17.375, 0.008),
+]
+NEOKEY_BACK_PARTS = [_face_flip(p, NEOKEY_W, NEOKEY_D)
+                     for p in _NEOKEY_FACE_AS_DRAWN]
 
 # Kailh hot-swap sockets hang off the underside -- every component on
 # either board is on that one face, and the switch side carries nothing
@@ -909,7 +1004,20 @@ FIELD_SUPPORT_LOCAL = [(2.45, 2.450), (2.45, 19.600)]
 # instead, where there is 4.896 between the cavity wall at -0.200 and the
 # first component at 4.696. A 4.50 pad leaves 0.198 a side, which is what
 # "board columns inside the cavity" is for. 3.50 leaves 0.698.
-FIELD_SUPPORT_DIA = 3.50
+#
+# 3.50 was settled against the *breakouts*, and it stopped being enough
+# the moment the NeoKey's component face went into the mock. The back-row
+# seam column straddles a breakout and the NeoKey, and on the NeoKey side
+# it comes 0.141 from a 0.300-proud part at board-local x 1.048..2.636 --
+# under this file's own 0.25 floor, and measured for the first time by
+# "column to a board's components", which could not exist while the mock
+# had nothing there. 3.00 puts it at 0.391.
+#
+# 3.20 also clears the floor, at 0.291, and was not taken: this machine
+# prints a post fat by about the 0.15 it pulls a hole in, so 3.20 arrives
+# at roughly 0.24 and lands back on the line. 3.00 arrives at about 0.34.
+# The pad only has to push a board up and a peg did that job at 2.30.
+FIELD_SUPPORT_DIA = 3.00
 BREAKOUT_SUPPORT_XY = [field_xy(p) for p in FIELD_SUPPORT_LOCAL]
 # No pegs. The first assembled unit settled it: a plate-mount switch
 # clips into the top plate and its pins go into the socket on the board,
