@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-from build123d import Pos, Rotation, export_step, export_stl
+from build123d import Cylinder, Pos, Rotation, export_step, export_stl
 
 import mock
 import params as P
@@ -34,6 +34,32 @@ def export_step_stable(part, path):
     f.write_text(re.sub(r"(FILE_NAME\('[^']*',')[^']*(')",
                         r"\g<1>1970-01-01T00:00:00\g<2>",
                         f.read_text(), count=1))
+
+
+def _head_seat_probe():
+    """The plate that has to be there above each counterbore.
+
+    An interference check asks what two solids share, so it can only ever
+    find material that should not exist. The channel's failure was the
+    opposite -- material that should exist and did not, 0.20 of plate
+    spanning the bore under the screw head's seat -- and no boolean run
+    against a mock can see that, because the missing part is a void.
+
+    So the polarity flips: build the volume the plate is required to fill
+    and subtract the plate from it. Anything left over is plate that is
+    not there. Starts above the lead-in cone, which is a void on purpose.
+    """
+    z0 = P.SCREW_SINK + P.CLEAR_CHAMFER
+    part = None
+    for x, y in P.POST_XY:
+        ring = (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
+                * Cylinder(radius=P.SCREW_HEAD_DIA / 2,
+                           height=P.BOTTOM_T - z0))
+        ring -= (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
+                 * Cylinder(radius=P.SCREW_CLEAR_DIA / 2,
+                            height=P.BOTTOM_T - z0 + 0.2))
+        part = ring if part is None else part + ring
+    return part
 
 
 def _rect_gap(xs, ys, cx, cy, r):
@@ -326,6 +352,15 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'shell':<7} vs {'bottom plate':<18}"
           f" {hit:9.3f} mm3")
+
+    # And the one that runs the other way: material required, not
+    # material shared. Nothing above could have found the wire channel
+    # eating the screw head's seat, because what it left was a void.
+    missing = (_head_seat_probe() - built["bottom"]).volume
+    good = missing < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
+          f"head {missing:9.3f} mm3")
 
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1

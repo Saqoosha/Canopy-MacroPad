@@ -146,11 +146,19 @@ sockets and their NeoPixels already fitted:
 | QT Py `MOSI` | breakout 0 `NEO_IN`; its `NEO_OUT` to breakout 1 `NEO_IN` |
 | QT Py `MISO` | breakout 0 `SWITCHA`, pulled up |
 | QT Py `SCK` | breakout 1 `SWITCHA`, pulled up |
-| NeoKey left STEMMA `V+` | both breakouts' `VDD` |
-| NeoKey left STEMMA `GND` | both breakouts' `GND`, and `SWITCHC` |
+| NeoKey `JP1`/`JP5` `VIN` | both breakouts' `VDD` |
+| NeoKey `JP1`/`JP5` `G` | both breakouts' `GND`, and `SWITCHC` |
 
-The QT Py's own `3V` and `GND` do just as well electrically and are the
-same net — it is the distance that decides it, not the topology.
+Power comes off the NeoKey rather than the QT Py, so only three wires
+cross the case. `JP1` and `JP5` are the headers on the NeoKey's long
+edges, `INT D C - 3 VIN`, and that `VIN` is the `VCC` net — the one the
+STEMMA receptacles' `V+` lands on. The pin marked `3` is the `AP2112K`'s
+output and feeds no pixel anywhere.
+
+The NeoKey's spare STEMMA socket carries the same net and is closer to
+the boards, and it was the plan for a while. A header wins on parts: it
+is a solder joint instead of a connector, and the second Qwiic cable's
+other pair would have been `SDA`/`SCL`, live and terminated in nothing.
 
 Five wires reach the breakouts but only **three of them cross the case**.
 `3V` and `GND` are taken at the NeoKey's *left* STEMMA socket, which is
@@ -197,7 +205,20 @@ Which settles the topology and not the question. What the colours
 actually depend on is the **voltage under load**, and six SK6812s at full
 white pull it down through a connector, a cable and however much wire
 this case makes them share. Same net says nothing about the drop across
-it. **The rail has not been metered.**
+it.
+
+The tap point does matter, and not for the reason it first looks. One net
+does not mean one potential: taking the breakouts off the QT Py leaves
+the NeoKey carrying the Qwiic cable's drop alone, so the two halves land
+at different voltages and drift apart in colour. Taking them off the
+NeoKey puts that drop in front of all six at once. It does not make the
+difference vanish — the breakouts still sit behind their own wire — it
+removes the cable's share of it. Whether any of this is visible is a
+different question again, since the rail is already about 200 mV below an
+SK6812's datasheet floor before a single wire is counted.
+
+**The rail has not been metered.** `tools/mpad.py --load` produces the
+worst case; probe at an LED's `VDD`, not at the QT Py.
 
 One consequence worth knowing before anyone "fixes" it. An SK6812's
 datasheet floor is 3.5 V and its green and blue dies drop out first, so a

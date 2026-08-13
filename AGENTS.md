@@ -140,10 +140,15 @@ one, not necessarily the only one.
   counterbore's ceiling at z 1.00, the trench floor at 1.20, so 0.70 of
   y was spanned by 0.20 of plate — one layer, printed over the bore,
   under the seat the screw head bears on — and 0.45 of the shell's post
-  stood on air beside it. `build.py` was green through all of it. The
-  guard has to be a plan-view floor instead: the channel's rectangle
-  against every circle that matters, watched failing at -0.455 on the
-  screws and 0.005 on the columns.
+  stood on air beside it. `build.py` was green through all of it. **What
+  an interference check can find is material that should not exist; its
+  twin is material that should exist and does not, and that one is a
+  subtraction against the volume the part is required to fill** —
+  `_head_seat_probe()` builds the ring the screw head bears on and
+  subtracts the plate from it, watched failing at 0.790 mm³. Plan-view
+  floors sit beside it for the distance the boolean cannot report
+  (-0.455 on the screws, 0.005 on the columns), but the subtraction is
+  the evidence.
 - **A case-space constant describes one layout.** `WIRE_LANE_Y` was
   written as a pair of case-space numbers off an `inline` scan. `stacked`
   seats the field 0.805 further back, so the same trench went 0.400 into

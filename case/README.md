@@ -434,8 +434,11 @@ It runs under the boards and stops there, because that is the only place
 the depth buys anything and because past the boards are the screws. A
 trench is invisible to the interference check: over a counterbore it left
 0.20 mm of plate spanning the bore, and beside it 0.45 mm of the shell's
-post stood on air, both with every boolean at zero. Two plan-view margins
-in `build.py` are the whole guard.
+post stood on air, both with every boolean at zero. What catches it is a
+boolean run the other way — the ring the screw head bears on, built as a
+solid and with the plate subtracted from it, so what is left is plate
+that is not there. Two plan-view margins sit beside it for the distance
+that measurement cannot report.
 
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes
