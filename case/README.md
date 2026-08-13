@@ -61,6 +61,15 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
+There are three, and the small ones exist so that re-asking one question
+does not cost a reprint of the answers already settled.
+`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own, and
+`out/<layout>/coupon-seam.stl` is 98 × 10 mm of the closing joint --
+four shell fragments and four plate fragments, one pair per
+`SEAM_SNAP_SWEEP` entry, engraved and printed in the orientation each
+real part is printed in. Snap them together by hand; the one that clicks
+on and needs a deliberate pull to come off is the answer.
+
 `out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
@@ -401,6 +410,18 @@ and an end-mounted QT Py fills one of them. 1.6 mm of depth was the
 cheaper thing to spend.
 
 ## How it holds together
+
+**The two halves overlap rather than butting.** The plate's top 1.20 is a
+tongue inset 1.00 a side and the shell's walls carry on down beside it,
+with barbs on the inside of that skirt dropping into a groove round the
+tongue. The step aligns the halves and hides whatever gap is left inside
+the joint; the snap is the only part that pulls them together. Both are
+there because neither is enough: a butt joint 158 mm long with screws
+only at the ends closed with 0.2 of gap at the centre, and slack above
+the boards took it to 0.1 and no further -- the rest is the parts not
+being flat off the bed. `out/<layout>/coupon-seam.stl` settles the barb's
+reach, which is the one number that decides both how hard it is to close
+and how hard it is to open.
 
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes

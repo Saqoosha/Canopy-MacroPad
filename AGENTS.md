@@ -152,22 +152,19 @@ one, not necessarily the only one.
   is also the screw head's seat, so it is the one dimension here with a
   maximum as well as a minimum, and `build.py` checks it outside the
   margins table because that table can only express floors.
-- **A feature added before a trim is a feature that was never added.**
-  `shell()` ends `part = part & outer`, and `outer` starts at `Z_FLOOR`,
-  so a skirt built below the seam was deleted on every build for three
-  rounds. No error, no warning, `all checks passed`, and the render
-  looked right -- the part is valid, it just does not have the thing in
-  it. Same family as the cut placed inside a void: **when a feature is
-  meant to change a shape, measure the shape.** A bounding box is usually
-  enough and takes one line.
-- **A cut placed inside a void does nothing, and looks like it worked.**
-  The chamfer above was first written below the counterbore top, where
-  the counterbore had already removed the material. `build.py` passed,
-  the part built, and the two coupon rows would have printed *identical*
-  while the experiment reported that chamfering does not help. What
-  caught it was a probe asking the rows to disagree at a stated height,
-  not a check asking whether the part was valid. When a feature is meant
-  to change a shape, measure the shape, not the exit code.
+- **A feature can be absent from a valid part, and nothing says so.**
+  Twice, by two different mechanisms. A chamfer written *below* the
+  counterbore top cut into space the counterbore had already removed, so
+  the two coupon rows would have printed identical while the experiment
+  concluded that chamfering does not help. And a skirt built below
+  `Z_FLOOR` was deleted on every build for three rounds by `shell()`'s
+  closing `part = part & outer`, because `outer` starts at `Z_FLOOR`.
+  Both times: no error, `all checks passed`, a render that looked right,
+  and the part simply did not have the thing in it. A check asks whether
+  the part is *valid*; it cannot ask whether it is the part you meant.
+  **When a feature is meant to change a shape, measure the shape** -- a
+  probe asking two rows to disagree at a stated height, or a bounding
+  box. One line either way, and it is the only thing that catches this.
 - **A check drifts away from the geometry it was written for, and goes
   on reporting.** Two shapes of it. One: a check *positioned from the
   thing it measures* -- the coupon's clearance label sits 1.00 from the
