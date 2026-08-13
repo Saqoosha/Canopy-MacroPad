@@ -158,7 +158,10 @@ def page():
     print(f"  {path}  {path.stat().st_size / 1024:.0f} KB")
 
 
-TEMPLATE = r"""<title>Canopy MacroPad — case viewer</title>
+TEMPLATE = r"""<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canopy MacroPad — case viewer</title>
 <style>
 /* Light is the base set; the two blocks below only re-point tokens, so
    nothing is defined solely behind a media query or a theme stamp. */
@@ -168,6 +171,7 @@ TEMPLATE = r"""<title>Canopy MacroPad — case viewer</title>
   --accent:#0b3fd6; --accent-ink:#ffffff;
   --grid:rgba(17,23,33,.055);
   --sky-a:#dfe4ec; --sky-b:#f3f5f8;
+  --cut:#c8443a;
   color-scheme:light dark;
 }
 @media (prefers-color-scheme:dark){
@@ -177,6 +181,7 @@ TEMPLATE = r"""<title>Canopy MacroPad — case viewer</title>
     --accent:#6f95ff; --accent-ink:#0d1015;
     --grid:rgba(230,236,245,.06);
     --sky-a:#0a0d12; --sky-b:#161b23;
+    --cut:#e0574c;
   }
 }
 :root[data-theme="dark"]{
@@ -185,6 +190,7 @@ TEMPLATE = r"""<title>Canopy MacroPad — case viewer</title>
   --accent:#6f95ff; --accent-ink:#0d1015;
   --grid:rgba(230,236,245,.06);
   --sky-a:#0a0d12; --sky-b:#161b23;
+  --cut:#e0574c;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -218,20 +224,31 @@ canvas:active{cursor:grabbing}
   overflow-y:auto; display:flex; flex-direction:column}
 @media (max-width:820px){ .rail{border-right:0; border-top:1px solid var(--line);
   max-height:46vh} }
-.head{padding:20px 18px 14px; border-bottom:1px solid var(--line)}
-.head h1{margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em}
-.head p{margin:5px 0 0; color:var(--dim); font-size:12px}
-.grp{padding:16px 18px; border-bottom:1px solid var(--line)}
-.lbl{margin:0 0 10px; font-size:10.5px; letter-spacing:.11em;
+.head{padding:14px 14px 11px; border-bottom:1px solid var(--line)}
+.head h1{margin:0; font-size:14px; font-weight:600; letter-spacing:-.01em}
+.head p{margin:3px 0 0; color:var(--dim); font-size:11.5px}
+.grp{padding:11px 14px; border-bottom:1px solid var(--line)}
+.lbl{margin:0 0 7px; font-size:10px; letter-spacing:.11em;
   text-transform:uppercase; color:var(--faint)}
+/* A heading that shares its line with a control, so the control does not
+   cost a row of its own. */
+.hrow{display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin:0 0 7px}
+.hrow .lbl{margin:0}
+.mini{appearance:none; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:6px; padding:3px 9px; font:inherit;
+  font-size:11px; cursor:pointer}
+.mini:hover{color:var(--ink)}
+.mini[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink);
+  border-color:var(--accent)}
 
 .seg{display:grid; grid-template-columns:1fr 1fr; gap:6px}
 .seg3{grid-template-columns:repeat(3,1fr)}
 .seg4{grid-template-columns:repeat(4,1fr)}
 .seg4 button{padding:7px 2px; font-size:12px}
 .seg button{appearance:none; border:1px solid var(--line); background:transparent;
-  color:var(--dim); border-radius:7px; padding:8px 6px; font:inherit;
-  font-size:12.5px; cursor:pointer; transition:background .12s,color .12s}
+  color:var(--dim); border-radius:6px; padding:6px 5px; font:inherit;
+  font-size:12px; cursor:pointer; transition:background .12s,color .12s}
 .seg button:hover{color:var(--ink)}
 .seg button[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink);
   border-color:var(--accent)}
@@ -243,26 +260,26 @@ input[type=range]{width:100%; accent-color:var(--accent)}
 
 .parts{list-style:none; margin:0; padding:0; display:flex;
   flex-direction:column; gap:1px}
-.parts button{display:flex; align-items:center; gap:10px; width:100%;
-  appearance:none; background:transparent; border:0; padding:7px 6px;
+.parts button{display:flex; align-items:center; gap:9px; width:100%;
+  appearance:none; background:transparent; border:0; padding:4px 5px;
   border-radius:6px; font:inherit; color:inherit; cursor:pointer; text-align:left}
 .parts button:hover{background:var(--grid)}
 .parts button[aria-pressed="false"]{opacity:.38}
 .sw{width:11px; height:11px; border-radius:3px; flex:none;
   border:1px solid rgba(128,128,128,.45)}
-.pn{flex:1; min-width:0; font-size:13px}
-.pn small{display:block; color:var(--faint); font-size:11px}
-.hint{margin:10px 0 0; color:var(--faint); font-size:11px; line-height:1.5}
+.pn{flex:1; min-width:0; font-size:12.5px; line-height:1.25}
+.pn small{display:block; color:var(--faint); font-size:10.5px}
+.hint{margin:7px 0 0; color:var(--faint); font-size:10.5px; line-height:1.45}
 .hint code{font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:10.5px}
 
-.keys{display:flex; flex-direction:column; gap:6px}
-.keys div{display:flex; align-items:center; gap:9px; font-size:12px;
+.keys{display:flex; flex-direction:column; gap:4px}
+.keys div{display:flex; align-items:center; gap:8px; font-size:11.5px;
   color:var(--dim)}
-.dims{display:flex; flex-direction:column; gap:6px; font-size:12.5px}
+.dims{display:flex; flex-direction:column; gap:4px; font-size:12px}
 .dims div{display:flex; justify-content:space-between; gap:10px}
 .dims span:first-child{color:var(--dim)}
-.note{padding:14px 18px 20px; color:var(--faint); font-size:11.5px;
-  line-height:1.55}
+.note{padding:11px 14px 16px; color:var(--faint); font-size:11px;
+  line-height:1.5}
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 
@@ -274,16 +291,11 @@ input[type=range]{width:100%; accent-color:var(--accent)}
     </div>
 
     <div class="grp">
-      <p class="lbl">Layout</p>
       <div class="seg" id="layout">
-        <button data-v="stacked" aria-pressed="true">Stacked</button>
-        <button data-v="inline" aria-pressed="false">Inline</button>
+        <button data-v="stacked" aria-pressed="false">Stacked</button>
+        <button data-v="inline" aria-pressed="true">Inline</button>
       </div>
-    </div>
-
-    <div class="grp">
-      <p class="lbl">View</p>
-      <div class="seg" id="proj">
+      <div class="seg" id="proj" style="margin-top:6px">
         <button data-v="persp" aria-pressed="true">Perspective</button>
         <button data-v="ortho" aria-pressed="false">Ortho</button>
       </div>
@@ -296,36 +308,44 @@ input[type=range]{width:100%; accent-color:var(--accent)}
     </div>
 
     <div class="grp">
-      <p class="lbl">Explode</p>
-      <input type="range" id="explode" min="0" max="100" value="0"
-             aria-label="Explode the assembly">
+      <div class="hrow"><p class="lbl">Section</p>
+        <button class="mini" id="sectflip" aria-pressed="false">Flip</button>
+      </div>
+      <div class="seg seg4" id="sect">
+        <button data-v="" aria-pressed="true">Off</button>
+        <button data-v="x" aria-pressed="false">YZ</button>
+        <button data-v="y" aria-pressed="false">XZ</button>
+        <button data-v="z" aria-pressed="false">XY</button>
+      </div>
+      <input type="range" id="sectAt" min="0" max="1000" value="500"
+             style="margin-top:7px" aria-label="Move the section plane">
+      <p class="hint">The cut face is filled solid, so a wall reads as a
+        wall and not as a hole.</p>
     </div>
 
     <div class="grp">
-      <p class="lbl">Case</p>
+      <div class="hrow"><p class="lbl">Case</p>
+        <button class="mini" id="env" aria-pressed="false">Envelopes</button>
+      </div>
       <div class="seg seg3" id="shellmode">
         <button data-v="solid" aria-pressed="true">Solid</button>
         <button data-v="ghost" aria-pressed="false">Glass</button>
         <button data-v="hidden" aria-pressed="false">Off</button>
       </div>
-      <p class="hint">Glass reads the inside with the lid shut — which is
-        the state it is actually assembled in.</p>
+      <p class="hint">Glass reads the inside with the lid shut, which is
+        how it is assembled. Envelopes swaps the bare board slabs for the
+        volumes <code>build.py</code> booleans against — sockets,
+        connectors with a plug mated, buttons, the USB shell.</p>
     </div>
 
     <div class="grp">
-      <p class="lbl">Parts</p>
+      <div class="hrow"><p class="lbl">Explode</p></div>
+      <input type="range" id="explode" min="0" max="100" value="0"
+             aria-label="Explode the assembly">
+    </div>
+
+    <div class="grp">
       <ul class="parts" id="parts"></ul>
-    </div>
-
-    <div class="grp">
-      <p class="lbl">What the checks see</p>
-      <div class="seg" id="envseg" style="grid-template-columns:1fr">
-        <button id="env" aria-pressed="false">Clearance envelopes</button>
-      </div>
-      <p class="hint">The boards above are drawn as bare slabs. These are
-        the volumes <code>build.py</code> actually booleans the case
-        against — sockets, connectors with a plug mated, buttons, the USB
-        shell and its overhang.</p>
     </div>
 
     <div class="grp">
@@ -334,7 +354,6 @@ input[type=range]{width:100%; accent-color:var(--accent)}
     </div>
 
     <div class="grp">
-      <p class="lbl">Dimensions</p>
       <div class="dims mono" id="dims"></div>
     </div>
 
@@ -355,7 +374,7 @@ const GEOM = __DATA__, LABELS = __LABELS__, STATUS = __STATUS__;
 
 /* ---------- gl ---------- */
 const cv = document.getElementById('gl');
-const gl = cv.getContext('webgl2', {antialias:true, alpha:false});
+const gl = cv.getContext('webgl2', {antialias:true, alpha:false, stencil:true});
 const HAS_FLOAT = gl && gl.getExtension('EXT_color_buffer_float');
 if (!gl) document.querySelector('.stage').innerHTML =
   '<p style="padding:2rem;color:var(--dim)">This browser has no WebGL2.</p>';
@@ -379,17 +398,21 @@ const EL_MAX = 1.5697;
    resolves them in one composite, with no ordering at all. */
 const VS = `#version 300 es
 layout(location=0) in vec3 p;
-uniform mat4 uMVP, uMV; uniform vec3 uLift; out vec3 vP;
-void main(){ vec3 q = p + uLift; vP = (uMV * vec4(q,1.0)).xyz;
+uniform mat4 uMVP, uMV; uniform vec3 uLift; out vec3 vP; out vec3 vW;
+void main(){ vec3 q = p + uLift; vP = (uMV * vec4(q,1.0)).xyz; vW = q;
   gl_Position = uMVP * vec4(q,1.0); }`;
 
 const FS = `#version 300 es
-precision highp float; in vec3 vP;
+precision highp float; in vec3 vP; in vec3 vW;
 layout(location=0) out vec4 oOpaque;
 layout(location=1) out vec4 oAccum;
 layout(location=2) out vec4 oReveal;
 uniform vec3 uColor; uniform float uAlpha; uniform int uMode;
 uniform vec2 uDepth;  // near, far
+/* Section plane, in model space. xyz is the normal and w the offset
+   along it; an all-zero normal means no section, so one uniform carries
+   both the plane and the switch. */
+uniform vec4 uPlane;
 vec3 shade(){
   /* Flat normal from screen-space derivatives: the mesh ships without
      normals, and faceted is the honest look for tessellated CAD. */
@@ -399,6 +422,8 @@ vec3 shade(){
   return uColor * (0.34 + 0.66*abs(dot(n,L))) + rim*0.16;
 }
 void main(){
+  if (dot(uPlane.xyz, uPlane.xyz) > 0.0 && dot(vW, uPlane.xyz) > uPlane.w)
+    discard;
   vec3 c = shade();
   if (uMode == 0){ oOpaque = vec4(c, 1.0); return; }
   float a = uAlpha;
@@ -447,6 +472,19 @@ void main(){
   o = vec4(mix(base, trans, 1.0 - rv), 1.0);
 }`;
 
+/* The cut face. Clipping alone leaves a hollow shell -- you see the
+   inside of the far wall through the opening and the part reads as a
+   tube rather than a solid, which is exactly the thing a section view
+   exists to avoid. So the plane is drawn as real geometry wherever the
+   stencil says it is inside a body. */
+const KVS = `#version 300 es
+layout(location=0) in vec3 p; uniform mat4 uMVP;
+void main(){ gl_Position = uMVP * vec4(p,1.0); }`;
+const KFS = `#version 300 es
+precision highp float; uniform vec3 uColor;
+layout(location=0) out vec4 o;
+void main(){ o = vec4(uColor, 1.0); }`;
+
 function sh(t, src){ const x = gl.createShader(t); gl.shaderSource(x, src);
   gl.compileShader(x);
   if(!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(x);
@@ -458,11 +496,19 @@ function link(vs, fs){ const pr = gl.createProgram();
   if(!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw gl.getProgramInfoLog(pr);
   return pr; }
 
-const prog = link(VS, FS), comp = link(CVS, CFS);
+const prog = link(VS, FS), comp = link(CVS, CFS), capp = link(KVS, KFS);
 const U = (pr,n) => gl.getUniformLocation(pr, n);
 const uMVP=U(prog,'uMVP'), uMV=U(prog,'uMV'), uColor=U(prog,'uColor'),
       uAlpha=U(prog,'uAlpha'), uLift=U(prog,'uLift'), uMode=U(prog,'uMode'),
-      uDepth=U(prog,'uDepth');
+      uDepth=U(prog,'uDepth'), uPlane=U(prog,'uPlane');
+const kMVP=U(capp,'uMVP'), kColor=U(capp,'uColor');
+const capVBO = gl.createBuffer();
+const capVAO = gl.createVertexArray();
+gl.bindVertexArray(capVAO);
+gl.bindBuffer(gl.ARRAY_BUFFER, capVBO);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+gl.bindVertexArray(null);
 const cOpaque=U(comp,'tOpaque'), cAccum=U(comp,'tAccum'),
       cReveal=U(comp,'tReveal'), cSkyA=U(comp,'uSkyA'), cSkyB=U(comp,'uSkyB'),
       cRes=U(comp,'uRes'), cSS=U(comp,'uSS');
@@ -493,7 +539,7 @@ function resize(w, h){
   TEX.reveal = target(w, h, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT);
   const db = gl.createRenderbuffer();
   gl.bindRenderbuffer(gl.RENDERBUFFER, db);
-  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, w, h);
   TEX.depth = db; TEX.depth.rb = true;
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
     gl.TEXTURE_2D, TEX.opaque, 0);
@@ -501,7 +547,7 @@ function resize(w, h){
     gl.TEXTURE_2D, TEX.accum, 0);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2,
     gl.TEXTURE_2D, TEX.reveal, 0);
-  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT,
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT,
     gl.RENDERBUFFER, db);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
@@ -543,8 +589,9 @@ for (const [key, g] of Object.entries(GEOM)) {
 }
 
 /* ---------- state ---------- */
-const S = {layout:'stacked', explode:0, env:false, shellMode:'solid',
+const S = {layout:'inline', explode:0, env:false, shellMode:'solid',
            ortho:false, hidden:new Set(),
+           sect:'', sectT:0.5, sectFlip:false,
            az:-0.72, el:0.42, dist:1, tAz:-0.72, tEl:0.42, tDist:1};
 /* Frame on the widest axis and the viewport's aspect, not on a constant:
    a 120 mm bar and a 98 mm one need different pull-backs. */
@@ -626,6 +673,8 @@ function render(){
   gl.uniformMatrix4fv(uMV, false, V);
   gl.uniformMatrix4fv(uMVP, false, MVP);
   gl.uniform2f(uDepth, near, far);
+  const PL = sectPlane();
+  gl.uniform4f(uPlane, ...(PL ? [...PL.n, PL.d] : [0,0,0,0]));
   gl.bindVertexArray(sc.vao);
 
   /* The case can be turned to glass so the inside can be read with the
@@ -653,7 +702,52 @@ function render(){
   gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 1.0, 0);
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
   gl.uniform1i(uMode, 0);
-  live.filter(p => alphaOf(p) >= 1).forEach(draw);
+  const solid = live.filter(p => alphaOf(p) >= 1);
+  solid.forEach(draw);
+
+  /* 1b. cap the cut. Per part, because Fusion fills each body in its own
+     colour and a single grey cap loses which wall you are looking at.
+     The stencil counts front faces against back faces with the clip
+     active: where the plane is inside a closed body the two do not
+     cancel, and that is exactly where the quad is allowed to paint.
+
+     Depth is off while counting so every layer is seen, and back on for
+     the quad so the cut face is occluded by anything nearer. */
+  if (PL) {
+    /* One colour for every cut face rather than each part's own. A
+       section is read for where material is, and a single flat fill says
+       that in one glance where twelve tinted ones make you match each
+       patch back to a legend first. */
+    const CUT = css('--cut');
+    gl.bindBuffer(gl.ARRAY_BUFFER, capVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, capQuad(PL), gl.DYNAMIC_DRAW);
+    gl.enable(gl.STENCIL_TEST);
+    for (const p of solid) {
+      gl.clearBufferiv(gl.STENCIL, 0, new Int32Array([0]));
+      gl.useProgram(prog);
+      gl.bindVertexArray(sc.vao);
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false);
+      gl.colorMask(false, false, false, false);
+      gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+      gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
+      gl.stencilOpSeparate(gl.BACK,  gl.KEEP, gl.KEEP, gl.DECR_WRAP);
+      draw(p);
+
+      gl.colorMask(true, true, true, true);
+      gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+      gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.useProgram(capp);
+      gl.uniformMatrix4fv(kMVP, false, MVP);
+      gl.uniform3fv(kColor, CUT);
+      gl.bindVertexArray(capVAO);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    gl.disable(gl.STENCIL_TEST);
+    gl.useProgram(prog);
+    gl.bindVertexArray(sc.vao);
+    gl.uniform1i(uMode, 0);
+  }
 
   const clear = live.filter(p => alphaOf(p) < 1);
   gl.depthMask(false); gl.enable(gl.BLEND);
@@ -687,6 +781,36 @@ function render(){
   gl.uniform1i(cSS, SS);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.bindVertexArray(null);
+}
+
+/* The plane, in model space, as the shader wants it: normal in xyz and
+   offset in w, all zeros when off. The slider is 0..1 across the scene's
+   own extent on that axis, padded a hair past each end so the extremes
+   really do show the whole part and really do hide it. */
+function sectPlane(){
+  if (!S.sect) return null;
+  const sc = scenes[S.layout];
+  const i = {x:0, y:1, z:2}[S.sect];
+  const sgn = S.sectFlip ? -1 : 1;
+  const nrm = [0,0,0]; nrm[i] = sgn;
+  const pad = 0.01 * sc.span[i];
+  const at = sc.lo[i] - pad + S.sectT * (sc.span[i] + 2*pad);
+  return {n: nrm, d: sgn * at, axis: i, at};
+}
+
+/* Two triangles lying on the plane, big enough to cover the scene from
+   any angle. Rebuilt per frame because it is six vertices and caching it
+   would mean invalidating it on layout, slider and flip. */
+function capQuad(pl){
+  const sc = scenes[S.layout];
+  const r = sc.radius * 1.6;
+  const c = sc.centre.slice(); c[pl.axis] = pl.at;
+  const u = [0,0,0], v = [0,0,0];
+  u[(pl.axis+1)%3] = r; v[(pl.axis+2)%3] = r;
+  const pt = (a,b) => [c[0]+a*u[0]+b*v[0], c[1]+a*u[1]+b*v[1],
+                       c[2]+a*u[2]+b*v[2]];
+  const q = [pt(-1,-1), pt(1,-1), pt(1,1), pt(-1,-1), pt(1,1), pt(-1,1)];
+  return new Float32Array(q.flat());
 }
 
 /* Supersampling costs real fill, so only pay it when something moved. */
@@ -782,6 +906,21 @@ document.getElementById('layout').addEventListener('click', e => {
 });
 document.getElementById('explode').addEventListener('input', e => {
   S.explode = e.target.value / 100; touch();
+});
+document.getElementById('sect').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.sect = b.dataset.v;
+  [...e.currentTarget.children].forEach(x =>
+    x.setAttribute('aria-pressed', String(x === b)));
+  touch();
+});
+document.getElementById('sectAt').addEventListener('input', e => {
+  S.sectT = e.target.value / 1000; touch();
+});
+document.getElementById('sectflip').addEventListener('click', e => {
+  S.sectFlip = !S.sectFlip;
+  e.currentTarget.setAttribute('aria-pressed', String(S.sectFlip));
+  touch();
 });
 document.getElementById('proj').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
