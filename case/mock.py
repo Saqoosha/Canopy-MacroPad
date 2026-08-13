@@ -61,16 +61,42 @@ def _stadium(across, w, h, axis, a0, a1):
 def _socket(sx, sy):
     """One Kailh hot-swap socket, hanging below the board.
 
+    Three boxes, not one. The socket is a body with a solder wing off
+    each end, and the wings are what a column runs into -- a box drawn
+    round the body alone cleared the back-left column by 0.586 while the
+    printed plate put it through the left wing. `params.SOCKET_PARTS`
+    carries the shape as measured off ref/neokey-breakout.step.
+
     Shared by both board kinds because it is the same part fitted the
     same way up: `KAILH_SOCKET` at `MR0` in both Eagle files, at the same
-    offset from its switch centre. Had the breakout mirrored it, this
-    would stick out the other side and the mock would be quietly wrong
-    about the one feature that decides where a column can stand.
+    offset from its switch centre. The NeoKey's own STEP does not model
+    its sockets at all, so this is where they come from for that board.
     """
-    return _block(
-        sx - 4.792, sx + 6.108, sy + 0.858, sy + 6.758,
-        P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP, P.Z_NEOKEY_BOTTOM,
-    )
+    z0 = P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP
+    out = None
+    for dx0, dx1, dy0, dy1 in P.SOCKET_PARTS:
+        b = _block(sx + dx0, sx + dx1, sy + dy0, sy + dy1,
+                   z0, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
+
+
+def _back_parts(ox, oy):
+    """Everything else on a breakout's back face, board-local.
+
+    The sockets are the tall ones and get their own helper, but the
+    reverse-mount NeoPixel and the diode hang down too, and a check that
+    only knows about sockets is a check that has been told half the
+    board.
+    """
+    out = None
+    for x0, x1, y0, y1, proud in P.BREAKOUT_BACK_PARTS:
+        if proud >= P.NEOKEY_SOCKET_DROP - 0.01:
+            continue          # a socket; _socket() places those
+        b = _block(ox + x0, ox + x1, oy + y0, oy + y1,
+                   P.Z_NEOKEY_BOTTOM - proud, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
 
 
 def breakouts():
@@ -90,6 +116,8 @@ def breakouts():
         part = slab if part is None else part + slab
     for sx, sy in P.BREAKOUT_SWITCH_XY:
         part += _socket(sx, sy)
+    for ox, oy in P.BREAKOUT_ORIGINS:
+        part += _back_parts(ox, oy)
     # Both holes are modelled even though only one is used, so that a peg
     # moved onto the unused one would still read as a fit rather than as
     # a collision -- and so that a peg moved off *either* one starts

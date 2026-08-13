@@ -75,6 +75,18 @@ one, not necessarily the only one.
   still seal it off, or leave a port a millimetre short of seating. That
   same shape of mistake happened four times, on both Qwiic sockets and
   the USB-C port, and every stand-in models plugs because of it.
+- **A stand-in summarised by hand is a check that agrees with you.**
+  `mock.py` drew the hot-swap socket as one 10.9 x 5.9 box, read off the
+  breakout's STEP. The real socket is a body *plus a solder wing off each
+  end*, 15.9 across, and the wings are what a column runs into. The
+  boolean said the back-left column cleared by 0.586; the printed plate
+  put it through the left wing. Nothing was wrong with the file -- the
+  wings are two separate solids in it and the summary took the biggest
+  one. Anything that decides where a column may stand now comes out of
+  the model as a list of boxes, `BREAKOUT_BACK_PARTS`, and includes the
+  reverse-mount NeoPixel and the diode, which the old summary also had
+  no idea about. Watched to fail: the three old supports against the real
+  shape report 15.659 mm³.
 - **A margin check is not a boolean.** The M3 post landed on the Qwiic
   plug while the margin that existed to prevent exactly that read green,
   because it measured to the board edge and the plug sticks out past it.

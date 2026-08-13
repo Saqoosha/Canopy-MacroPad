@@ -44,6 +44,35 @@ NEOKEY_HOLE_DIA = 2.50  # MOUNTINGHOLE_2.5_PLATED in the .brd
 NEOKEY_SW_Y = 10.795
 NEOKEY_SW_X = [9.525, 28.575, 47.625, 66.675]
 
+# Everything on the 4978's back face, board-local, as (x0, x1, y0, y1,
+# how far it stands proud). Read straight out of ref/neokey-breakout.step
+# rather than summarised: the hot-swap socket is a body *plus two solder
+# wings*, and a hand-made box around the body alone said a column at the
+# back-left corner cleared by 0.586 when the built plate put it through
+# the left wing. Anything that decides where a column may stand gets the
+# shape the model has, not the shape it is convenient to describe.
+BREAKOUT_BACK_PARTS = [
+    (4.741, 15.641, 11.680, 17.580, 1.830),   # socket body
+    (2.241, 4.741, 14.650, 17.150, 1.830),    # socket wing, left
+    (15.641, 18.141, 12.110, 14.610, 1.830),  # socket wing, right
+    (7.925, 11.125, 4.696, 7.496, 0.930),     # NeoPixel, reverse mount
+    (5.802, 7.152, 8.429, 11.129, 1.100),     # 1N4148
+    (13.932, 15.532, 6.408, 7.308, 0.800),
+    (11.125, 12.465, 6.562, 7.242, 0.244),
+    (11.125, 12.465, 4.950, 5.630, 0.244),
+    (6.585, 7.925, 6.562, 7.242, 0.244),
+    (6.585, 7.925, 4.950, 5.630, 0.244),
+]
+
+# The same Kailh socket sits on the NeoKey, whose own STEP does not model
+# it, so its three boxes are given relative to a switch centre and reused
+# there. Taken from the three 1.830-proud entries above.
+SOCKET_PARTS = [
+    (-4.784, 6.116, 0.885, 6.785),
+    (-7.284, -4.784, 3.855, 6.355),
+    (6.116, 8.616, 1.315, 3.815),
+]
+
 # Kailh hot-swap sockets hang off the underside. The Adafruit STEP does not
 # model them (its Z range is 0..4.53, all above the board), so this is the
 # Kailh CPG151101S11 datasheet height, not a measurement of that file.
@@ -611,7 +640,7 @@ BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
 # fouls the socket the board rocks instead of seating, which is loud at
 # assembly and a file stroke to fix -- so the second locating point is
 # worth the risk that the first alone was not.
-BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080), (1.905, 16.510)]
+BREAKOUT_SUPPORT_LOCAL = [(2.45, 2.45), (16.20, 2.45), (2.45, 6.70)]
 BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
                        for ox, oy in BREAKOUT_ORIGINS
                        for sx, sy in BREAKOUT_SUPPORT_LOCAL]
