@@ -87,6 +87,17 @@ one, not necessarily the only one.
   reverse-mount NeoPixel and the diode, which the old summary also had
   no idea about. Watched to fail: the three old supports against the real
   shape report 15.659 mm³.
+- **A model read for one face has to be turned over to be used for the
+  other.** The 4978's STEP draws the switch on -z; the case puts the
+  switch side up, so the board is turned over about its long axis and
+  everything on the back face **mirrors left to right**. The z flip was
+  implicit and the in-plane one was simply missing, so the socket, the
+  NeoPixel and the diode were all modelled on the wrong side of the
+  board -- which is why the columns that fouled were the left-hand pair
+  rather than the right. The mirror is one function applied once, at the
+  point the tables become case geometry, so the tables still read as the
+  file does and can be checked against it. Watched to fail: the third
+  support pad left on the side it used to be reports 1.672 mm³.
 - **A margin check is not a boolean.** The M3 post landed on the Qwiic
   plug while the margin that existed to prevent exactly that read green,
   because it measured to the board edge and the plug sticks out past it.

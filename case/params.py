@@ -44,6 +44,22 @@ NEOKEY_HOLE_DIA = 2.50  # MOUNTINGHOLE_2.5_PLATED in the .brd
 NEOKEY_SW_Y = 10.795
 NEOKEY_SW_X = [9.525, 28.575, 47.625, 66.675]
 
+# The STEP has the switch on -z, and the case puts the switch side up, so
+# the board is turned over about its long axis to get there -- which
+# mirrors the back face left to right. Read the numbers as the file gives
+# them and then mirror once, here, rather than mirroring by hand into the
+# table: a table of already-flipped numbers cannot be checked against the
+# file it came from.
+def _back_flip(part):
+    x0, x1, y0, y1, proud = part
+    return (BREAKOUT_W - x1, BREAKOUT_W - x0, y0, y1, proud)
+
+
+def _socket_flip(part):
+    dx0, dx1, dy0, dy1 = part
+    return (-dx1, -dx0, dy0, dy1)
+
+
 # Everything on the 4978's back face, board-local, as (x0, x1, y0, y1,
 # how far it stands proud). Read straight out of ref/neokey-breakout.step
 # rather than summarised: the hot-swap socket is a body *plus two solder
@@ -51,7 +67,7 @@ NEOKEY_SW_X = [9.525, 28.575, 47.625, 66.675]
 # back-left corner cleared by 0.586 when the built plate put it through
 # the left wing. Anything that decides where a column may stand gets the
 # shape the model has, not the shape it is convenient to describe.
-BREAKOUT_BACK_PARTS = [
+_BACK_PARTS_AS_DRAWN = [
     (4.741, 15.641, 11.680, 17.580, 1.830),   # socket body
     (2.241, 4.741, 14.650, 17.150, 1.830),    # socket wing, left
     (15.641, 18.141, 12.110, 14.610, 1.830),  # socket wing, right
@@ -67,11 +83,12 @@ BREAKOUT_BACK_PARTS = [
 # The same Kailh socket sits on the NeoKey, whose own STEP does not model
 # it, so its three boxes are given relative to a switch centre and reused
 # there. Taken from the three 1.830-proud entries above.
-SOCKET_PARTS = [
+_SOCKET_PARTS_AS_DRAWN = [
     (-4.784, 6.116, 0.885, 6.785),
     (-7.284, -4.784, 3.855, 6.355),
     (6.116, 8.616, 1.315, 3.815),
 ]
+
 
 # Kailh hot-swap sockets hang off the underside. The Adafruit STEP does not
 # model them (its Z range is 0..4.53, all above the board), so this is the
@@ -92,6 +109,10 @@ BREAKOUT_SW = (9.525, 10.795)
 # 2.54 drill against the NeoKey's 2.5 plated, so PEG_DIA has 0.24 of play
 # here instead of 0.20. The peg locates, it does not grip.
 BREAKOUT_HOLES = [(1.905, 5.080), (17.145, 16.510)]
+# Mirrored here rather than in the tables, now that the width they are
+# mirrored about exists.
+BREAKOUT_BACK_PARTS = [_back_flip(p) for p in _BACK_PARTS_AS_DRAWN]
+SOCKET_PARTS = [_socket_flip(p) for p in _SOCKET_PARTS_AS_DRAWN]
 # Drill 2.540 in the .brd, and Ø2.540 again measured off the STEP's own
 # board solid -- two independent sources, exact agreement.
 BREAKOUT_HOLE_DIA = 2.54
@@ -608,7 +629,10 @@ NEOKEY_SWITCH_XY = [neokey_xy((x, NEOKEY_SW_Y)) for x in NEOKEY_SW_X]
 SWITCH_XY = BREAKOUT_SWITCH_XY + NEOKEY_SWITCH_XY
 
 MOUNT_XY = [neokey_xy(h) for h in NEOKEY_HOLES]
-BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
+# Mirrored like everything else on that face. Nothing enters these any
+# more -- the pegs are gone -- but a mock that puts a board's holes on the
+# wrong diagonal is a mock that would mislead the next person to try.
+BREAKOUT_HOLE_XY = [(ox + BREAKOUT_W - hx, oy + hy)
                     for ox, oy in BREAKOUT_ORIGINS
                     for hx, hy in BREAKOUT_HOLES]
 
@@ -640,7 +664,12 @@ BREAKOUT_HOLE_XY = [(ox + hx, oy + hy)
 # fouls the socket the board rocks instead of seating, which is loud at
 # assembly and a file stroke to fix -- so the second locating point is
 # worth the risk that the first alone was not.
-BREAKOUT_SUPPORT_LOCAL = [(2.45, 2.45), (16.20, 2.45), (2.45, 6.70)]
+# Front corners, plus one up the right edge. The socket's body and its
+# left wing take the whole of the left side once the board is the way up
+# the case puts it, so the third pad can only be on the right -- which is
+# the mirror of where it was, and is the collision Saqoosha found on the
+# printed plate.
+BREAKOUT_SUPPORT_LOCAL = [(2.45, 2.45), (16.20, 2.45), (16.20, 6.70)]
 BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
                        for ox, oy in BREAKOUT_ORIGINS
                        for sx, sy in BREAKOUT_SUPPORT_LOCAL]
