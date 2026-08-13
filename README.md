@@ -220,8 +220,22 @@ removes the cable's share of it. Whether any of this is visible is a
 different question again, since the rail is already about 200 mV below an
 SK6812's datasheet floor before a single wire is counted.
 
-**The rail has not been metered.** `tools/mpad.py --load` produces the
-worst case; probe at an LED's `VDD`, not at the QT Py.
+**The rail has still not been metered, and it no longer needs to be.**
+The voltage was only ever a proxy for a question that can be looked at
+directly: on the assembled unit, all six set to `ffffff` at `B 100` —
+the worst case, three dies lit on every pixel, the breakouts' current
+crossing the cable too — the two halves are the same white. So the
+argument above was right, and the tap point stopped being a colour
+decision. If a number is ever wanted anyway, `tools/mpad.py --load`
+produces that same worst case; probe at an LED's `VDD`, not at the QT
+Py.
+
+**The pixels are not identical to each other, though.** One of the six
+sits slightly purple against the other five under that test, and it does
+not follow the supply — it is on the same node as its neighbours, and
+they agree. It is part-to-part variation in the LED. Worth writing down
+because the alternative explanation is the rail, and the rail is now
+exonerated: a small mismatch found later is a pixel, not a wire.
 
 One consequence worth knowing before anyone "fixes" it. An SK6812's
 datasheet floor is 3.5 V and its green and blue dies drop out first, so a

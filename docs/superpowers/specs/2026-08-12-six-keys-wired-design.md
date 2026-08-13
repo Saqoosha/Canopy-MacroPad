@@ -93,8 +93,16 @@ Five wires reach the QT Py:
 | `MISO` | breakout 0 `SWITCHA`, `Pull.UP` |
 | `SCK` | breakout 1 `SWITCHA`, `Pull.UP` |
 
-All three are on the QT Py's `3V`/`GND` edge, so the harness does not
-have to cross the board.
+All three signals are on the QT Py's `3V`/`GND` edge, so the harness does
+not have to cross the board.
+
+**The built unit does not take power from the QT Py.** `3V` and `GND`
+come off the NeoKey's `JP1`/`JP5` headers instead, which is the same net
+by a shorter route and leaves only three wires crossing the case. It
+also means the Qwiic cable now carries the supply for all six keys, so
+"a dead cable costs exactly the keys that use it" — argued below under
+the I2C guard — narrowed to "a dead *NeoKey* costs four, a dead cable
+costs six". `README.md` is the current word on both.
 
 The diode points `SWITCHA` to `SWITCHC`, so `SWITCHC` goes to ground
 and a pressed key pulls its input low. The 1N4148 drops about 0.45 V at
@@ -105,11 +113,13 @@ stuck-pressed, this is the first number to measure.
 Three GPIO of the eleven broken out. The STEMMA QT connector is on its
 own pair (GPIO 24/25) and is untouched.
 
-**The one measurement before wiring**: `VCC` on the NeoKey. STEMMA QT
-is a 3.3 V rail, so powering the breakouts from the QT Py's `3V` should
-put their pixels on the same voltage as the existing four — which is
-the whole argument for the colours carrying over. Meter it rather than
-assume it.
+~~**The one measurement before wiring**: `VCC` on the NeoKey.~~ This
+asked for a meter and never got one, and the reason it did not is worth
+keeping: **the voltage was a proxy.** What it stood in for is whether
+the two halves match, and six pixels side by side answer that directly.
+They do — see Open, deliberately. Both halves are on one net whichever
+pad the power is taken from, traced through both schematics, so the
+question was never topology either.
 
 ## Firmware
 
@@ -281,10 +291,15 @@ static above.
 
 ## Open, deliberately
 
-- **The colour match is argued, not measured.** Both boards carry
-  `NEO3535_REVERSE` and both will run off the same rail, which is why
-  this is the cheap option to try first. If keys 0-1 read differently,
-  the fix is per-source tuning, and the Snap-Apart 1x6 is the fallback
-  that removes the question entirely.
+- ~~**The colour match is argued, not measured.**~~ **Closed on the
+  assembled unit.** Both boards carry `NEO3535_REVERSE` and both run off
+  the same rail, which is why this was the cheap option to try first. It
+  worked: all six at `ffffff` with `B 100` — the worst case — read as
+  the same white, so per-source tuning and the ¥5,088 Snap-Apart
+  fallback are both unnecessary. The rail was never metered, and that
+  turned out to be fine: the voltage was a proxy for "do they match",
+  and the six of them side by side answer that directly. One pixel is
+  faintly purple against the other five; it sits on the same node as
+  its neighbours, so that is the part, not the supply.
 - `PILOT_DIA` at 2.50 has still never had an M3 driven into it. That
   predates this work and is not in its scope.

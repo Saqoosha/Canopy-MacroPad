@@ -487,6 +487,15 @@ on a reprint. `stacked` has not been printed at all.
   silent: a name that still exists but points at the wrong pin reads
   high through its pull-up, so keys 0-1 quietly stop opening the drive
   while the NeoKey's four still do.
+
+  That copy is also why **"one line switches the build" is true of
+  `code.py` and not of `boot.py`.** Emptying `GPIO_KEY_PIN_NAMES` gives
+  a four-key firmware; `boot.py` goes on reading `MISO` and `SCK`
+  regardless, and on a board with no breakouts they read high through
+  their pull-ups, so the gate falls through to the I2C path and behaves
+  correctly. Left alone on purpose: deriving one file's constants from
+  the other is the import that cannot happen, and the cost of the
+  asymmetry is two pin reads that always say "not held".
 - `lib/` needs `neopixel.mpy` as well now, for the breakouts' chain.
   Missing, keys 0-1 report presses and never light, and the host is told
   `ERR gpio pixels ...`.
