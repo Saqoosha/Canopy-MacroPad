@@ -152,6 +152,14 @@ one, not necessarily the only one.
   is also the screw head's seat, so it is the one dimension here with a
   maximum as well as a minimum, and `build.py` checks it outside the
   margins table because that table can only express floors.
+- **A feature added before a trim is a feature that was never added.**
+  `shell()` ends `part = part & outer`, and `outer` starts at `Z_FLOOR`,
+  so a skirt built below the seam was deleted on every build for three
+  rounds. No error, no warning, `all checks passed`, and the render
+  looked right -- the part is valid, it just does not have the thing in
+  it. Same family as the cut placed inside a void: **when a feature is
+  meant to change a shape, measure the shape.** A bounding box is usually
+  enough and takes one line.
 - **A cut placed inside a void does nothing, and looks like it worked.**
   The chamfer above was first written below the counterbore top, where
   the counterbore had already removed the material. `build.py` passed,
