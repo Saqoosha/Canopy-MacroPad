@@ -615,9 +615,14 @@ BREAKOUT_SUPPORT_LOCAL = [(1.905, 5.080), (17.145, 5.080), (1.905, 16.510)]
 BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
                        for ox, oy in BREAKOUT_ORIGINS
                        for sx, sy in BREAKOUT_SUPPORT_LOCAL]
-BREAKOUT_PEG_XY = [(ox + hx, oy + hy)
-                   for ox, oy in BREAKOUT_ORIGINS
-                   for hx, hy in BREAKOUT_HOLES]
+# No pegs. The first assembled unit settled it: a plate-mount switch
+# clips into the top plate and its pins go into the socket on the board,
+# so the switch is what ties a breakout to the plate -- the supports set
+# its height, the shell presses it down, and a locating peg carries
+# nothing. Removing them also removes the two things they cost: 0.362 to
+# the socket at the back-right hole, and an orientation trap, since a
+# peg pair is the only feature that made it look like the board had a
+# wrong way round. BREAKOUT_HOLES stays because it is board data.
 
 # Where the shell presses the boards down. The NeoKey gets standoffs in
 # its own four holes; the breakouts cannot, and the arithmetic is worth
@@ -635,6 +640,16 @@ BREAKOUT_PEG_XY = [(ox + hx, oy + hy)
 SEAM_XY = [field_xy((i * BREAKOUT_W, y))
            for i in range(1, BREAKOUT_COUNT + 1)
            for y in (NEOKEY_HOLES[0][1], NEOKEY_HOLES[2][1])]
+
+# A seam is between two boards, so the field's outer left edge has none
+# and the leftmost breakout was pressed on one side only -- which is what
+# the first assembled unit showed. A standoff cannot go there either: the
+# board runs 2.525 from its own left edge to its switch body against the
+# 5.05 a seam has, and STANDOFF_DIA needs 4.20. So the plate reaches down
+# as a rib along that edge instead. 1.50 keeps it 1.025 clear of the
+# switch body in x, which holds whichever way PCB_SLOP lets the board
+# sit, and 1.50 x 21.59 is more bearing area than a 4.20 circle anyway.
+EDGE_RIB_W = 1.50
 BTN_XY = [qtpy_xy(QTPY_BTN_A), qtpy_xy(QTPY_BTN_B)]
 # Taken at the board edge the connector actually sits on. Passing y=0
 # here happens to be harmless when the board is only mirrored and puts

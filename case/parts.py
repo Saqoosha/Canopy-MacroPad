@@ -189,6 +189,13 @@ def shell():
     for x, y in P.SEAM_XY:
         part += _tube(x, y, P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
 
+    # ...and a rib down the field's outer left edge, which has no seam to
+    # stand on. It grows off the plate, so on a shell printed plate face
+    # down it is not an overhang.
+    _rx, _ry = P.FIELD_ORIGIN
+    part += _block(_rx, _rx + P.EDGE_RIB_W, _ry, _ry + P.BREAKOUT_D,
+                   P.Z_NEOKEY_TOP, P.Z_PLATE_BOTTOM)
+
     # Corner posts for the bottom plate's screws, full interior height.
     for x, y in P.POST_XY:
         part += _tube(x, y, P.Z_FLOOR, P.Z_PLATE_BOTTOM, P.POST_DIA)
@@ -316,9 +323,6 @@ def bottom():
     # "whichever ones happen to have a column beneath them".
     for x, y in P.BREAKOUT_SUPPORT_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
-    for x, y in P.BREAKOUT_PEG_XY:
-        part += _tube(x, y, P.BOTTOM_T,
-                      P.Z_NEOKEY_BOTTOM + P.PEG_H, P.PEG_DIA)
 
     if P.STACKED:
         part += _stacked_qtpy_mount()

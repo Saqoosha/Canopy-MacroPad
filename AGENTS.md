@@ -286,6 +286,18 @@ and `coupon_layout()` exists because a probe holding its own copy of the
 row positions kept measuring where the posts used to be, passing every
 "this hole is open" assertion by finding nothing at all.
 
+The first assembled six-key unit settled two things the model could not.
+**A breakout needs no locating peg**: a plate-mount switch clips into the
+top plate and its pins go into the socket on the board, so the switch is
+what ties the two together -- the supports set the height and the shell
+presses down, and a peg carries nothing. They are gone, and with them the
+0.362 to the socket at the back-right hole and the only feature that made
+the board look like it had a wrong way round. **And the leftmost breakout
+was pressed on one side only**, because a seam is between two boards and
+the field's outer edge has none; `EDGE_RIB_W` is the plate reaching down
+along that edge, since a 4.20 standoff does not fit in the 2.525 a board
+has from its edge to its own switch body.
+
 Also noted: the Qwiic plug goes into the `inline` pocket but takes some
 working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
 on a reprint. `stacked` has not been printed at all.
