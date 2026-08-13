@@ -48,6 +48,17 @@ run, and conflict markers went into four commits of a rebase before
 anyone looked. The tree at the end was correct, which is what makes it
 easy to miss -- only the intermediate commits carried them.
 
+**`git add -A` stages whoever else is in the worktree.** Two sessions
+work in this one at the same time, and `git add -A && git commit` swept
+up a peer's four in-progress files -- 100 lines of `firmware/code.py`
+among them -- under a message describing only the case fix it was
+written for. The commit was not wrong about its content, it was wrong
+about *whose* content, which no diff of that commit can show you.
+**Stage by explicit path, and read `git status` for files you did not
+touch before committing.** The recovery is `git reset --soft HEAD~1`
+followed by `git reset`, which keeps every change and hands the split
+back; do it before anything is pushed and it costs one round.
+
 **Restore from a copy, never from git.** `git checkout -- <file>` after
 an injection restores the *committed* file, so any uncommitted work in it
 is gone -- which is how a session lost a finished `case/params.py` while
