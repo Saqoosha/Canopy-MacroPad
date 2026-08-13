@@ -385,9 +385,9 @@ def bottom():
     # and columns leave. Cut before the columns go on, so a column that
     # ever lands in the lane is a column standing in a trench rather than
     # one the channel quietly ate.
+    x0, x1 = P.WIRE_CHANNEL_X
     y0, y1 = P.WIRE_LANE_Y
-    part -= _block(P.FIELD_ORIGIN[0] - 2.0, P.QTPY_CENTER[0],
-                   y0, y1,
+    part -= _block(x0, x1, y0, y1,
                    P.BOTTOM_T - P.WIRE_CHANNEL_D, P.BOTTOM_T + 0.1)
 
     # Columns that push the NeoKey up against the shell's standoffs.

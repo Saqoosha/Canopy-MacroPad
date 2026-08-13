@@ -115,11 +115,43 @@ one, not necessarily the only one.
   still read as the file does so they can be checked against it. Watched
   to fail: the old supports against the real shape 15.659 mm³, the third
   pad left on the old side 1.672 mm³.
-- **A margin check is not a boolean.** The M3 post landed on the Qwiic
-  plug while the margin that existed to prevent exactly that read green,
-  because it measured to the board edge and the plug sticks out past it.
-  Arithmetic guards are worth having and are not evidence; the boolean
-  is the evidence.
+- **A margin check is not a boolean**, and neither is a sentence. The M3
+  post landed on the Qwiic plug while the margin that existed to prevent
+  exactly that read green, because it measured to the board edge and the
+  plug sticks out past it. Worse, because nothing at all was measuring
+  it: the reason the breakouts go left was written as "a mated plug
+  stands 2.50 proud and a butted breakout's switch body starts 2.525 --
+  0.025, which is the tolerance", and it stood in three files for weeks.
+  The plug hangs *below* the board and the switch stands *above* it, so
+  that pair was never in the same space. **A number borrowed from a
+  sentence that is true does not bring the truth with it** — 0.025 is
+  right where it was written, about a standoff and a switch, both above
+  the board, and it was carried across a Z boundary it does not cross.
+  A peer's replacement (the hot-swap socket's solder wing, which does
+  share the plug's Z band and does overlap it 0.258 in x) was two thirds
+  right and missed in y by 4.03. Booleaned, the plug clears everything at
+  0.000 mm³; moved +10.03 in y onto the wing the same probe reports
+  1.198. Arithmetic guards are worth having and are not evidence; prose
+  is not even a guard.
+- **A boolean cannot see a trench, in either direction.** Interference
+  asks what two solids share, and a cut removes material, so a feature
+  standing *over* a channel and a membrane left *under* one both report
+  0.000 forever. The wire channel ran across both screw positions: the
+  counterbore's ceiling at z 1.00, the trench floor at 1.20, so 0.70 of
+  y was spanned by 0.20 of plate — one layer, printed over the bore,
+  under the seat the screw head bears on — and 0.45 of the shell's post
+  stood on air beside it. `build.py` was green through all of it. The
+  guard has to be a plan-view floor instead: the channel's rectangle
+  against every circle that matters, watched failing at -0.455 on the
+  screws and 0.005 on the columns.
+- **A case-space constant describes one layout.** `WIRE_LANE_Y` was
+  written as a pair of case-space numbers off an `inline` scan. `stacked`
+  seats the field 0.805 further back, so the same trench went 0.400 into
+  a NeoKey column there while `inline` stayed green — and the fault was
+  in the layout nobody prints, which is how it would have kept. Anything
+  positioned relative to the boards belongs board-local with
+  `FIELD_ORIGIN` applied once; the tell that it worked is the margin
+  coming out identical in both layouts.
 - **Prove a check fires before trusting it**, and **inject the fault by
   moving geometry, not by shrinking it to nothing.** A zero-width `Box`
   makes OCCT throw, so the build dies before the check ever runs and the

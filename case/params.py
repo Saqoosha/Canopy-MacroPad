@@ -161,13 +161,31 @@ BREAKOUT_COUNT = 2
 # the same repository ref/fetch.sh already pulls the other two from.
 BREAKOUT_T = 1.57
 
-# They go to the *left* of the NeoKey, and that is forced rather than
-# preferred. A mated Qwiic plug stands 2.50 proud of the board edge it is
-# plugged into (QWIIC_PLUG_L), and the first switch on a butted breakout
-# starts 2.525 from that same edge -- 0.025 apart, which is the number
-# this file elsewhere calls "not clearance, the same value as the
-# tolerance". Putting them on the right would also strand the NeoKey's
-# socket 114 mm from the QT Py, and the cable is 50 mm.
+# They go to the *left* of the NeoKey, and it is the cable that forces
+# it: on the right, the NeoKey's socket ends up 114 mm from the QT Py
+# against a 50 mm cable.
+#
+# There used to be a second reason here and it was not true. It said a
+# mated Qwiic plug stands 2.50 proud of its board edge while a butted
+# breakout's switch body starts 2.525 from that edge, so the two miss by
+# 0.025 -- "not clearance, the tolerance". That sentence is correct
+# elsewhere in this file, about a standoff and a switch, and it does not
+# survive being carried here: the plug hangs *below* the board and the
+# switch body stands *above* it, so they were never in the same space to
+# be 0.025 apart. A peer session replaced the switch body with the
+# hot-swap socket's solder wing, which does share the plug's z band and
+# does overlap it by 0.258 in x -- and misses it by 4.03 in y.
+#
+# Booleaned rather than argued: a mated plug built on the NeoKey's left
+# socket reports 0.000 mm3 against the breakout boards and their back
+# faces, against the switch bodies, and against both printed parts. It
+# passes under the butted breakout in the strip its receptacles occupy,
+# where the nearest thing hanging down is the diode, 3.302 away. Moving
+# that plug +10.03 in y, onto the wing, turns the same probe red at
+# 1.198 mm3, so the clean result is a measurement and not a blind spot.
+#
+# So the left socket is not blocked, and the only thing keeping the
+# breakouts on this side is the cable length above.
 #
 # So keys 0-1 are the GPIO pair and 2-5 are the NeoKey, left to right,
 # and firmware/code.py assigns its index bases the same way round.
@@ -447,16 +465,32 @@ BOARD_CLAMP_SLACK = 0.20
 # There is exactly one lane. The plate's columns block outright; a board
 # component blocks if it hangs lower than the wire is tall. A hot-swap
 # socket leaves 1.53 and a wire passes under it; a STEMMA receptacle
-# leaves 0.40 and nothing does. What survives is a band at case y +0.55
-# to +5.85, and at its tightest -- x -32.1, the NeoKey's left edge -- it
-# is 5.30 wide. Four 26AWG wires abreast, and the fifth has nowhere.
+# leaves 0.40 and nothing does. Scanned across the board field, a 1.30
+# wire's centre can sit anywhere in y +0.55 to +5.35, so the band the
+# wires occupy is -0.10 to +6.00, and the nearest thing standing up out
+# of the plate -- a Ø4.5 NeoKey column at y 8.26 -- starts at 6.01.
 #
 # So the plate carries a channel along it. Depth buys the second layer
 # that headroom alone does not: 1.53 + WIRE_CHANNEL_D clears two 1.30
 # wires stacked, which is what makes five fit with room to spare. It also
 # gives the bundle somewhere to stay while the case is closed, which the
 # design had no answer for at all.
-WIRE_LANE_Y = (0.55, 5.85)
+#
+# The top is pulled in off the free band to leave a wall between the
+# trench and those columns; the untrimmed 16.795 would have left 0.005.
+# What a trench takes away is not a collision, so nothing booleans this
+# -- the margins in build.py are the whole guard, and they are why these
+# numbers are here rather than inline in parts.py.
+#
+# Board-local, and that is the point. Written as a case-space pair it
+# described one layout: stacked seats the field 0.805 further back to fit
+# the QT Py underneath, and the same two numbers put the trench 0.400
+# *into* a NeoKey column there while inline stayed green. Everything the
+# lane is about -- the boards' own components, the columns that stand
+# under them -- is fixed relative to the boards, so the lane is too.
+# Only inline was scanned; stacked has never been printed, and it gets
+# the same band by construction rather than by measurement.
+WIRE_LANE_LOCAL = (10.695, 16.395)
 WIRE_CHANNEL_D = 1.20   # leaves 1.20 of plate under it
 
 # --- how the two printed halves close on each other --------------------
@@ -752,6 +786,22 @@ def qtpy_xy(local):
 NEOKEY_CENTER = (NEOKEY_ORIGIN[0] + NEOKEY_W / 2,
                  NEOKEY_ORIGIN[1] + NEOKEY_D / 2)
 QTPY_CENTER = (QTPY_CX, QTPY_CY)
+
+# The wire channel runs under the boards and stops there. It used to run
+# from 2 mm left of the field to the QT Py's centre, which put it over
+# both screw positions at y +8.2, and that is worse than it sounds: the
+# counterbore's ceiling is at z 1.00 and the trench floor at 1.20, so
+# 0.70 of y had 0.20 of plate spanning it -- one layer, printed over the
+# bore, under the seat the screw head bears on. The same overlap left
+# 0.45 of the shell's post standing on air. Neither is an interference
+# and `build.py` was green throughout.
+#
+# Past the NeoKey's right edge there is no board overhead anyway, so the
+# depth bought nothing there and the field is the honest extent.
+WIRE_CHANNEL_X = (FIELD_ORIGIN[0], FIELD_ORIGIN[0] + KEY_FIELD_W)
+WIRE_LANE_Y = (FIELD_ORIGIN[1] + WIRE_LANE_LOCAL[0],
+               FIELD_ORIGIN[1] + WIRE_LANE_LOCAL[1])
+
 BREAKOUT_ORIGINS = [field_xy(o) for o in BREAKOUT_ORIGINS_LOCAL]
 BREAKOUT_CENTERS = [(ox + BREAKOUT_W / 2, oy + BREAKOUT_D / 2)
                     for ox, oy in BREAKOUT_ORIGINS]

@@ -36,6 +36,18 @@ def export_step_stable(part, path):
                         f.read_text(), count=1))
 
 
+def _rect_gap(xs, ys, cx, cy, r):
+    """Plan-view clearance between an axis-aligned rect and a circle.
+
+    Separated on any one axis is separated, so the largest of the four
+    one-axis gaps is the answer; negative means the footprints overlap.
+    Used for features a boolean cannot see -- a trench takes material
+    away, so nothing standing over one ever reports interference.
+    """
+    return max(xs[0] - (cx + r), (cx - r) - xs[1],
+               ys[0] - (cy + r), (cy - r) - ys[1])
+
+
 def check(label, got, want, tol=0.01):
     ok = abs(got - want) <= tol
     print(f"  [{'ok ' if ok else 'BAD'}] {label:<38} {got:8.3f}  (want {want:.3f})")
@@ -238,6 +250,32 @@ def main():
              for _, y in P.MOUNT_XY]
             + [P.CASE_D / 2 - P.WALL - abs(y) - P.FIELD_SUPPORT_DIA / 2
                for _, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
+        ),
+        # Nothing booleans a trench: what it removes is material, so a
+        # feature standing over one still reports zero interference and a
+        # membrane left under one is a valid solid. These are the only
+        # guard the wire channel has, and they are floors on the plan
+        # view -- the channel's rectangle against every circle that
+        # matters, separated on any one axis being enough.
+        #
+        # Against the screw features first, because that is the pair that
+        # was wrong: the channel ran over both counterbores and left
+        # 0.20 of plate spanning them, one layer over the bore. Measured
+        # to the larger of the counterbore and the shell's post, since
+        # the post's foot has to land on plate that is still there.
+        "wire channel clear of the screws": min(
+            _rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                      max(P.SCREW_HEAD_DIA, P.POST_DIA) / 2)
+            for x, y in P.POST_XY
+        ),
+        # ...and against the columns that stand up out of the plate, per
+        # column because they are not one diameter.
+        "wire channel clear of the columns": min(
+            [_rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                       P.COLUMN_DIA / 2) for x, y in P.MOUNT_XY]
+            + [_rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                         P.FIELD_SUPPORT_DIA / 2)
+               for x, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
         ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening

@@ -423,6 +423,20 @@ being flat off the bed. `out/<layout>/coupon-seam.stl` settles the barb's
 reach, which is the one number that decides both how hard it is to close
 and how hard it is to open.
 
+**The wires have a trench.** Five have to cross the whole field and the
+space under the boards leaves exactly one lane; a hot-swap socket gives a
+wire 1.53 mm to pass under, a STEMMA receptacle 0.40 and nothing does.
+The plate is sunk `WIRE_CHANNEL_D` along that lane, which turns 1.53 into
+2.73 — two layers of 26AWG, so eight fit where four did — and gives the
+bundle somewhere to stay while the case closes.
+
+It runs under the boards and stops there, because that is the only place
+the depth buys anything and because past the boards are the screws. A
+trench is invisible to the interference check: over a counterbore it left
+0.20 mm of plate spanning the bore, and beside it 0.45 mm of the shell's
+post stood on air, both with every boolean at zero. Two plan-view margins
+in `build.py` are the whole guard.
+
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes
 and fixes it in X and Y; the bottom plate's columns push it up against
