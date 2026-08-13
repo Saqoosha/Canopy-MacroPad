@@ -109,13 +109,18 @@ def _qtpy_rect():
     return min(xs), max(xs), min(ys), max(ys)
 
 
-def _clear_rects(inset=0.0):
+def _clear_rects():
     """The board's two component-free margins, as case-space rectangles.
 
-    `inset` pulls each strip away from the board's own edge, for the
-    plate's rails: the strips are clear of components but they are also
-    where the castellated pads are, and a rail under a pad leaves the
-    solder fillet and its wire nowhere to go.
+    Full width to the board's edge. A version of this held the rails
+    1.80 back so they missed the castellated pads, and that bought
+    clearance along the whole length to solve a problem at three points;
+    `_pad_reliefs` cuts those three instead and the rail keeps the
+    support it is for.
+
+    The inner end is still trimmed against QTPY_UNDER_X, because the
+    strips are clear of components by eye and the second one starts
+    0.014 inside the first real part.
 
     Both faces are clear along these strips -- USB shell, both buttons,
     the STEMMA socket and every underside part sit between them -- so the
@@ -125,20 +130,16 @@ def _clear_rects(inset=0.0):
     caller should have to know.
     """
     for a0, a1 in P.QTPY_CLEAR_X:
-        # Whichever end of the strip is the board's edge is the one that
-        # moves; the strips are given outer-edge-first and inner-second
-        # on one side and the reverse on the other, so decide by which is
-        # nearer the middle of the board.
+        # Whichever end of the strip faces the middle of the board is the
+        # one that gives way; the strips are given outer-edge-first on one
+        # side and the reverse on the other, so decide by which is nearer
+        # the centre rather than by their order.
         mid = P.QTPY_W / 2
         u0, u1 = P.QTPY_UNDER_X
         if abs(a0 - mid) > abs(a1 - mid):
-            a0 = a0 + inset
-            if inset:
-                a1 = min(a1, u0 - P.QTPY_RAIL_CLEAR)
+            a1 = min(a1, u0 - P.QTPY_RAIL_CLEAR)
         else:
-            a1 = a1 - inset
-            if inset:
-                a0 = max(a0, u1 + P.QTPY_RAIL_CLEAR)
+            a0 = max(a0, u1 + P.QTPY_RAIL_CLEAR)
         xs, ys = [], []
         for lx in (a0, a1):
             for ly in (0.0, P.QTPY_D):
@@ -146,6 +147,34 @@ def _clear_rects(inset=0.0):
                 xs.append(x)
                 ys.append(y)
         yield min(xs), max(xs), min(ys), max(ys)
+
+
+def _pad_reliefs():
+    """Pockets in the rail where a wire is soldered to the board's edge.
+
+    Three pads carry this build -- SCK, MISO and MOSI, all on the one
+    row -- and a rail running under a soldered pad leaves the fillet and
+    the wire nowhere to go, which is what stops the board sitting down.
+    Cut only at those three, out to the board's edge, so the rest of the
+    rail is still a rail.
+
+    Which three is a wiring fact rather than a board fact, so it lives in
+    params beside the wiring it comes from: change what is soldered and
+    this follows.
+    """
+    ys = [y for _name, y in P.QTPY_PADS_USED]
+    y0, y1 = min(ys) - P.QTPY_PAD_RELIEF, max(ys) + P.QTPY_PAD_RELIEF
+    # Out past the board's edge so the pocket really opens, and in as far
+    # as the pad row itself.
+    x0 = P.QTPY_PAD_X - P.QTPY_PAD_RELIEF
+    x1 = P.QTPY_W + 1.0
+    xs, cs = [], []
+    for lx in (x0, x1):
+        for ly in (y0, y1):
+            x, y = P.qtpy_xy((lx, ly))
+            xs.append(x)
+            cs.append(y)
+    return min(xs), max(xs), min(cs), max(cs)
 
 
 def _stemma_rect():
@@ -338,8 +367,10 @@ def _stacked_qtpy_mount():
                    P.BOTTOM_T - 0.1, P.Z_QTPY_LOW)
     part += stop
 
-    for cx0, cx1, cy0, cy1 in _clear_rects(P.QTPY_RAIL_INSET):
+    for cx0, cx1, cy0, cy1 in _clear_rects():
         part += _block(cx0, cx1, cy0, cy1, P.BOTTOM_T, P.Z_QTPY_LOW)
+    rx0, rx1, ry0, ry1 = _pad_reliefs()
+    part -= _block(rx0, rx1, ry0, ry1, P.BOTTOM_T - 0.1, P.Z_QTPY_LOW + 0.1)
 
     # Lips reach in 1.0 from the pocket walls and no further: any deeper
     # and they land on the buttons, which stand 1.94 proud on this face.
@@ -427,10 +458,13 @@ def bottom():
         part += _stacked_qtpy_mount()
     else:
         # Inline, the shell holds the board down. All the bottom plate has
-        # to do is hold it up, on the same two clear margins -- inset off
-        # the board's edge so the pads it is soldered to keep their room.
-        for cx0, cx1, cy0, cy1 in _clear_rects(P.QTPY_RAIL_INSET):
+        # to do is hold it up, on the same two clear margins, cut back
+        # only where a wire is soldered to the board's edge.
+        for cx0, cx1, cy0, cy1 in _clear_rects():
             part += _block(cx0, cx1, cy0, cy1, P.BOTTOM_T, P.Z_QTPY_LOW)
+        rx0, rx1, ry0, ry1 = _pad_reliefs()
+        part -= _block(rx0, rx1, ry0, ry1,
+                       P.BOTTOM_T - 0.1, P.Z_QTPY_LOW + 0.1)
 
     for x, y in P.POST_XY:
         part -= _tube(x, y, -0.1, P.BOTTOM_T + 0.1, P.SCREW_CLEAR_DIA)

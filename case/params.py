@@ -698,17 +698,15 @@ QTPY_SLOP = 0.40
 QTPY_FRAME_W = 1.60  # pocket wall around the QT Py, on the bottom plate
 QTPY_RAIL_W = 3.00  # posts under the board's clear margins
 
-# How far the plate's rails hold off the board's own edge. The clear
-# strips are clear of *components*, which is what they were chosen for --
-# but they are also where the castellated pads are, and this case has
-# five wires soldered to them. A rail directly under a pad means the
-# solder fillet and the wire have nowhere to be and the board will not
-# sit down. 1.80 leaves the outer 1.80 of each strip open, which is pad
-# and fillet, and keeps 1.10 of ledge to rest on.
-QTPY_RAIL_INSET = 1.80
-
-# ...and how far it holds off the components at the other end, which is
-# the end the hand-written strip got wrong.
+# How far the rail holds off the components at its inner end. The clear
+# strips are clear of components by eye, but the second one starts at
+# 14.40 and the underside parts reach 14.414 -- 0.014 inside, which did
+# not matter until a rail was pulled onto that boundary.
+#
+# There used to be a QTPY_RAIL_INSET here as well, holding the rail 1.80
+# off the board's outer edge so it missed the castellated pads. It is
+# gone: it narrowed the rail along its whole length to clear three pads,
+# and QTPY_PADS_USED cuts it back only where those three are.
 QTPY_RAIL_CLEAR = 0.30
 QTPY_LIP = 1.00  # ledge the board slides in under, so it cannot lift
 
@@ -724,6 +722,75 @@ QTPY_LIP = 1.00  # ledge the board slides in under, so it cannot lift
 # not matter until a rail was narrowed onto exactly that boundary.
 QTPY_UNDER_X = (3.700, 14.414)
 QTPY_CLEAR_X = ((0.40, 3.30), (14.40, 17.40))
+
+# Every solid that hangs off the QT Py's underside, board-local, out of
+# ref/qtpy-rp2040.step. Forty of them, generated rather than typed.
+#
+# mock.py drew this as a single hand-written box, 4.900..12.700 by
+# 3.400..20.000, and **24 of the forty fall outside it** -- so a rail
+# could stand on a real part and the interference boolean would report
+# zero, which is the same failure the NeoKey's face had and the breakout
+# had before that. Third board, same shape: a stand-in summarised by hand
+# is a check that agrees with you.
+QTPY_UNDER_PARTS = [
+    (  5.914,   8.614,  18.553,  19.903, 1.100),
+    (  5.644,  12.644,   3.498,  10.498, 1.000),
+    (  3.838,   4.738,   1.430,   3.030, 0.800),
+    (  4.922,   5.822,  11.430,  13.030, 0.800),
+    (  6.572,  10.572,  13.937,  17.939, 0.800),
+    ( 12.814,  14.414,  11.755,  12.655, 0.800),
+    (  9.253,  11.753,   0.613,   2.613, 0.700),
+    (  3.700,   4.200,  11.248,  11.448, 0.500),
+    (  3.700,   4.200,  11.448,  12.048, 0.500),
+    (  3.700,   4.200,  12.048,  12.248, 0.500),
+    (  5.596,   5.796,   1.630,   2.130, 0.500),
+    (  5.605,   6.105,  17.178,  17.378, 0.500),
+    (  5.605,   6.105,  16.578,  17.178, 0.500),
+    (  5.605,   6.105,  16.378,  16.578, 0.500),
+    (  5.796,   6.396,   1.630,   2.130, 0.500),
+    (  6.396,   6.596,   1.630,   2.130, 0.500),
+    (  6.519,   7.019,  12.162,  12.362, 0.500),
+    (  6.519,   7.019,  11.562,  12.162, 0.500),
+    (  6.519,   7.019,  11.362,  11.562, 0.500),
+    (  6.676,   6.876,  13.047,  13.547, 0.500),
+    (  6.876,   7.476,  13.047,  13.547, 0.500),
+    (  7.476,   7.676,  13.047,  13.547, 0.500),
+    (  8.450,   8.950,   1.024,   1.224, 0.500),
+    (  8.450,   8.950,   1.224,   1.824, 0.500),
+    (  8.450,   8.950,   1.824,   2.024, 0.500),
+    (  9.635,   9.835,  19.079,  19.579, 0.500),
+    (  9.835,  10.435,  19.079,  19.579, 0.500),
+    ( 10.435,  10.635,  19.079,  19.579, 0.500),
+    ( 12.390,  12.590,   2.036,   2.536, 0.500),
+    ( 12.390,  12.590,   0.702,   1.202, 0.500),
+    ( 12.590,  13.190,   2.036,   2.536, 0.500),
+    ( 12.590,  13.190,   0.702,   1.202, 0.500),
+    ( 13.190,  13.390,   2.036,   2.536, 0.500),
+    ( 13.190,  13.390,   0.702,   1.202, 0.500),
+    ( 13.428,  13.928,   9.876,  10.076, 0.500),
+    ( 13.428,  13.928,  10.076,  10.676, 0.500),
+    ( 13.428,  13.928,  10.676,  10.876, 0.500),
+    ( 13.745,  14.245,   5.075,   5.275, 0.500),
+    ( 13.745,  14.245,   4.475,   5.075, 0.500),
+    ( 13.745,  14.245,   4.275,   4.475, 0.500),
+]
+
+# The pads this build actually solders to, board-local. All three are on
+# JP3, the right-hand row, read out of Adafruit-QT-Py-RP2040-PCB's .brd
+# with the through-hole row at x 16.510 and the castellated edge at
+# 17.780. Power comes off the NeoKey, so these three are the whole list.
+QTPY_PAD_X = 16.510
+QTPY_PADS_USED = (
+    ("SCK",   5.271),
+    ("MISO",  7.811),
+    ("MOSI", 10.351),
+)
+# How far the rail is cut back around them, for the pad, its fillet and
+# the wire standing off it. The rail runs the full width of the clear
+# strip again and gives way only here, which is Saqoosha's call: a rail
+# narrowed everywhere buys clearance it does not need along most of its
+# length and loses the support it exists for.
+QTPY_PAD_RELIEF = 1.60
 
 # STEMMA QT socket footprint, board-local, for the pocket to keep clear.
 QTPY_STEMMA = (4.01, 10.01, -0.09, 4.87)

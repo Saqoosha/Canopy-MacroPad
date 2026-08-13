@@ -484,6 +484,22 @@ down by two pinch bars on its clear margins with the plate closing
 underneath. There is nothing above it to hide from, so face up costs
 nothing and puts the USB-C out the right end.
 
+**The rails run full width and give way at three points.** They were
+narrowed once, held 1.80 back off the board's edge so they missed the
+castellated pads — which spent clearance along their whole length to
+solve a problem in three places, and left 1.10 mm and 0.89 mm of ledge to
+carry the board. They are 2.90 and 2.69 now, and `QTPY_PADS_USED` cuts a
+pocket only where `SCK`, `MISO` and `MOSI` are soldered. Which three pads
+those are is a wiring fact, so it lives in `params.py` next to the wiring
+rather than in the geometry.
+
+Their inner ends are still trimmed to `QTPY_UNDER_X`. The clear strips
+were read off the board by eye and the second one starts at 14.40 while
+the first real component reaches 14.414 — 0.014 inside it, which only
+matters once a rail is pulled onto that boundary, and which the mock
+could not see at all until the QT Py's underside stopped being one
+hand-drawn box.
+
 Switches go in **from the top, through the plate**, after the case is
 closed — the hot-swap sockets mean they stay removable without opening
 anything, and the plate keeps them square while they seat.

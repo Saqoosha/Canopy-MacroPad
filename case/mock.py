@@ -238,8 +238,17 @@ def qtpy():
         P.Z_QTPY_LOW, P.Z_QTPY_LOW + P.QTPY_T,
     )
     # Underside parts -- up at the NeoKey's sockets when stacked, down at
-    # the bottom plate when not.
-    part += _qt(4.9, 12.7, 3.4, 20.0, P.Z_UNDER_LOW, P.Z_UNDER_HIGH)
+    # the bottom plate when not. Each solid out of the STEP rather than
+    # one box drawn round them: the box was 4.900..12.700 by 3.400..20.000
+    # and 24 of the 40 parts stood outside it, so a rail could land on a
+    # real component and this boolean would still read zero.
+    #
+    # Every one still claims the full QTPY_BOTTOM_DROP in Z rather than
+    # its own height. That is deliberately conservative: what was wrong
+    # here was the footprint, and giving each part its true depth as well
+    # would be a second change riding on an unverified one.
+    for x0, x1, y0, y1, _proud in P.QTPY_UNDER_PARTS:
+        part += _qt(x0, x1, y0, y1, P.Z_UNDER_LOW, P.Z_UNDER_HIGH)
     # USB-C shell, overhanging the board's edge. A stadium, not a box:
     # the real shell has fully rounded ends, and squaring it invented four
     # corners for the opening to have to clear.
