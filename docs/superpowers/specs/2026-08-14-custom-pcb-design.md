@@ -98,8 +98,23 @@ consequence of the geometry rather than a goal that bent it.
 - 12 MHz crystal, 3.3 V LDO, decoupling per the RP2040 hardware design
   guide, BOOT button.
 - USB-C 16-pin receptacle, 2 x 5.1 kΩ CC, ESD diodes.
-- Six addressable RGB LEDs, one per key. Part and mount style are open --
-  see "Open, deliberately".
+- Six **SK6812MINI-E** reverse-mount addressable RGB, one per key,
+  `C5149201` at JLCPCB. Same controller family and same mount style as
+  the NeoKey's, which is the point: the status colours in `README.md`
+  were tuned on reverse-mount SK6812-class pixels and stay valid.
+  Adafruit's own description of the NeoKey -- "mounted on the back of
+  the board to shine through to the top" -- is the arrangement this
+  board copies.
+
+  Its body is a 3528, i.e. 3.5 x 2.8, which is the same package GTMX's
+  drawing calls for by its other name, 2835. That is not luck; it is
+  the size keyboard switches leave room for.
+
+  **`SK6812MINI-E` and `SK6812MINI-EA` are not interchangeable on an
+  order.** One is reversed in the tape and one has to be placed
+  upside-down by explicit instruction to the assembler. Getting this
+  wrong lights the inside of the board six times over, and the boards
+  arrive looking perfect.
 - Six Kailh hot-swap sockets, MX or PG1350, **hand-soldered after the
   PCBA order**. They are the one thing the board must not have decided.
 
@@ -262,27 +277,26 @@ Ordered so that nothing expensive waits on something cheap.
 
 ## Open, deliberately
 
-- **The LED is the one unresolved part of the board.** Three windows
-  disagree: 3535 on full MX, **2835 on GTMX**, 5.00 x 3.15 on Choc. The
-  status colours in `README.md` were tuned on 3535 reverse-mount pixels
-  running at the Qwiic rail voltage, so changing the part changes the
-  colours that are already calibrated.
+- **The LED's aperture, not its package.** The part is settled and so is
+  the mount style, and that turned out to move the question rather than
+  answer it. A reverse-mounted pixel sits *under* the board and throws
+  light up through a hole in it, so the package never has to fit inside
+  a switch's window -- only the light does. What is unsettled is
+  therefore **where the hole goes**, and whether each of the three
+  housings is actually open above it.
 
-  This is settled by looking, not by arithmetic, and it costs nothing:
-  **hold a GTMX over a lit NeoKey pixel.** Both are on the desk. If a
-  3535 clears the 2835 window, the part does not change and neither do
-  the colours. If it does not, a 2020 addressable (WS2812B-2020 class)
-  fits every window of the three and the colours are re-tuned once.
+  Three windows disagree on position as well as size: 3535 on full MX,
+  2835 on GTMX at the offsets its drawing gives, 5.00 x 3.15 on Choc.
+  One hole has to serve all three or the board favours one switch.
 
-- **Mount style follows from that.** Reverse-mount through a hole in the
-  PCB keeps the assembly single-sided and copies the arrangement the
-  NeoKey has proven; top-mount inside the switch window is what the GTMX
-  drawing itself specifies and forces two-sided assembly. Decide after
-  the LED part, not before.
+  Settled by looking, and it costs nothing: **turn a GTMX and a Durock
+  and a Choc upside down and see where each one is open.** All three are
+  on the desk. The NeoKey's own LED position, 5.08 south of switch
+  centre, is the incumbent answer and the thing to check first.
 
-- **JLCPCB stock has not been checked** for the LED or for either
-  hot-swap socket. The sockets are hand-soldered anyway, so only the LED
-  can block an order.
+- **Hot-swap socket stock at JLCPCB has not been checked**, and does not
+  need to be. The sockets are hand-soldered after assembly on purpose,
+  so they cannot block an order.
 
 - **Choc's 2.20 was read off a drawing, and the drawing is a figure.**
   It is the number the community uses and it is consistent with the
