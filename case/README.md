@@ -440,6 +440,14 @@ solid and with the plate subtracted from it, so what is left is plate
 that is not there. Two plan-view margins sit beside it for the distance
 that measurement cannot report.
 
+One place the channel still meets something coming the other way, and it
+has nowhere better to be: the left rear foot's recess rises 0.50 under a
+channel going down 1.20, leaving **0.70 mm** of plate over an Ø8 pocket.
+A Ø8 foot at y 5.99 in a 25.99 mm case cannot clear a channel reaching
+5.60, and putting it on the other edge would stand the case on three
+feet in a row. It is a thickness rather than a hole, so no boolean sees
+it and `plate left under the wire channel` is what holds it.
+
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes
 and fixes it in X and Y; the bottom plate's columns push it up against

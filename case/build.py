@@ -303,6 +303,26 @@ def main():
                          P.FIELD_SUPPORT_DIA / 2)
                for x, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
         ),
+        # ...and the third thing a trench does, which is neither of the
+        # other two: meet something cut from the *other* face and leave a
+        # membrane between them. The screws were the 0.20 case and are
+        # clear now; the feet are not, and cannot be -- a Ø8.00 foot at
+        # y 5.99 in a 25.99-deep case has nowhere to go that clears a
+        # channel reaching y 5.60, and moving it to the other side would
+        # put two feet on one edge. So the left +y foot keeps 0.70 of
+        # plate over its recess and this is the number that says so.
+        #
+        # Not a boolean, and deliberately: the material is there, it is
+        # thin. Reaching for the subtraction probe here would report
+        # 0.000 and mean nothing.
+        "plate left under the wire channel": min(
+            [P.BOTTOM_T - P.WIRE_CHANNEL_D] + [
+                P.BOTTOM_T - P.WIRE_CHANNEL_D - P.FOOT_RECESS
+                for x, y in P.FOOT_XY
+                if _rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y,
+                             x, y, P.FOOT_DIA / 2) < 0
+            ]
+        ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening
         # and becomes whether it fouls the desk.

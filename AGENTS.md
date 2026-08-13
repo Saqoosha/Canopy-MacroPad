@@ -149,6 +149,16 @@ one, not necessarily the only one.
   floors sit beside it for the distance the boolean cannot report
   (-0.455 on the screws, 0.005 on the columns), but the subtraction is
   the evidence.
+
+  **And the subtraction has a boundary, which is the next place to get
+  this wrong.** A trench also meets things cut from the *other* face and
+  leaves a membrane between them: the left +y foot's recess comes up 0.50
+  under a channel going down 1.20, so 0.70 of plate spans an Ø8.00
+  pocket. The material is *there* — it is thin — so the required-volume
+  probe reports 0.000 and means nothing, and only a thickness says
+  anything (watched failing at 0.200 with `FOOT_RECESS` doubled).
+  Reaching for the shiny new check because it worked last time is the
+  same disease as trusting the arithmetic one, moved up a level.
 - **A case-space constant describes one layout.** `WIRE_LANE_Y` was
   written as a pair of case-space numbers off an `inline` scan. `stacked`
   seats the field 0.805 further back, so the same trench went 0.400 into
