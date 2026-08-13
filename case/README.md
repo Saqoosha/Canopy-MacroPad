@@ -423,12 +423,23 @@ being flat off the bed. `out/<layout>/coupon-seam.stl` settles the barb's
 reach, which is the one number that decides both how hard it is to close
 and how hard it is to open.
 
-**The wires have a trench.** Five have to cross the whole field and the
-space under the boards leaves exactly one lane; a hot-swap socket gives a
-wire 1.53 mm to pass under, a STEMMA receptacle 0.40 and nothing does.
-The plate is sunk `WIRE_CHANNEL_D` along that lane, which turns 1.53 into
-2.73 — two layers of 26AWG, so eight fit where four did — and gives the
-bundle somewhere to stay while the case closes.
+**The wires have a trench, and the case grew for them.** Five have to
+cross the whole field, and the first wired unit would not lie down: the
+space under the boards was 3.36 mm, of which a hot-swap socket took 1.83
+and a STEMMA receptacle 2.96, leaving one usable lane 5.70 mm wide.
+`UNDER_BOARD_AIR` went from 0.40 to 1.40 on that evidence, so the gap is
+**4.36** and the whole case 13.33 instead of 12.33.
+
+The extra millimetre changed the shape of the problem rather than its
+size. **A wire passes under something only if that thing leaves more
+room than the wire is thick**, so at 0.40 under a receptacle the
+receptacles were walls and the near half of the board was unreachable.
+At 1.40 they are not, and the lane opens from four wires abreast to
+nine. The channel is cut to that whole width — 11.20 mm — because 1.40
+against a 1.30 wire is 0.10 and no harness should be laid on that; sunk
+`WIRE_CHANNEL_D`, a receptacle leaves 2.60 instead. The Qwiic cable
+hangs in that same near half and now has somewhere to sit for the first
+time.
 
 It runs under the boards and stops there, because that is the only place
 the depth buys anything and because past the boards are the screws. A
@@ -440,13 +451,13 @@ solid and with the plate subtracted from it, so what is left is plate
 that is not there. Two plan-view margins sit beside it for the distance
 that measurement cannot report.
 
-One place the channel still meets something coming the other way, and it
-has nowhere better to be: the left rear foot's recess rises 0.50 under a
-channel going down 1.20, leaving **0.70 mm** of plate over an Ø8 pocket.
-A Ø8 foot at y 5.99 in a 25.99 mm case cannot clear a channel reaching
-5.60, and putting it on the other edge would stand the case on three
-feet in a row. It is a thickness rather than a hole, so no boolean sees
-it and `plate left under the wire channel` is what holds it.
+Where the channel meets something coming the other way it has nowhere
+better to be: both left feet's recesses rise 0.50 under a channel going
+down 1.20, leaving **0.70 mm** of plate over an Ø8 pocket. Ø8 feet at
+y ±5.99 in a 25.99 mm case cannot clear a channel reaching ±5.60, and
+the feet are where they are so the case does not rock. It is a thickness
+rather than a hole, so no boolean sees it and `plate left under the wire
+channel` is what holds it.
 
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes

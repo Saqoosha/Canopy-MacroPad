@@ -462,13 +462,27 @@ BOARD_CLAMP_SLACK = 0.20
 # breakout. Nothing in the case was ever shaped for them, and a scan of
 # the space under the boards says why that nearly did not work.
 #
-# There is exactly one lane. The plate's columns block outright; a board
-# component blocks if it hangs lower than the wire is tall. A hot-swap
-# socket leaves 1.53 and a wire passes under it; a STEMMA receptacle
-# leaves 0.40 and nothing does. Scanned across the board field, a 1.30
-# wire's centre can sit anywhere in y +0.55 to +5.35, so the band the
-# wires occupy is -0.10 to +6.00, and the nearest thing standing up out
-# of the plate -- a Ø4.5 NeoKey column at y 8.26 -- starts at 6.01.
+# The plate's columns block outright; a board component blocks if it
+# hangs lower than the wire is tall. That second rule is why raising
+# UNDER_BOARD_AIR changed the shape of this and not just its size.
+#
+# At 3.36 of air there was exactly one lane. A hot-swap socket left 1.53
+# and a 26AWG wire passed under it; a STEMMA receptacle left 0.40 and
+# nothing did, so the receptacles walled off the near half of the board
+# and the lane was y +0.55 to +5.35, four wires abreast. At 4.36 a
+# receptacle leaves 1.40 and the scan opens to -5.35 .. +5.35, nine
+# abreast.
+#
+# The channel is cut to that whole width rather than the old strip,
+# because 1.40 against a 1.30 wire is 0.10 -- the sort of margin this
+# repository has been burned by twice, and not something to lay a
+# harness on. In the channel a receptacle leaves 2.60 instead, and the
+# Qwiic cable, which hangs in that same near half, gets somewhere to sit
+# for the first time.
+#
+# The limit is the columns, board-local because they are placed
+# board-local: the y 2.54 row's Ø4.5 reaches in to 4.79 and the y 19.05
+# row's to 16.80, so the band is those minus a 0.40 wall each side.
 #
 # So the plate carries a channel along it. Depth buys the second layer
 # that headroom alone does not: 1.53 + WIRE_CHANNEL_D clears two 1.30
@@ -490,7 +504,7 @@ BOARD_CLAMP_SLACK = 0.20
 # under them -- is fixed relative to the boards, so the lane is too.
 # Only inline was scanned; stacked has never been printed, and it gets
 # the same band by construction rather than by measurement.
-WIRE_LANE_LOCAL = (10.695, 16.395)
+WIRE_LANE_LOCAL = (5.195, 16.395)
 WIRE_CHANNEL_D = 1.20   # leaves 1.20 of plate under it
 
 # --- how the two printed halves close on each other --------------------
@@ -567,8 +581,21 @@ USB_FLOOR_CLEAR = 0.40  # under the USB-C shell, which is now the low point
 # the bottom plate: it shuts, and the boards inside are strained. That is
 # what "the model says 0.000 mm3" is worth when the model has a part on
 # the wrong side.
+# The air on top of that used to be 0.40, which is a fit and nothing
+# more. It is 1.40 now, on Saqoosha's call after wiring the first unit:
+# five wires would not lie down under the plate, and a taller case is
+# cheaper than a cleverer route. The whole case grows by the same 1.00,
+# 12.33 -> 13.33 in inline.
+#
+# It buys more than height. A wire passes under something only if that
+# thing leaves more room than the wire is thick, so the lane's width was
+# set by what a 26AWG wire could get under -- and a STEMMA receptacle at
+# 2.96 left 0.40, which is nothing. At 4.36 it leaves 1.40, so the
+# receptacles stop being walls and the lane opens up rather than merely
+# deepening. WIRE_LANE_LOCAL was re-scanned against this, not guessed.
 UNDER_BOARD_MAX = 2.96   # STEMMA QT receptacle, the deepest of them
-SOCKET_CLEARANCE = UNDER_BOARD_MAX + 0.40
+UNDER_BOARD_AIR = 1.40
+SOCKET_CLEARANCE = UNDER_BOARD_MAX + UNDER_BOARD_AIR
 
 # 0.20 a side, and confirmed on the printed inline shell: the board goes
 # into the pocket without force and without slop.
