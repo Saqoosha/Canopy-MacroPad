@@ -90,9 +90,12 @@ _SOCKET_PARTS_AS_DRAWN = [
 ]
 
 
-# Kailh hot-swap sockets hang off the underside. The Adafruit STEP does not
-# model them (its Z range is 0..4.53, all above the board), so this is the
-# Kailh CPG151101S11 datasheet height, not a measurement of that file.
+# Kailh hot-swap sockets hang off the underside -- every component on
+# either board is on that one face, and the switch side carries nothing
+# but the switch. Both STEPs model the sockets, contrary to what this
+# comment claimed for a long time: they are there at z 0.400..3.400
+# against a board of 0..1.570, so 1.830 proud, and the datasheet's 1.85
+# used here is 0.02 conservative rather than the only figure available.
 NEOKEY_SOCKET_DROP = 1.85
 
 # --- NeoKey Socket Breakout (ADA-4978), keys 0 and 1 --------------------
@@ -664,15 +667,20 @@ BREAKOUT_HOLE_XY = [(ox + BREAKOUT_W - hx, oy + hy)
 # fouls the socket the board rocks instead of seating, which is loud at
 # assembly and a file stroke to fix -- so the second locating point is
 # worth the risk that the first alone was not.
-# Front corners, plus one up the right edge. The socket's body and its
-# left wing take the whole of the left side once the board is the way up
-# the case puts it, so the third pad can only be on the right -- which is
-# the mirror of where it was, and is the collision Saqoosha found on the
-# printed plate.
-BREAKOUT_SUPPORT_LOCAL = [(2.45, 2.45), (16.20, 2.45), (16.20, 6.70)]
-BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
-                       for ox, oy in BREAKOUT_ORIGINS
-                       for sx, sy in BREAKOUT_SUPPORT_LOCAL]
+# One pad, at the field's outer left end. Everything else the breakouts
+# need from below is a seam column, and three pads per board on top of
+# those put five columns inside 5.3 mm around each seam -- which is what
+# the model looked like before anyone drew it.
+#
+# The back row is the reason there is only one. A column there has to
+# clear a socket body spanning y 11.680 .. 17.580 across most of the
+# board, and nowhere on that row is free -- even hard against a board
+# edge it fouls by 0.378. The seams are the single exception, because a
+# column centred on one straddles two boards and sits on the outermost
+# strip of each. So: seams carry the back row, and this carries the one
+# end no seam reaches.
+FIELD_SUPPORT_LOCAL = [(2.45, NEOKEY_HOLES[0][1])]
+BREAKOUT_SUPPORT_XY = [field_xy(p) for p in FIELD_SUPPORT_LOCAL]
 # No pegs. The first assembled unit settled it: a plate-mount switch
 # clips into the top plate and its pins go into the socket on the board,
 # so the switch is what ties a breakout to the plate -- the supports set
@@ -695,9 +703,17 @@ BREAKOUT_SUPPORT_XY = [(ox + sx, oy + sy)
 # leaves between two 14 mm bodies. Same y values as the NeoKey's holes,
 # so the whole field is pressed along two lines rather than at scattered
 # points.
+# The front row sits 0.34 ahead of the NeoKey's own, which is the one
+# place the two lines do not agree. A STEMMA QT receptacle starts 4.620
+# up the board and stands 2.96 proud, so at the NeoKey's 2.540 a
+# STANDOFF_DIA circle reaches 4.640 and grazes it -- 0.011 mm3, which
+# only appeared once both receptacles were modelled rather than just the
+# one with a cable in it. 2.200 clears by 0.320 and still lands on the
+# board, whose front edge is at 0.
+SEAM_Y = (2.200, NEOKEY_HOLES[2][1])
 SEAM_XY = [field_xy((i * BREAKOUT_W, y))
            for i in range(1, BREAKOUT_COUNT + 1)
-           for y in (NEOKEY_HOLES[0][1], NEOKEY_HOLES[2][1])]
+           for y in SEAM_Y]
 
 # A seam is between two boards, so the field's outer left edge has none
 # and the leftmost breakout was pressed on one side only -- which is what

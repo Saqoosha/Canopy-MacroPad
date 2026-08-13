@@ -150,12 +150,21 @@ def neokey():
     # there -- which is also the reason the breakouts are on that side:
     # see BREAKOUT_ORIGINS_LOCAL, where the right-hand alternative leaves
     # the mated plug 0.025 from the first breakout's switch.
-    ends = (1,)
-    for sign in ends:
-        sx = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 2.54)
-        outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + P.QWIIC_PLUG_L)
+    # Both of them. The board has a receptacle at each end -- the STEP
+    # puts them at x 0.065..5.015 and 71.185..76.135 -- and only the right
+    # one was modelled for a while, on the grounds that nothing can be
+    # plugged into the left one with a breakout butted against it. True,
+    # and beside the point: the receptacle is there whether a cable is or
+    # not, and the case has to not sit on it.
+    #
+    # The mated plug is a different claim and stays one-ended, because it
+    # reaches QWIIC_PLUG_L past the board edge and on the left that is
+    # into the breakout. That is a fact about the cable, not the case.
+    for sign, plug in ((1, P.QWIIC_PLUG_L), (-1, 0.0)):
+        inner = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 5.0)
+        outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + plug)
         part += _block(
-            min(sx, outer), max(sx, outer),
+            min(inner, outer), max(inner, outer),
             P.NEOKEY_ORIGIN[1] + 4.62, P.NEOKEY_ORIGIN[1] + 10.62,
             P.Z_NEOKEY_TOP, P.Z_NEOKEY_TOP + 2.96,
         )
