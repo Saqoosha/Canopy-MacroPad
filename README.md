@@ -125,23 +125,52 @@ uniform board with guaranteed LED consistency, but it carries no seesaw,
 so I2C disappears, the drive gate is rewritten, and every error path
 proven by injection has to be proven again — for ¥5,088 against ¥858.
 
-The 4978s go to the **left** of the NeoKey, and that is forced rather
-than chosen. A mated Qwiic plug stands 2.50 mm proud of the board edge,
-and a butted breakout's switch body starts 2.525 mm from that same edge:
-0.025 mm apart, which is not clearance, it is the tolerance. On the right
-they would also strand the NeoKey's socket 114 mm from the QT Py against
-a 50 mm cable.
+The 4978s go to the **left** of the NeoKey, and the cable is what forces
+it: on the right they strand the NeoKey's socket 114 mm from the QT Py
+against a 50 mm cable. This used to give a second reason — that a mated
+Qwiic plug stands 2.50 mm proud of its board edge while a butted
+breakout's switch body starts 2.525 mm from that edge, so the two miss
+by the tolerance — and it was not a reason at all. The plug hangs below
+the board and the switch stands above it, so that pair was never in the
+same space. Booleaned since, and then assembled: a plug in the NeoKey's
+left socket clears the breakouts, the switches and both printed parts,
+and there is a photograph of one sitting in there with both breakouts
+butted on. That socket is not blocked — it is where the power comes
+from.
 
-Five wires from the QT Py, and no per-key soldering — the breakouts ship
-with Kailh sockets and their NeoPixels already fitted:
+Five wires and no per-key soldering — the breakouts ship with Kailh
+sockets and their NeoPixels already fitted:
 
-| QT Py | to |
+| from | to |
 |---|---|
-| `3V` | both boards' `VDD` |
-| `GND` | both boards' `GND`, and `SWITCHC` |
-| `MOSI` | breakout 0 `NEO_IN`; its `NEO_OUT` to breakout 1 `NEO_IN` |
-| `MISO` | breakout 0 `SWITCHA`, pulled up |
-| `SCK` | breakout 1 `SWITCHA`, pulled up |
+| QT Py `MOSI` | breakout 0 `NEO_IN`; its `NEO_OUT` to breakout 1 `NEO_IN` |
+| QT Py `MISO` | breakout 0 `SWITCHA`, pulled up |
+| QT Py `SCK` | breakout 1 `SWITCHA`, pulled up |
+| NeoKey left STEMMA `V+` | both breakouts' `VDD` |
+| NeoKey left STEMMA `GND` | both breakouts' `GND`, and `SWITCHC` |
+
+The QT Py's own `3V` and `GND` do just as well electrically and are the
+same net — it is the distance that decides it, not the topology.
+
+Five wires reach the breakouts but only **three of them cross the case**.
+`3V` and `GND` are taken at the NeoKey's *left* STEMMA socket, which is
+the nearest point on that net to the boards that need it — a second
+Qwiic cable in the receptacle facing the breakouts. The schematic has
+both receptacles fully parallel, `V+`, `GND`, `SDA` and `SCL` all
+common, so the left one is the same node as the right and no board
+modification is involved.
+
+Two consequences of that being a Qwiic cable rather than two wires. Its
+other pair is `SDA`/`SCL`, live and going nowhere — 50 mm of unterminated
+stub on a 100 kHz bus, which is harmless but should be understood rather
+than discovered. And it does **not** relax the wire channel: the tap is
+at the NeoKey's left edge and the narrowest point in the case is
+immediately left of it, so all five are still abreast where it matters.
+
+The `JP1`/`JP5` headers at the NeoKey's midpoint are the alternative,
+carrying `INT D C - 3 VIN` on the long edges. `VIN` there is the same
+`VCC` net again. The pin marked `3` is the `AP2112K`'s output and feeds
+no pixel anywhere — if these headers are used, take `VIN`.
 
 Each breakout carries a 1N4148 from `SWITCHA` to `SWITCHC`, so grounding
 `SWITCHC` makes a press read low. The forward drop at the ~55 µA an
@@ -157,9 +186,18 @@ see whatever the cable brings, and the status colours below were tuned at
 whatever that is.
 
 That is the argument for the colours carrying over: identical part, and
-the breakouts on the QT Py's `3V`, which is the rail the Qwiic connector
-already hands the NeoKey. It is an argument, not a measurement, and
-**the rail has not been metered.**
+one net. Traced through both schematics rather than assumed — the QT Py's
+`3V` pad, its STEMMA `V+` and its regulator output are all `+3V3`; the
+cable carries that to the NeoKey's `VCC`, which is what its four pixels'
+`VDD` and its `JP1`/`JP5` `VIN` sit on. Wherever the breakouts are
+tapped, they are on the same node as the pixels the colours were tuned
+against.
+
+Which settles the topology and not the question. What the colours
+actually depend on is the **voltage under load**, and six SK6812s at full
+white pull it down through a connector, a cable and however much wire
+this case makes them share. Same net says nothing about the drop across
+it. **The rail has not been metered.**
 
 One consequence worth knowing before anyone "fixes" it. An SK6812's
 datasheet floor is 3.5 V and its green and blue dies drop out first, so a

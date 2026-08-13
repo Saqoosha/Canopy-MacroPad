@@ -44,13 +44,19 @@ other pair. Key field **114.30 x 21.59**, six switches at
 
 ### Butting them on
 
-They go on the **left**, and it is forced rather than chosen. This spec
-first said the right, and the arithmetic says otherwise: a mated Qwiic
-plug stands `QWIIC_PLUG_L` = 2.50 proud of the board edge it is in, and
-a butted breakout's switch body starts 2.525 from that same edge. 0.025
-apart is not clearance, it is the tolerance -- the repository already
-has that sentence, about a standoff. On the right the NeoKey's socket
-would also sit 114 mm from the QT Py, against a 50 mm cable.
+They go on the **left**, and the cable is what forces it. This spec
+first said the right, which would put the NeoKey's socket 114 mm from
+the QT Py against a 50 mm cable.
+
+It also gave a second reason that turned out not to be one: that a
+mated Qwiic plug stands `QWIIC_PLUG_L` = 2.50 proud of its board edge
+while a butted breakout's switch body starts 2.525 from that edge, so
+the two miss by the tolerance. The plug hangs below the board and the
+switch stands above it, so that pair never met; the sentence is correct
+where the repository first wrote it, about a standoff and a switch, and
+was carried here across a Z boundary it does not cross. Booleaned since:
+a plug on the NeoKey's left socket clears the breakouts, the switches
+and both printed parts at 0.000 mm³. See `BREAKOUT_ORIGINS_LOCAL`.
 
 So physical order is breakout, breakout, NeoKey, and key order follows
 it: 0-1 on GPIO, 2-5 on I2C.

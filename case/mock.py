@@ -145,21 +145,19 @@ def neokey():
     # the QT Py is at the right end and the cable can only come from the
     # right socket -- claiming the left one too would put an imaginary
     # plug through the left screw post, and that layout is handed anyway.
-    # Only the right one now, in both layouts. The NeoKey's left socket
-    # has a breakout butted against it, so nothing can be plugged in
-    # there -- which is also the reason the breakouts are on that side:
-    # see BREAKOUT_ORIGINS_LOCAL, where the right-hand alternative leaves
-    # the mated plug 0.025 from the first breakout's switch.
-    # Both of them. The board has a receptacle at each end -- the STEP
-    # puts them at x 0.065..5.015 and 71.185..76.135 -- and only the right
-    # one was modelled for a while, on the grounds that nothing can be
-    # plugged into the left one with a breakout butted against it. True,
-    # and beside the point: the receptacle is there whether a cable is or
+    # Both receptacles. The board has one at each end -- the STEP puts
+    # them at x 0.065..5.015 and 71.185..76.135 -- and only the right one
+    # was modelled for a while, on the grounds that nothing can be
+    # plugged into the left one with a breakout butted against it. Beside
+    # the point either way: the receptacle is there whether a cable is or
     # not, and the case has to not sit on it.
     #
-    # The mated plug is a different claim and stays one-ended, because it
-    # reaches QWIIC_PLUG_L past the board edge and on the left that is
-    # into the breakout. That is a fact about the cable, not the case.
+    # The mated plug is a different claim and stays one-ended, because
+    # only the right socket has a cable in it. Not because the left one
+    # is blocked -- it was said to be, and BREAKOUT_ORIGINS_LOCAL now
+    # carries the boolean showing a plug there clears everything. A plug
+    # is a fact about the cable, so modelling one on a socket nothing is
+    # plugged into would be inventing an obstacle.
     for sign, plug in ((1, P.QWIIC_PLUG_L), (-1, 0.0)):
         inner = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 5.0)
         outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + plug)
