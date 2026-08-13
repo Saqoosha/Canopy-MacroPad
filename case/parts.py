@@ -408,8 +408,18 @@ def bottom():
     # points and now something pushes back up along the same line, rather
     # than the pair being offset and leaving a moment. A seam straddles
     # two boards, so these are the only columns that have to clear two
-    # back faces at once; they do, by 2.979 at the front row and 0.688 at
-    # the back.
+    # back faces at once.
+    #
+    # The numbers that used to be here -- 2.979 at the front row, 0.688 at
+    # the back -- counted only the breakout's face, which is half of what
+    # "two boards at once" means. Measured against the NeoKey's STEP as
+    # well, the back row's real worst is **0.141**, against a 0.300-proud
+    # part at board-local x 1.048..2.636, and the front row's is 0.331
+    # against the STEMMA receptacle. Neither of those parts is in the
+    # mock, so build.py cannot see them: mock.neokey() carries the
+    # hot-swap sockets and the receptacles and nothing else, while the
+    # breakouts got every part on their face. Positive, and thinner than
+    # anything else here.
     for x, y in P.SEAM_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.FIELD_SUPPORT_DIA)
 
