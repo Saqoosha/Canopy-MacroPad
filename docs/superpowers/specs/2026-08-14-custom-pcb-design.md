@@ -237,6 +237,63 @@ before anything is printed, and the mock has to gain the new board and
 lose three old ones. Every stand-in models the mated plug, not the
 connector, because that mistake has happened four times here.
 
+## The EDA tool, which is not settled yet
+
+Both candidates can be driven by an agent, and the question that
+separates them is the one this repository always asks: **can the result
+be read back and asserted, rather than looked at.**
+
+### KiCad, measured
+
+Proven on this machine, headless, no GUI opened. A script created a
+board, placed two real `SW_Cherry_MX_1.00u_Plate` footprints, saved,
+**re-read the file from disk** and measured the gap:
+
+```
+SW1 x = 9.525000   SW2 x = 28.575000
+measured pitch = 19.050000   wanted 19.05
+all checks passed
+```
+
+The check was **watched failing first** -- placed at 19.00 it reported
+`FAIL: pitch is off by -0.050000000 mm` -- so the green means something.
+`kicad-cli` then exported Gerbers from the same file. The board is
+s-expression text: `(at 28.575 10.795)` is literally greppable, which
+makes it diffable and reviewable the way `params.py` is.
+
+Version here is KiCad **10.0.5**, `pcbnew` importable from the app's own
+Python. One trap, recorded because it cost a wrong diagnosis: a write to
+`/tmp` is killed by the sandbox with **SIGKILL and no traceback**, which
+reads exactly like a crash inside `pcbnew`.
+
+### EasyEDA, not yet run
+
+The English-language search for this returns third-party MCP servers
+whose write paths are beta or disabled. **They are the wrong tooling.**
+The real path is first-party and is a *skill*, not an MCP:
+
+- `github.com/easyeda/easyeda-api-skill`, the `easyeda` org's own repo
+- extension `run-api-gateway.eext`, publisher `oshwhub-official`
+- a Node bridge on ports **49620-49629**; the agent POSTs **JavaScript**
+  to `/execute`, running against the client's `eda` API
+
+That last point matters more than it looks, because it dissolves the
+argument that would otherwise decide this. A board built by executing
+code is a board built from a script, and a script is text that can hold
+`9.525 + n * 19.05` and live beside `case/params.py`. **The
+"scripted, therefore checkable" property is not exclusive to KiCad.**
+
+PCB coordinates there are in **1 mil**, so the pitch is exactly 750
+units and rounding cannot be blamed for anything. Schematic coordinates
+are 0.01 inch; mixing the two misplaces parts by 10x.
+
+Known and unrun: whether placement can be **read back** through the same
+API, which is the half that decides this. Also unrun, and needed before
+an order: DRC, and manufacturing output with correct rotations.
+
+**Do not install a third-party EasyEDA MCP alongside the official
+bridge** -- they squat the same 49620-49629 range and fight.
+
 ## Host tools and documentation
 
 `tools/mpad.py` needs nothing. It was widened to six keys for the wired
