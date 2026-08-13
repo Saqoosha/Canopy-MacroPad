@@ -493,6 +493,17 @@ pocket only where `SCK`, `MISO` and `MOSI` are soldered. Which three pads
 those are is a wiring fact, so it lives in `params.py` next to the wiring
 rather than in the geometry.
 
+And the pocket wall gives way too. The frame runs all the way round the
+board, so a wire soldered to JP3 had the board's edge to leave from and
+nowhere to go — the fourth time this case has fitted a board and then
+made itself impossible to wire, after both Qwiic sockets and the USB
+port. `QTPY_WIRE_NOTCH_W`/`_H` open the wall between the pocket and the
+key field, just above the screw post the wires have to clear anyway and
+stopping short of the plate, so what is left is a bridge rather than a
+missing wall. Measured, not guessed: a bundle laid from the pads to the
+channel shared 10.240 mm³ with that wall and nothing with the plate, and
+shares nothing with either now.
+
 Their inner ends are still trimmed to `QTPY_UNDER_X`. The clear strips
 were read off the board by eye and the second one starts at 14.40 while
 the first real component reaches 14.414 — 0.014 inside it, which only

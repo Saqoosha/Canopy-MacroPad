@@ -792,6 +792,23 @@ QTPY_PADS_USED = (
 # length and loses the support it exists for.
 QTPY_PAD_RELIEF = 1.60
 
+# ...and the wall those three wires then have to get through. The QT Py
+# sits in a pocket whose frame runs all the way round, so a wire soldered
+# to JP3 has the board's own edge to leave from and nowhere to go: the
+# -x wall stands between the pocket and the key field.
+#
+# Fourth time this case has fitted a board and then made itself
+# impossible to wire -- both Qwiic sockets, the USB port, and now this.
+# Measured rather than guessed: a 1.30 bundle laid from the pads to the
+# channel shares 10.240 mm3 with the shell and nothing with the plate,
+# all of it in that one wall.
+#
+# It starts above the screw post at y -8.20, whose 5.60 diameter reaches
+# -5.40 and is not going anywhere, and stops short of the plate above --
+# so what is left is a bridge rather than a missing wall.
+QTPY_WIRE_NOTCH_W = 6.00
+QTPY_WIRE_NOTCH_H = 2.20
+
 # STEMMA QT socket footprint, board-local, for the pocket to keep clear.
 QTPY_STEMMA = (4.01, 10.01, -0.09, 4.87)
 QTPY_STEMMA_H = 2.96

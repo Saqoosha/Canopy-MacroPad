@@ -305,6 +305,19 @@ def shell():
         frame -= _block(qx0 - s_ - f - 0.1, qx0 - s_ + 0.1,
                         ey0 - n, ey1 + n,
                         P.Z_STEMMA_LOW - 0.4, P.Z_PLATE_BOTTOM)
+        # ...and the same wall opened again, lower down, for the three
+        # wires that leave JP3. Fourth time. They come off the board's
+        # own edge inside the pocket and have nowhere to go otherwise:
+        # measured, a bundle laid from the pads to the channel shares
+        # 10.240 mm3 with this wall and nothing with the plate.
+        #
+        # Just above the screw post at y -8.20, whose reach to -5.40 the
+        # wires have to clear anyway, and stopping short of the plate, so
+        # what is left is a bridge rather than a missing wall.
+        wy0 = P.WIRE_LANE_Y[0] + 0.30
+        frame -= _block(qx0 - s_ - f - 0.1, qx0 - s_ + 0.1,
+                        wy0, wy0 + P.QTPY_WIRE_NOTCH_W,
+                        P.Z_FLOOR - 0.1, P.Z_FLOOR + P.QTPY_WIRE_NOTCH_H)
         part += frame
 
         for cx0, cx1, cy0, cy1 in _clear_rects():
