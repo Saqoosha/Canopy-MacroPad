@@ -44,20 +44,47 @@ NEOKEY_HOLE_DIA = 2.50  # MOUNTINGHOLE_2.5_PLATED in the .brd
 NEOKEY_SW_Y = 10.795
 NEOKEY_SW_X = [9.525, 28.575, 47.625, 66.675]
 
-# The STEP has the switch on -z, and the case puts the switch side up, so
-# the board is turned over about its long axis to get there -- which
-# mirrors the back face left to right. Read the numbers as the file gives
-# them and then mirror once, here, rather than mirroring by hand into the
-# table: a table of already-flipped numbers cannot be checked against the
-# file it came from.
+# The STEP has the switch on -z and the case puts the switch side up, so
+# the board is turned over to get there and its back face mirrors left to
+# right. x only -- the sockets and everything else on that face land
+# correctly with this, checked against the assembled unit. Read the
+# numbers as the file gives them and mirror once, here, rather than
+# mirroring by hand into the table: a table of already-flipped numbers
+# cannot be checked against the file it came from.
+#
+# The STEMMA receptacles are the exception and are placed separately in
+# mock.py, on the far side of the board from where the file draws them.
+# Which way round a board sits in the case is ONE fact about the board,
+# not one fact per feature. Getting that wrong is the whole story of this
+# section: the socket, the components and the STEMMA receptacles were
+# each turned separately, each time to satisfy the last thing someone had
+# pointed at, and the answers contradicted each other because they were
+# describing one rigid object with three different orientations.
+#
+# So: one flag, applied to everything on the board at once. The photograph
+# that settles it shows both white receptacles on the far long edge and
+# the hot-swap sockets on the near one, which is the file's y reversed.
+BOARD_FLIP_X = True    # the switch side goes up, so the back face mirrors
+BOARD_FLIP_Y = False   # y is the file's y; only x mirrors
+
+
+def _flip_y(y0, y1, depth):
+    return (depth - y1, depth - y0) if BOARD_FLIP_Y else (y0, y1)
+
+
 def _back_flip(part):
     x0, x1, y0, y1, proud = part
-    return (BREAKOUT_W - x1, BREAKOUT_W - x0, y0, y1, proud)
+    fx0, fx1 = ((BREAKOUT_W - x1, BREAKOUT_W - x0) if BOARD_FLIP_X
+                else (x0, x1))
+    fy0, fy1 = _flip_y(y0, y1, BREAKOUT_D)
+    return (fx0, fx1, fy0, fy1, proud)
 
 
 def _socket_flip(part):
     dx0, dx1, dy0, dy1 = part
-    return (-dx1, -dx0, dy0, dy1)
+    fx0, fx1 = (-dx1, -dx0) if BOARD_FLIP_X else (dx0, dx1)
+    fy0, fy1 = (-dy1, -dy0) if BOARD_FLIP_Y else (dy0, dy1)
+    return (fx0, fx1, fy0, fy1)
 
 
 # Everything on the 4978's back face, board-local, as (x0, x1, y0, y1,
@@ -421,11 +448,18 @@ QTPY_FLIPPED = STACKED
 BOARD_CLEAR = 0.40  # air between board envelopes
 USB_FLOOR_CLEAR = 0.40  # under the USB-C shell, which is now the low point
 
-# The Adafruit STEP does not model the hot-swap sockets, so this is not a
-# fit measured against the file -- it is the datasheet drop plus a margin,
-# rounded up. The extra 0.6 over a snug 2.2 also buys wall above the USB
-# opening, which is the tightest spot in the shell.
-SOCKET_CLEARANCE = 2.80
+# How much air a board needs under it. Every component on either board is
+# on the one face and the switch side carries nothing, so this is set by
+# whatever hangs down furthest -- and that is not the hot-swap socket.
+#
+# The STEMMA QT receptacle is 2.96, against the socket's 1.85, and for a
+# long time it was modelled on the wrong face and therefore not counted.
+# At 2.80 the case closes on a NeoKey whose receptacles are pressing into
+# the bottom plate: it shuts, and the boards inside are strained. That is
+# what "the model says 0.000 mm3" is worth when the model has a part on
+# the wrong side.
+UNDER_BOARD_MAX = 2.96   # STEMMA QT receptacle, the deepest of them
+SOCKET_CLEARANCE = UNDER_BOARD_MAX + 0.40
 
 # 0.20 a side, and confirmed on the printed inline shell: the board goes
 # into the pocket without force and without slop.
@@ -590,6 +624,11 @@ def field_xy(local):
 NEOKEY_ORIGIN = field_xy(NEOKEY_LOCAL)
 
 
+def neokey_y(y):
+    """NeoKey board-local y, turned the way the board actually sits."""
+    return NEOKEY_D - y if BOARD_FLIP_Y else y
+
+
 def neokey_xy(local):
     """NeoKey board-local (x, y) -> case (x, y)."""
     return (NEOKEY_ORIGIN[0] + local[0], NEOKEY_ORIGIN[1] + local[1])
@@ -679,7 +718,25 @@ BREAKOUT_HOLE_XY = [(ox + BREAKOUT_W - hx, oy + hy)
 # column centred on one straddles two boards and sits on the outermost
 # strip of each. So: seams carry the back row, and this carries the one
 # end no seam reaches.
-FIELD_SUPPORT_LOCAL = [(2.45, NEOKEY_HOLES[0][1])]
+# 19.200, not the seam row's 19.390. The socket envelope reaches 16.894
+# and the cavity wall is at 21.790, so a COLUMN_DIA pad has 4.896 of
+# board to sit in and needs 4.50 of it: at 19.390 it cleared the socket
+# but left only 0.150 to the wall, which is what "board columns inside
+# the cavity" is for. 19.200 splits the difference -- 1.908 to the
+# socket, 0.440 to the wall.
+# Both ends of the field's outer left edge. The near one has 4.696 of
+# free board to sit in and the far one 4.010, which is why they are not
+# symmetric: 19.600 is where the far one clears the last component by
+# 0.486 and the cavity wall by 0.440, and there is about 0.4 of room to
+# move it in either direction before one of those goes.
+FIELD_SUPPORT_LOCAL = [(2.45, 2.450), (2.45, 19.600)]
+# Thinner than COLUMN_DIA, and it has to be. A seam column clears the
+# back face in x, by sitting on the outermost strip of two boards at
+# once; this one is in the middle of a board and has to clear in y
+# instead, where there is 4.896 between the cavity wall at -0.200 and the
+# first component at 4.696. A 4.50 pad leaves 0.198 a side, which is what
+# "board columns inside the cavity" is for. 3.50 leaves 0.698.
+FIELD_SUPPORT_DIA = 3.50
 BREAKOUT_SUPPORT_XY = [field_xy(p) for p in FIELD_SUPPORT_LOCAL]
 # No pegs. The first assembled unit settled it: a plate-mount switch
 # clips into the top plate and its pins go into the socket on the board,
@@ -704,13 +761,19 @@ BREAKOUT_SUPPORT_XY = [field_xy(p) for p in FIELD_SUPPORT_LOCAL]
 # so the whole field is pressed along two lines rather than at scattered
 # points.
 # The front row sits 0.34 ahead of the NeoKey's own, which is the one
-# place the two lines do not agree. A STEMMA QT receptacle starts 4.620
-# up the board and stands 2.96 proud, so at the NeoKey's 2.540 a
+# place the two press-lines do not agree. A STEMMA QT receptacle starts
+# 4.620 up the board and stands 2.96 proud, so at the NeoKey's 2.540 a
 # STANDOFF_DIA circle reaches 4.640 and grazes it -- 0.011 mm3, which
 # only appeared once both receptacles were modelled rather than just the
 # one with a cable in it. 2.200 clears by 0.320 and still lands on the
 # board, whose front edge is at 0.
-SEAM_Y = (2.200, NEOKEY_HOLES[2][1])
+# The NeoKey's own hole rows, and nothing cleverer. A row of these was
+# shifted 0.34 for a while to dodge a STEMMA receptacle, back when the
+# receptacle was modelled above the board; it is below it with every
+# other component now, so a standoff coming down from the plate cannot
+# reach it and the shift was a workaround for a condition that had
+# stopped existing.
+SEAM_Y = (NEOKEY_HOLES[0][1], NEOKEY_HOLES[2][1])
 SEAM_XY = [field_xy((i * BREAKOUT_W, y))
            for i in range(1, BREAKOUT_COUNT + 1)
            for y in SEAM_Y]

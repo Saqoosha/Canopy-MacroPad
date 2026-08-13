@@ -165,8 +165,9 @@ def neokey():
         outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + plug)
         part += _block(
             min(inner, outer), max(inner, outer),
-            P.NEOKEY_ORIGIN[1] + 4.62, P.NEOKEY_ORIGIN[1] + 10.62,
-            P.Z_NEOKEY_TOP, P.Z_NEOKEY_TOP + 2.96,
+            P.NEOKEY_ORIGIN[1] + min(P.neokey_y(4.62), P.neokey_y(10.62)),
+            P.NEOKEY_ORIGIN[1] + max(P.neokey_y(4.62), P.neokey_y(10.62)),
+            P.Z_NEOKEY_BOTTOM - P.UNDER_BOARD_MAX, P.Z_NEOKEY_BOTTOM,
         )
     # The M2.5 holes are real holes. Without them the shell's locating
     # pegs read as a 23 mm3 collision, which is the check crying wolf

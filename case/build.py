@@ -218,10 +218,17 @@ def main():
                 for px, _ in P.POST_XY)
             - P.POST_DIA / 2
         ),
-        "board columns inside the cavity": (
-            P.CASE_D / 2 - P.WALL
-            - max(abs(y) for _, y in P.MOUNT_XY + P.BREAKOUT_SUPPORT_XY)
-            - P.COLUMN_DIA / 2
+        # Per column, because they are not all one diameter any more: the
+        # field pads are FIELD_SUPPORT_DIA because they have to clear the
+        # board's own components in y, where a seam column escapes in x.
+        # Measuring both against COLUMN_DIA reported a pad 0.06 outside
+        # the cavity that is really 0.44 inside it -- a check describing a
+        # column that no longer exists.
+        "board columns inside the cavity": min(
+            [P.CASE_D / 2 - P.WALL - abs(y) - P.COLUMN_DIA / 2
+             for _, y in P.MOUNT_XY]
+            + [P.CASE_D / 2 - P.WALL - abs(y) - P.FIELD_SUPPORT_DIA / 2
+               for _, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
         ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening

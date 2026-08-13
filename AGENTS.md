@@ -210,6 +210,13 @@ one, not necessarily the only one.
   MPAD_LAYOUT=<layout> .venv/bin/python webgl.py dump
   .venv/bin/python webgl.py page                     # once, after both dumps
   ```
+
+  **Run the whole sweep after every geometry fix, not at the end of a
+  batch of them.** Saqoosha reads the viewer, not the diff, and a fix he
+  cannot see is a fix he has to take on trust -- which during a
+  back-and-forth about where a part sits is exactly the thing there is
+  none of. Finish with `open -a "Google Chrome" out/viewer.html`, and say
+  that the tab needs a reload.
 - Print `out/<layout>/coupon.stl` before the case. `SWITCH_HOLE` is
   settled at 14.15 — a Durock Ice King seats right in it on the A1 mini
   in PLA Basic, so the 0.15 over nominal is this machine's hole shrink

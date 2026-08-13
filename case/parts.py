@@ -322,7 +322,7 @@ def bottom():
     # there is no support under it to stand on, and one rule beats
     # "whichever ones happen to have a column beneath them".
     for x, y in P.BREAKOUT_SUPPORT_XY:
-        part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
+        part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.FIELD_SUPPORT_DIA)
     # ...and one directly under each seam standoff, so the breakouts get
     # the sandwich the NeoKey has: the shell pushes down at these four
     # points and now something pushes back up along the same line, rather
@@ -331,7 +331,7 @@ def bottom():
     # back faces at once; they do, by 2.979 at the front row and 0.688 at
     # the back.
     for x, y in P.SEAM_XY:
-        part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.COLUMN_DIA)
+        part += _tube(x, y, P.BOTTOM_T, P.Z_NEOKEY_BOTTOM, P.FIELD_SUPPORT_DIA)
 
     if P.STACKED:
         part += _stacked_qtpy_mount()
