@@ -822,11 +822,17 @@ QTPY_STEMMA_H = 2.96
 
 # How far past that footprint the wall in front of the socket opens up.
 # It is the room a thumb and a plug share while mating a connector that
-# is already boxed in on three sides. At 1.00 the plug goes in and takes
-# some working at, on the printed `inline` shell -- fine, not comfortable.
-# Widening it costs a little of the wall that stops the board sliding,
-# and the wall below the notch is untouched either way, so 1.5-2.0 is
-# the knob to turn if the pocket is ever reprinted.
+# is already boxed in on three sides.
+#
+# Settled at 1.00 by Saqoosha, over several builds of the `inline` shell:
+# the plug goes in every time and nothing about it is a problem. This
+# file said the opposite for a while -- "takes some working at", with
+# 1.5-2.0 named as the knob to turn on a reprint -- on a single
+# impression from the first print, which is exactly the kind of claim
+# that does not survive being made again. Repetition is the measurement
+# here; there is no boolean for it, because the plug's *width* is not
+# modelled at all (mock.py builds the mated plug at the receptacle's own
+# 6.00 and only its 2.50 of standoff is measured).
 QTPY_STEMMA_NOTCH = 1.00
 
 USB_CLEAR_W = 1.10  # added to USB_W/USB_H for the back-wall opening

@@ -617,8 +617,8 @@ both halves of the keypad read as the same white at `B 100`, so the
 Snap-Apart fallback is not needed; a breakout wants no locating peg,
 because the switch clips to the plate and ties the board to it through
 its socket; and the five wires needed a millimetre of case they did not
-have. The one thing still open is `QTPY_STEMMA_NOTCH` at 1.00, which
-works and is tight.
+have. Nothing on the case is open — the Qwiic pocket's notch was the last
+entry on that list, and several builds later it is simply fine at 1.00.
 
 The rest of the later phases — low-profile Choc switches, and wireless on
 a MagSafe charger — are sketched in

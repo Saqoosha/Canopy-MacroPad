@@ -50,10 +50,9 @@ the USB-C opening, where a real cable seats fully with about 1 mm around
 its housing — worth knowing, because `USB_PLUG_W/H` were never measured
 off anything.
 
-Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
-1.00 takes some working at — the Qwiic plug does go in, but a reprint
-would want 1.5–2.0. And the M3 has now been driven into a post: it goes,
-but hard enough to be the first thing anyone says about the part. That
+One thing the part says that the model does not. The M3 has now been
+driven into a post: it goes, but hard enough to be the first thing
+anyone says about the part. That
 sent `PILOT_DIA` to the coupon, which settled it at 2.95 — the how is
 under "Print the coupon first" — and put a Ø3.40 × 0.60 lead-in at every
 mouth. The reprinted shell has both and the screw goes in clean.
@@ -91,6 +90,19 @@ And one that was arithmetic all along: the first six-key unit closed with
 the halves apart. `BOARD_CLAMP_SLACK` at 0.20 stops the standoffs acting
 as jacks; the rest is the parts not being flat off the bed, which is what
 the seam step is for.
+
+**One entry came off this list by being done again.**
+`QTPY_STEMMA_NOTCH` at 1.00 was written up as tight — "the plug goes in,
+but a reprint would want 1.5–2.0" — on one impression from one print.
+Several builds later the plug goes in every time and nothing about it is
+a problem, so 1.00 is settled and the reprint knob is not needed. Worth
+keeping as a shape rather than a number: **a fit is a claim about a
+distribution, and one assembly is one sample.** The numbers on this case
+that held up were all felt more than once, side by side or minutes
+apart; this one was not, and it read worse than it was. Nothing checks
+it either way — `mock.py` builds the mated plug at the receptacle's own
+6.00 width, so the plug's width is assumed rather than measured and no
+boolean has an opinion.
 
 `stacked` has never been printed at all.
 

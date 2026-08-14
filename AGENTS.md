@@ -383,12 +383,23 @@ never been printed. **The reasoning behind every settled number is in
 
 Settled on real parts: `SWITCH_HOLE` 14.15, `PEG_DIA` 2.30, `QTPY_SLOP`
 0.40, the USB-C opening, `PILOT_DIA` 2.95 with a Ø3.40 x 0.60 lead-in,
-and `SCREW_CLEAR_DIA` 3.70 with `CLEAR_CHAMFER` 0.60. The assembled
-six-key unit added two the model could not have: a breakout needs no
-locating peg (a plate-mount switch clips to the top plate and its pins
-go into the board's socket, so the switch ties the two together), and
-the field's outer edge has no seam to press on, which is what
-`EDGE_RIB_W` is for.
+`SCREW_CLEAR_DIA` 3.70 with `CLEAR_CHAMFER` 0.60, and
+`QTPY_STEMMA_NOTCH` 1.00. The assembled six-key unit added two the model
+could not have: a breakout needs no locating peg (a plate-mount switch
+clips to the top plate and its pins go into the board's socket, so the
+switch ties the two together), and the field's outer edge has no seam to
+press on, which is what `EDGE_RIB_W` is for.
+
+**A fit is a claim about a distribution, and one assembly is one
+sample.** The notch was on the open list for rounds as "the plug goes in
+but takes some working at, a reprint would want 1.5-2.0", off a single
+impression from a single print. Saqoosha has built several since and the
+plug goes in every time. Every number on this case that held up was felt
+more than once -- `PILOT_DIA` and `CLEAR_SWEEP` side by side on a coupon,
+`SWITCH_HOLE` and `PEG_DIA` across two prints -- and the one that was
+not was also the one that read wrong. When a fit is written up from one
+handling, say that is what it is, and do not let it name a replacement
+number it has not earned.
 
 **The six-key `inline` case is printed, assembled and closing**, at
 13.33 with 4.36 under the boards, an 11.20 wire channel, 3.00 field pads
@@ -396,10 +407,8 @@ and the QT Py's pad pockets and wire notch. The wires have room. The one
 change since that print is the pad pocket running off the near end, which
 removes a rail stub the wires were bending round; it needs no reprint.
 
-Open:
+Open -- and the list is down to one entry that is not really a question:
 
-- `QTPY_STEMMA_NOTCH` at 1.00 works but the Qwiic plug takes some
-  working at; a reprint would want 1.5-2.0.
 - The Ø8 feet sit under the wire channel and leave 0.70 of plate over
   their recesses. Nothing moves -- a Ø8 foot at y ±5.99 in a 25.99 case
   cannot clear a channel reaching ±5.60, and the feet are where they are
