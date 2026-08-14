@@ -365,7 +365,8 @@ input[type=range]{width:100%; accent-color:var(--accent)}
   <div class="stage">
     <canvas id="gl"></canvas>
     <div class="stamp"><b id="stampSize">—</b><span id="stampName">—</span></div>
-    <div class="hud"><span>drag · orbit</span><span>scroll · zoom</span></div>
+    <div class="hud"><span>drag · orbit</span><span>right-drag · pan</span>
+      <span>scroll · zoom</span></div>
   </div>
 </div>
 
@@ -387,9 +388,20 @@ if (!gl) document.querySelector('.stage').innerHTML =
    no per-attachment blit, and it antialiases the OIT edges too. */
 const SS = 2;
 const FOV = 0.46;  /* ~26 deg: long and low reads badly through a wide lens */
-/* Just shy of straight down: at exactly 90 the up vector and the view
-   direction are parallel and the view matrix collapses. */
-const EL_MAX = 1.5697;
+/* The presets are still written as azimuth and elevation, because that
+   is how a person says "look at it from the top". They are turned into
+   an orientation once, on the way in, and nothing downstream carries two
+   angles -- see `qFromAzEl`. Nothing clamps them either: the camera has
+   no pole to stay away from any more.
+
+   The 1.5697 that used to be here was 0.0011 rad short of straight down,
+   on the stated grounds that the view matrix collapsed at the pole. It
+   does not -- the residual in `Math.cos(Math.PI/2)` carries the right
+   direction and the normalise recovers a unit vector from it, checked
+   against the old code side by side. What the two angles really lose at
+   the pole is a degree of freedom, which no amount of care in building
+   the matrix gives back. */
+const EL_MAX = Math.PI / 2;
 
 /* Weighted-blended OIT (McGuire & Bavoil). Sorting transparent objects
    back to front cannot be right here: a keycap's skirt and the switch
@@ -592,7 +604,9 @@ for (const [key, g] of Object.entries(GEOM)) {
 const S = {layout:'inline', explode:0, env:false, shellMode:'solid',
            ortho:false, hidden:new Set(),
            sect:'', sectT:0.5, sectFlip:false,
-           az:-0.72, el:0.42, dist:1, tAz:-0.72, tEl:0.42, tDist:1};
+           q:[0,0,0,1], tq:[0,0,0,1], dist:1, tDist:1,
+           pan:[0,0,0], tPan:[0,0,0]};
+S.q = S.tq = qFromAzEl(-0.72, 0.42);
 /* Frame on the widest axis and the viewport's aspect, not on a constant:
    a 120 mm bar and a 98 mm one need different pull-backs. */
 /* Project the bounding box onto the screen axes for the direction we are
@@ -601,9 +615,7 @@ const S = {layout:'inline', explode:0, env:false, shellMode:'solid',
 function fit(){
   const sc = scenes[S.layout], sp = sc.span;
   const asp = Math.max(cv.clientWidth / Math.max(cv.clientHeight, 1), 0.35);
-  const a = S.tAz, e = S.tEl;
-  const right = [-Math.sin(a), Math.cos(a), 0];
-  const up = [-Math.sin(e)*Math.cos(a), -Math.sin(e)*Math.sin(a), Math.cos(e)];
+  const [right, up] = qBasis(S.tq);
   const ext = v => 0.5 * (Math.abs(sp[0]*v[0]) + Math.abs(sp[1]*v[1])
                           + Math.abs(sp[2]*v[2]));
   const need = Math.max(ext(right) / asp, ext(up));
@@ -624,14 +636,79 @@ function persp(fov,asp,n,f){const t=1/Math.tan(fov/2);
 function ortho(hh,asp,n,f){const hw=hh*asp;
   return new Float32Array([1/hw,0,0,0, 0,1/hh,0,0, 0,0,-2/(f-n),0,
     0,0,-(f+n)/(f-n),1]);}
-function lookAt(e,c,u){
-  const z=norm(sub(e,c)), x=norm(cross(u,z)), y=cross(z,x);
+/* ---------- orientation ----------
+ *
+ * The camera used to be two angles, and two angles lose a degree of
+ * freedom where they meet: at the pole, turning the azimuth and rolling
+ * about the view axis are the same motion, so one of the two drags stops
+ * doing anything new. That is gimbal lock, and it is a property of the
+ * parameterisation -- building the basis more carefully does not remove
+ * it, which was worth finding out before rewriting this.
+ *
+ * A quaternion has no poles. Drags rotate it about the *camera's* own
+ * axes, so the model turns the way it is grabbed from any attitude, and
+ * there is no limit to clamp: it tumbles over the top and keeps going.
+ * The cost is that the horizon is no longer held level, which is why the
+ * four presets exist.
+ */
+/* Declarations rather than `const` arrows, and that is load-bearing:
+   the state block sets the opening orientation and sits above this, so a
+   `const` here is still in its temporal dead zone when the page runs and
+   the whole viewer throws before it draws anything. */
+function qmul(a,b){ return [
+  a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+  a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+  a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+  a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2]]; }
+function qnorm(q){ const l = Math.hypot(q[0],q[1],q[2],q[3]) || 1;
+  return [q[0]/l, q[1]/l, q[2]/l, q[3]/l]; }
+/* A rotation about a camera-space axis, which is what a drag is. */
+function qAxis(ax, ang){ const h = ang/2, s = Math.sin(h);
+  return [ax[0]*s, ax[1]*s, ax[2]*s, Math.cos(h)]; }
+
+/* The three view axes as world vectors: rows of the rotation the
+   quaternion stands for. x is screen right, y screen up, z runs from the
+   centre out to the eye. */
+function qBasis(q){
+  const [x,y,z,w] = q;
+  return [[1-2*(y*y+z*z),   2*(x*y+z*w),   2*(x*z-y*w)],
+          [  2*(x*y-z*w), 1-2*(x*x+z*z),   2*(y*z+x*w)],
+          [  2*(x*z+y*w),   2*(y*z-x*w), 1-2*(x*x+y*y)]];
+}
+
+/* Presets are still spoken as azimuth and elevation. This is the only
+   place the two ever appear, and it is one-way. */
+function qFromAzEl(az, el){
+  const ca=Math.cos(az), sa=Math.sin(az), ce=Math.cos(el), se=Math.sin(el);
+  return mat2q([[-sa, ca, 0],
+                [-se*ca, -se*sa, ce],
+                [ce*ca, ce*sa, se]]);
+}
+function mat2q(m){
+  const t = m[0][0] + m[1][1] + m[2][2];
+  if (t > 0) { const s = Math.sqrt(t+1)*2;
+    return qnorm([(m[1][2]-m[2][1])/s, (m[2][0]-m[0][2])/s,
+                  (m[0][1]-m[1][0])/s, s/4]); }
+  if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) {
+    const s = Math.sqrt(1+m[0][0]-m[1][1]-m[2][2])*2;
+    return qnorm([s/4, (m[1][0]+m[0][1])/s, (m[2][0]+m[0][2])/s,
+                  (m[1][2]-m[2][1])/s]); }
+  if (m[1][1] > m[2][2]) {
+    const s = Math.sqrt(1+m[1][1]-m[0][0]-m[2][2])*2;
+    return qnorm([(m[1][0]+m[0][1])/s, s/4, (m[2][1]+m[1][2])/s,
+                  (m[2][0]-m[0][2])/s]); }
+  const s = Math.sqrt(1+m[2][2]-m[0][0]-m[1][1])*2;
+  return qnorm([(m[2][0]+m[0][2])/s, (m[2][1]+m[1][2])/s, s/4,
+                (m[0][1]-m[1][0])/s]);
+}
+
+function orbitView(q, eye){
+  const [x, y, z] = qBasis(q);
   return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0,
-    x[2],y[2],z[2],0, -dot(x,e),-dot(y,e),-dot(z,e),1]);}
-const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-const norm=a=>{const l=Math.hypot(...a)||1; return [a[0]/l,a[1]/l,a[2]/l];};
+    x[2],y[2],z[2],0, -dot(x,eye),-dot(y,eye),-dot(z,eye),1]);
+}
+function dot(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function dot4(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3]; }
 
 function css(name){
   const v = getComputedStyle(document.documentElement)
@@ -650,11 +727,12 @@ function render(){
   resize(W, H);
   gl.viewport(0,0,W,H);
 
-  const c = sc.centre, d = S.dist;
-  const eye = [c[0] + d*Math.cos(S.el)*Math.cos(S.az),
-               c[1] + d*Math.cos(S.el)*Math.sin(S.az),
-               c[2] + d*Math.sin(S.el)];
-  const V = lookAt(eye, c, [0,0,1]);
+  const d = S.dist;
+  const c = [sc.centre[0] + S.pan[0], sc.centre[1] + S.pan[1],
+             sc.centre[2] + S.pan[2]];
+  const out = qBasis(S.q)[2];
+  const eye = [c[0] + d*out[0], c[1] + d*out[1], c[2] + d*out[2]];
+  const V = orbitView(S.q, eye);
   /* Clamped hard to the model: a 0.05d..6d range spends most of a 24-bit
      depth buffer on empty space, and the switch flanges sitting flat on
      the plate then fight over the same depth value. */
@@ -818,9 +896,23 @@ let dirty = true;
 const touch = () => { dirty = true; };
 function tick(){
   const k = 0.18;
-  const d0 = Math.abs(S.tAz-S.az) + Math.abs(S.tEl-S.el)
-           + Math.abs(S.tDist-S.dist);
-  S.az += (S.tAz-S.az)*k; S.el += (S.tEl-S.el)*k;
+  /* Normalised lerp rather than a slerp: the step is small and the two
+     are indistinguishable under 90 degrees, which a preset change is.
+     Take the near end of the double cover first, or a preset can spin
+     the long way round for no reason. */
+  const sgn = dot4(S.q, S.tq) < 0 ? -1 : 1;
+  let d0 = Math.abs(S.tDist - S.dist);
+  const nq = [0,0,0,0];
+  for (let i = 0; i < 4; i++) {
+    const t = sgn * S.tq[i];
+    nq[i] = S.q[i] + (t - S.q[i]) * k;
+    d0 += Math.abs(t - S.q[i]);
+  }
+  S.q = qnorm(nq);
+  for (let i = 0; i < 3; i++) {
+    d0 += Math.abs(S.tPan[i] - S.pan[i]);
+    S.pan[i] += (S.tPan[i] - S.pan[i]) * k;
+  }
   S.dist += (S.tDist-S.dist)*k;
   if (dirty || d0 > 1e-4){ render(); dirty = d0 > 1e-4; }
   requestAnimationFrame(tick);
@@ -834,12 +926,32 @@ addEventListener('resize', () => { fit(); touch(); });
 /* ---------- input ---------- */
 let drag = null;
 cv.addEventListener('pointerdown', e => {
-  drag = {x:e.clientX, y:e.clientY}; cv.setPointerCapture(e.pointerId); });
+  drag = {x:e.clientX, y:e.clientY, pan: e.button === 2 || e.shiftKey};
+  cv.setPointerCapture(e.pointerId);
+});
+/* Right-drag is pan, so the menu it would otherwise open has to go. */
+cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointermove', e => {
   if (!drag) return;
-  S.tAz -= (e.clientX-drag.x)*0.008;
-  S.tEl = Math.max(-EL_MAX, Math.min(EL_MAX, S.tEl + (e.clientY-drag.y)*0.006));
-  drag = {x:e.clientX, y:e.clientY};
+  const px = e.clientX - drag.x, py = e.clientY - drag.y;
+  if (drag.pan) {
+    /* One pixel of drag moves the model one pixel, whatever the zoom:
+       the viewport spans 2*d*tan(FOV/2) of world across its height, so
+       that over the pixel height is the scale. Along the camera's own
+       right and up, which is what makes it feel like sliding the part
+       rather than steering the camera. */
+    const [rx, uy] = qBasis(S.tq);
+    const k = 2 * S.dist * Math.tan(FOV/2) / Math.max(cv.clientHeight, 1);
+    for (let i = 0; i < 3; i++)
+      S.tPan[i] -= rx[i]*px*k - uy[i]*py*k;
+  } else {
+    /* About the camera's own axes, so the grab feels the same whichever
+       way up the model already is -- and so there is no attitude at which
+       one of the two drags stops doing anything. */
+    S.tq = qnorm(qmul(qmul(qAxis([0,1,0], px*0.008),
+                           qAxis([1,0,0], py*0.008)), S.tq));
+  }
+  drag = {x:e.clientX, y:e.clientY, pan: drag.pan};
 });
 addEventListener('pointerup', () => drag = null);
 cv.addEventListener('wheel', e => {
@@ -855,7 +967,11 @@ const VIEWS = {
   front: [-Math.PI/2, 0],
   left:  [Math.PI, 0],
 };
-function setView(k){ [S.tAz, S.tEl] = VIEWS[k]; fit(); }
+function setView(k){
+  S.tq = qFromAzEl(...VIEWS[k]);
+  S.tPan = [0,0,0];   /* a named view is a view of the whole thing */
+  fit();
+}
 
 /* ---------- rail ---------- */
 const partsEl = document.getElementById('parts');
