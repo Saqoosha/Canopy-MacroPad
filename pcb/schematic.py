@@ -217,18 +217,33 @@ _WIRE_LOG = []  # (net_label, [(x,y), ...]) for every wire created, for the repo
 _ALL_SEGMENTS = []  # every (a, b) segment already drawn, for crossing checks
 
 
-def _segments_cross(a1, a2, b1, b2):
-    """True if two axis-aligned segments touch or overlap anywhere,
-    including a perpendicular crossing where neither shares an endpoint
-    with the other -- a bounding-box overlap test, which is exact for a
-    pair of segments that are each already a degenerate (zero-width or
-    zero-height) rectangle.
+def _segment_overlap(a1, a2, b1, b2):
+    """The overlap between two axis-aligned segments, as an (x0, x1, y0,
+    y1) box (a bounding-box intersection, exact for a pair of segments
+    that are each already a degenerate zero-width or zero-height
+    rectangle), or None if they do not touch at all.
     """
     ax0, ax1 = sorted((a1[0], a2[0]))
     ay0, ay1 = sorted((a1[1], a2[1]))
     bx0, bx1 = sorted((b1[0], b2[0]))
     by0, by1 = sorted((b1[1], b2[1]))
-    return ax0 <= bx1 and bx0 <= ax1 and ay0 <= by1 and by0 <= ay1
+    if ax0 <= bx1 and bx0 <= ax1 and ay0 <= by1 and by0 <= ay1:
+        return (max(ax0, bx0), min(ax1, bx1), max(ay0, by0), min(ay1, by1))
+    return None
+
+
+def _overlap_allowed(overlap, allowed):
+    """True if an overlap box (from _segment_overlap()) is nothing more
+    than one of this path's own declared points -- a legitimate T-junction
+    or fan-out, not a crossing with an unrelated wire. A box that is a
+    single point is allowed exactly when that point is in `allowed`; any
+    wider overlap (two segments running along the same line for more than
+    one point) is never allowed, regardless of what `allowed` contains.
+    """
+    x0, x1, y0, y1 = overlap
+    if x0 != x1 or y0 != y1:
+        return False
+    return (x0, y0) in allowed
 
 
 def wire_path(points, net=None, label=""):
@@ -251,7 +266,7 @@ def wire_path(points, net=None, label=""):
         raise AssertionError(f"wire create returned nothing for {label or points}")
     _WIRE_LOG.append((label, points))
     for i in range(len(points) - 1):
-        _ALL_SEGMENTS.append((points[i], points[i + 1]))
+        _ALL_SEGMENTS.append((points[i], points[i + 1], net))
     return wid
 
 
@@ -267,15 +282,36 @@ def _pin_on_segment(p, a, b):
     return False
 
 
-def _path_collides(path, allowed):
+def _path_collides(path, allowed, net=None):
     """True if any pin (other than the path's own declared endpoints,
-    `allowed`) lies on any segment of path -- a bend landing exactly on an
-    unrelated pin, or a straight run passing over one, both count. This
-    exists because both shapes were watched happening live: R5-Y1's bend
-    landed on the crystal's own GND pin, and R1-USB_DP's bend landed on
-    U1.USB_DM -- a different signal, three pins away in the symbol's own
-    pin list, that just happened to share a coordinate with the bend this
-    function's naive predecessor picked.
+    `allowed`) lies on any segment of path, OR any segment of path
+    crosses/touches an already-drawn wire segment of a *different* net
+    anywhere other than a real shared endpoint -- three distinct shapes
+    of the same underlying mistake, all watched happening live:
+
+    - a bend landing exactly on an unrelated pin (R5-Y1's bend landed on
+      the crystal's own GND pin);
+    - a straight run passing over one (R1-USB_DP's bend landed on
+      U1.USB_DM, a different signal three pins away in the symbol's own
+      pin list);
+    - and the one this function's earlier version still missed entirely:
+      two *different* signals' own detour paths crossing each other at a
+      waypoint that is not a registered pin at all, which EasyEDA still
+      merges into one wire object and one net. Confirmed live, and not a
+      near miss: QSPI_SCLK and QSPI_SD3 (and, separately, QSPI_SD1 and
+      QSPI_SD2) ended up on the same wire object this way, and so did
+      USB's D+ and D- at the connector -- three real shorts, caught only
+      by directly probing `getState_Net()` on two supposedly-different
+      pins and finding the same wire `primitiveId` came back for both.
+      Checking against `_ALL_SEGMENTS` (every segment any wire_path()
+      call has already drawn) is what the pin-only check could not do.
+
+    `net`, if given, is the net this new path is itself going to carry --
+    a crossing against an *already-drawn segment of that same net* is not
+    a fault (VBUS's own star, wired point by point from one anchor,
+    legitimately has several of its own segments passing near each other
+    in the LDO/ESD/J1 cluster); only a crossing against a segment carrying
+    a *different* (or no) net is.
     """
     for i in range(len(path) - 1):
         a, b = path[i], path[i + 1]
@@ -284,10 +320,24 @@ def _path_collides(path, allowed):
                 continue
             if _pin_on_segment(p, a, b):
                 return True
+        for wa, wb, seg_net in _ALL_SEGMENTS:
+            if net and seg_net == net:
+                continue
+            overlap = _segment_overlap(a, b, wa, wb)
+            if overlap is None:
+                continue
+            if _overlap_allowed(overlap, allowed):
+                # The only point of contact is one of *this path's own*
+                # declared endpoints -- legitimate fan-out (e.g. QSPI_SS
+                # to both the flash and R6) or a deliberate T-junction
+                # (a bus_connect() drop meeting its own rail) -- not a
+                # crossing with an unrelated wire.
+                continue
+            return True
     return False
 
 
-def elbow(a, b):
+def elbow(a, b, net=None):
     """Two points -> a Manhattan path between them that does not pass
     through any other pin on the board.
 
@@ -314,16 +364,16 @@ def elbow(a, b):
         candidates.append([a, (bx, ay), b])
         candidates.append([a, (ax, by), b])
     for cand in candidates:
-        if not _path_collides(cand, allowed):
+        if not _path_collides(cand, allowed, net=net):
             return cand
     for offset in (10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 180, 210, 250, 300):
         for dy in (offset, -offset):
             cand = [a, (ax, ay + dy), (bx, ay + dy), b]
-            if not _path_collides(cand, allowed):
+            if not _path_collides(cand, allowed, net=net):
                 return cand
         for dx in (offset, -offset):
             cand = [a, (ax + dx, ay), (ax + dx, by), b]
-            if not _path_collides(cand, allowed):
+            if not _path_collides(cand, allowed, net=net):
                 return cand
     raise AssertionError(
         f"elbow({a}, {b}): no route up to a 100-unit detour clears every "
@@ -351,30 +401,37 @@ def bus_connect(rail_y, points, net=None, label=""):
     xs = [p[0] for p in points]
     rail = [(min(xs), rail_y), (max(xs), rail_y)]
     rail_allowed = {rail[0], rail[1]}
-    if _path_collides(rail, rail_allowed):
+    if _path_collides(rail, rail_allowed, net=net):
         raise AssertionError(f"{label}-rail at y={rail_y} collides with an existing pin")
     ids = [wire_path(rail, net=net, label=f"{label}-rail")]
     for i, (x, y) in enumerate(points):
         drop = [(x, rail_y), (x, y)]
-        if _path_collides(drop, {(x, rail_y), (x, y)}):
+        if _path_collides(drop, {(x, rail_y), (x, y)}, net=net):
             raise AssertionError(f"{label}-drop[{i}] at x={x} collides with an existing pin")
-        ids.append(wire_path(drop, label=f"{label}-drop[{i}]"))
+        ids.append(wire_path(drop, net=net, label=f"{label}-drop[{i}]"))
     return ids
 
 
 def connect(anchor, points, net=None, label=""):
     """Star-wire anchor to every point in points, each as its own elbowed
-    2-or-3-point path. The first wire carries the explicit net name (if
-    given); later wires touching the anchor's now-named point inherit it by
-    coincidence, per sch_PrimitiveWire.create()'s own documented net-
-    inference rule (one endpoint on a primitive with a net -> follow it) --
-    passing the same net name again is not needed and, per the same rule,
-    would be rejected as a conflict if it ever mismatched.
+    2-or-3-point path, every one of them carrying the explicit net name.
+
+    An earlier version only named the first branch, on the assumption
+    that later branches would inherit the name by coincidence once merged
+    with it -- true for what EasyEDA reports (confirmed live: VBUS, DVDD,
+    and USB_DP_RAW all read back their correct name this way), but it
+    also meant every branch after the first was registered in
+    `_ALL_SEGMENTS` with no net at all, so this file's own crossing check
+    could not tell two branches of the *same* star apart from two
+    branches of *different* nets crossing by accident -- exactly the bug
+    that turned into the USB D+/D- short. Naming every branch explicitly
+    fixes both: the check can now skip same-net crossings on purpose (see
+    elbow()/_path_collides()), and there is no longer a silent gap in
+    what the registry itself remembers.
     """
     ids = []
     for i, p in enumerate(points):
-        n = net if i == 0 else None
-        ids.append(wire_path(elbow(anchor, p), net=n, label=f"{label}[{i}]"))
+        ids.append(wire_path(elbow(anchor, p, net=net), net=net, label=f"{label}[{i}]"))
     return ids
 
 
@@ -508,32 +565,58 @@ def main():
         xin_u1, (xin_u1[0], 460), (280, 460),
         (280, y1_a[1] - 10), (y1_a[0], y1_a[1] - 10), y1_a,
     ]
-    if _path_collides(xin_path, set(xin_path)):
+    if _path_collides(xin_path, set(xin_path), net="XIN"):
         raise AssertionError(f"hand-built XIN-Y1 route {xin_path} still collides")
-    wire_path(xin_path, label="XIN-Y1")
-    wire_path(elbow(y1_a, c15), label="Y1-C15")
+    # Every signal wire below gets its net passed explicitly. Confirmed
+    # live (see pcb/README.md's "Schematic-side API traps") that
+    # coincidence-based inheritance does not reliably populate
+    # getState_Net() the way an explicit net argument does, and -- the
+    # more serious finding -- that two *different* signals' own detour
+    # paths sharing an unregistered waypoint get silently merged into one
+    # wire object by EasyEDA regardless of either signal's intended name.
+    # elbow()'s collision search (via _path_collides()) now also checks
+    # against every already-drawn wire segment, not just registered pins,
+    # which is what actually prevents that merge; the explicit net= here
+    # is what makes a real, surviving mistake (if the collision search
+    # ever misses one) visible as two segments both claiming the same
+    # name-conflict rather than silently reading blank.
+    wire_path(xin_path, net="XIN", label="XIN-Y1")
+    wire_path(elbow(y1_a, c15, net="XIN"), net="XIN", label="Y1-C15")
     # XOUT to R5's *near* pin (closer to U1, x=400) first, then R5's far
     # pin (x=360) on to the crystal -- the other order runs straight
     # through R5's own near pin on the way to the far one, since both sit
-    # on the same y as XOUT.
-    wire_path(elbow(xout_u1, r5_near), label="XOUT-R5")
-    wire_path(elbow(r5_far, y1_b), label="R5-Y1")
-    wire_path(elbow(y1_b, c16), label="Y1-C16")
+    # on the same y as XOUT. XOUT and the post-resistor node (named
+    # XTAL_B) are deliberately different nets -- R5 sits between them.
+    wire_path(elbow(xout_u1, r5_near, net="XOUT"), net="XOUT", label="XOUT-R5")
+    wire_path(elbow(r5_far, y1_b, net="XTAL_B"), net="XTAL_B", label="R5-Y1")
+    # Y1-C16 is hand-routed, not elbow()'s search: XIN's own hand-built
+    # detour (above) boxes in this whole corner -- a horizontal run at
+    # y=460 from x=280-470, a vertical run at x=280 from y=410-460, and
+    # U1.XIN's own pin at (470,440) -- and Y1 pin "3" sits at x=330,
+    # inside that horizontal run's x-range, so any straight drop from it
+    # crosses XIN somewhere. The only gap is a narrow y=435-445 corridor
+    # (between Y1's own pin row at y=440 and XIN's horizontal at y=460)
+    # wide enough to get *out* to x=500 -- past XIN's whole bounding box
+    # on the right -- before dropping down and coming back in from below.
+    y1_c16_path = [y1_b, (330, 435), (500, 435), (500, 470), c16]
+    if _path_collides(y1_c16_path, set(y1_c16_path), net="XTAL_B"):
+        raise AssertionError(f"hand-built Y1-C16 route {y1_c16_path} still collides")
+    wire_path(y1_c16_path, net="XTAL_B", label="Y1-C16")
     print("  [ok ] crystal: XIN-Y1-C15 and XOUT-R5-Y1-C16 wired")
 
     # --- QSPI / flash ---------------------------------------------------------
     u2 = get_pins(pids["U2"])
     r6 = get_pins(pids["R6"])
     sw1 = get_pins(pids["SW1"])
-    wire_path(elbow(u1pin("QSPI_SCLK"), pin_xy(u2, "CLK")), label="QSPI_SCLK")
-    wire_path(elbow(u1pin("QSPI_SD0"), pin_xy(u2, "DI(IO0)")), label="QSPI_SD0")
-    wire_path(elbow(u1pin("QSPI_SD1"), pin_xy(u2, "DO(IO1)")), label="QSPI_SD1")
-    wire_path(elbow(u1pin("QSPI_SD2"), pin_xy(u2, "/WP(IO2)")), label="QSPI_SD2")
-    wire_path(elbow(u1pin("QSPI_SD3"), pin_xy(u2, "/HOLDor/RESET(IO3)")), label="QSPI_SD3")
+    wire_path(elbow(u1pin("QSPI_SCLK"), pin_xy(u2, "CLK"), net="QSPI_SCLK"), net="QSPI_SCLK", label="QSPI_SCLK")
+    wire_path(elbow(u1pin("QSPI_SD0"), pin_xy(u2, "DI(IO0)"), net="QSPI_SD0"), net="QSPI_SD0", label="QSPI_SD0")
+    wire_path(elbow(u1pin("QSPI_SD1"), pin_xy(u2, "DO(IO1)"), net="QSPI_SD1"), net="QSPI_SD1", label="QSPI_SD1")
+    wire_path(elbow(u1pin("QSPI_SD2"), pin_xy(u2, "/WP(IO2)"), net="QSPI_SD2"), net="QSPI_SD2", label="QSPI_SD2")
+    wire_path(elbow(u1pin("QSPI_SD3"), pin_xy(u2, "/HOLDor/RESET(IO3)"), net="QSPI_SD3"), net="QSPI_SD3", label="QSPI_SD3")
     qspi_ss = u1pin("QSPI_SS")
-    wire_path(elbow(qspi_ss, pin_xy(u2, "/CS")), label="QSPI_SS-flash")
-    wire_path(elbow(qspi_ss, pin_xy(r6, "1")), label="QSPI_SS-R6")
-    wire_path(elbow(pin_xy(r6, "2"), pin_xy(sw1, "A")), label="R6-SW1")
+    wire_path(elbow(qspi_ss, pin_xy(u2, "/CS"), net="QSPI_SS"), net="QSPI_SS", label="QSPI_SS-flash")
+    wire_path(elbow(qspi_ss, pin_xy(r6, "1"), net="QSPI_SS"), net="QSPI_SS", label="QSPI_SS-R6")
+    wire_path(elbow(pin_xy(r6, "2"), pin_xy(sw1, "A"), net="BOOT"), net="BOOT", label="R6-SW1")
     print("  [ok ] QSPI: 6 signals to flash, QSPI_SS to BOOT switch via R6")
 
     # --- USB ---------------------------------------------------------------
@@ -551,10 +634,19 @@ def main():
     # keeps each wire on its own resistor's near pin, not routed past its
     # own far pin first (the same near/far mistake R5 and the flash's own
     # pin columns already caught).
+    #
+    # USB_DP_RAW and USB_DM_RAW were confirmed live to merge into a single
+    # wire object -- D+ shorted to D- at the connector -- when connect()'s
+    # two independent star fans, routed through the same tight J1/ESD
+    # cluster, crossed at an unregistered bend point. elbow()'s collision
+    # search (now checking _ALL_SEGMENTS, not just pins) is what actually
+    # prevents the two stars from touching; wiring USB_DM_RAW *after*
+    # USB_DP_RAW is registered means its own search has USB_DP_RAW's real
+    # wires to route around.
     connect(dp_targets[0], dp_targets[1:] + u4_io1 + [pin_xy(r1, "2")], net="USB_DP_RAW", label="USB_DP_RAW")
     connect(dn_targets[0], dn_targets[1:] + u4_io2 + [pin_xy(r2, "2")], net="USB_DM_RAW", label="USB_DM_RAW")
-    wire_path(elbow(pin_xy(r1, "1"), u1pin("USB_DP")), label="R1-USB_DP")
-    wire_path(elbow(pin_xy(r2, "1"), u1pin("USB_DM")), label="R2-USB_DM")
+    wire_path(elbow(pin_xy(r1, "1"), u1pin("USB_DP"), net="USB_DP"), net="USB_DP", label="R1-USB_DP")
+    wire_path(elbow(pin_xy(r2, "1"), u1pin("USB_DM"), net="USB_DM"), net="USB_DM", label="R2-USB_DM")
     print("  [ok ] USB: D+/D- bridged both orientations, through ESD and 27R series")
 
     # --- CC1 / CC2 -----------------------------------------------------------
@@ -562,7 +654,7 @@ def main():
     cc2 = next((p["x"], p["y"]) for p in j1_pins if p["name"] == "CC2")
     r3 = get_pins(pids["R3"])
     r4 = get_pins(pids["R4"])
-    wire_path(elbow(cc1, pin_xy(r3, "1")), label="CC1-R3")
+    wire_path(elbow(cc1, pin_xy(r3, "1"), net="CC1"), net="CC1", label="CC1-R3")
     # CC2 sits at y=565, inside J1's shield (EH) pins' y=545-575 band at
     # x=1085 -- both of elbow()'s search shapes route straight along
     # J1's own x=1015 column first, which is packed solid (a J1 pin every
@@ -572,9 +664,9 @@ def main():
     # every other hand-built path in this file.
     cc2_r4 = pin_xy(r4, "1")
     cc2_path = [cc2, (1080, cc2[1]), (1080, 585), (cc2_r4[0], 585), cc2_r4]
-    if _path_collides(cc2_path, set(cc2_path)):
+    if _path_collides(cc2_path, set(cc2_path), net="CC2"):
         raise AssertionError(f"hand-built CC2-R4 route {cc2_path} still collides")
-    wire_path(cc2_path, label="CC2-R4")
+    wire_path(cc2_path, net="CC2", label="CC2-R4")
     print("  [ok ] CC1/CC2: wired to their own 5.1k pull-down (GND leg queued for a flag, not wired yet)")
 
     if "--debug-collisions" in sys.argv:
@@ -674,11 +766,24 @@ def assert_nets_by_graph(pids):
         return pin_xy(u1, name, num)
 
     u2 = get_pins(pids["U2"])
-    for u1_name, flash_name in [
+    qspi_pairs = [
         ("QSPI_SCLK", "CLK"), ("QSPI_SD0", "DI(IO0)"), ("QSPI_SD1", "DO(IO1)"),
         ("QSPI_SD2", "/WP(IO2)"), ("QSPI_SD3", "/HOLDor/RESET(IO3)"), ("QSPI_SS", "/CS"),
-    ]:
+    ]
+    for u1_name, flash_name in qspi_pairs:
         same(f"QSPI {u1_name}-{flash_name}", u1pin(u1_name), pin_xy(u2, flash_name))
+    # Every QSPI signal must be a *different* net from every other one --
+    # not checked at all in an earlier version of this function, which is
+    # exactly how two real shorts (QSPI_SCLK merged with QSPI_SD3, and
+    # separately QSPI_SD1 with QSPI_SD2 -- both confirmed live by reading
+    # getState_Net() back on two supposedly-different pins and finding
+    # the same wire primitiveId) went undetected: "each signal reaches
+    # its own flash pin" was true for both shorted pairs, since the
+    # merged wire object still touched every pin it was ever asked to.
+    for i in range(len(qspi_pairs)):
+        for j in range(i + 1, len(qspi_pairs)):
+            name_i, name_j = qspi_pairs[i][0], qspi_pairs[j][0]
+            different(f"QSPI {name_i} vs {name_j}", u1pin(name_i), u1pin(name_j))
 
     y1 = get_pins(pids["Y1"])
     y1_a, y1_b = pin_xy(y1, None, "1"), pin_xy(y1, None, "3")
@@ -713,6 +818,13 @@ def assert_nets_by_graph(pids):
     same("R2 to U1.USB_DM", pin_xy(r2, "1"), u1pin("USB_DM"))
     different("USB_DP_RAW vs U1.USB_DP (27R in between)", dp_raw[0], u1pin("USB_DP"))
     different("USB_DP vs USB_DM", u1pin("USB_DP"), u1pin("USB_DM"))
+    # D+ vs D- themselves -- the actual short found live (J1.DP1 and
+    # J1.DN1 read back as the same wire primitiveId, both reporting net
+    # "USB_DP_RAW") was never checked here either: every assertion above
+    # checked a RAW net was internally consistent and separated from its
+    # own post-resistor net, never that the two RAW nets differ from each
+    # other.
+    different("USB_DP_RAW vs USB_DM_RAW (D+ vs D-)", dp_raw[0], dn_raw[0])
 
     r3, r4 = get_pins(pids["R3"]), get_pins(pids["R4"])
     cc1 = next((p["x"], p["y"]) for p in j1 if p["name"] == "CC1")
@@ -859,14 +971,28 @@ def assert_nets(pids):
 
     u2 = one(params.DEV_FLASH, "U2 flash")
     # U2.VCC and U2.GND: same deferral as U1's power pins above.
-    for u1_name, flash_name in [
+    qspi_pairs = [
         ("QSPI_SCLK", "CLK"), ("QSPI_SD0", "DI(IO0)"), ("QSPI_SD1", "DO(IO1)"),
         ("QSPI_SD2", "/WP(IO2)"), ("QSPI_SD3", "/HOLDor/RESET(IO3)"), ("QSPI_SS", "/CS"),
-    ]:
+    ]
+    for u1_name, flash_name in qspi_pairs:
         want(
             net_of(u1, u1_name) == net_of(u2, flash_name),
             f"U1.{u1_name} and U2.{flash_name} are on different nets",
         )
+    # Every QSPI signal must differ from every other -- not checked at all
+    # in an earlier version of this function. Two real shorts (SCLK with
+    # SD3, and separately SD1 with SD2) passed every check above, because
+    # a merged wire object still touches every pin it was ever asked to;
+    # "each signal reaches its own flash pin" says nothing about whether
+    # it reaches *only* that pin.
+    for i in range(len(qspi_pairs)):
+        for j in range(i + 1, len(qspi_pairs)):
+            name_i, name_j = qspi_pairs[i][0], qspi_pairs[j][0]
+            want(
+                net_of(u1, name_i) != net_of(u1, name_j),
+                f"U1.{name_i} and U1.{name_j} are on the same net (shorted)",
+            )
 
     u3 = one(params.DEV_LDO, "U3 LDO")
     # U3.GND and U3.Vout: same deferral. U3.Vin is VBUS, which is a
@@ -882,6 +1008,7 @@ def assert_nets(pids):
         want(len(io1_nets) == 1, f"ESD IO1 pins (1,6) split across nets: {io1_nets}")
         want(len(io2_nets) == 1, f"ESD IO2 pins (3,4) split across nets: {io2_nets}")
         want(vbus_nets == {"VBUS"}, f"ESD VBUS pin not on VBUS: {vbus_nets}")
+        want(io1_nets != io2_nets, f"ESD IO1 and IO2 are on the same net (shorted): {io1_nets}")
         # ESD GND pin: same deferral as U1/U2/U3's GND pins.
         esd_io1_net = next(iter(io1_nets))
         esd_io2_net = next(iter(io2_nets))
@@ -894,9 +1021,18 @@ def assert_nets(pids):
         dn_nets = {net_of(usbc, "DN1"), net_of(usbc, "DN2")}
         want(len(dp_nets) == 1, f"J1 DP1/DP2 (both cable orientations) split across nets: {dp_nets}")
         want(len(dn_nets) == 1, f"J1 DN1/DN2 (both cable orientations) split across nets: {dn_nets}")
-        want({esd_io1_net, esd_io2_net} == dp_nets | dn_nets or
-             (esd_io1_net in dp_nets | dn_nets and esd_io2_net in dp_nets | dn_nets),
-             "ESD IO1/IO2 nets do not match J1's DP/DN nets")
+        # D+ vs D- themselves -- the actual short found live (J1.DP1 and
+        # J1.DN1 read back as the same wire primitiveId, both reporting
+        # net "USB_DP_RAW") was never checked by the union-equality test
+        # this replaces: that test only confirmed the *union* of the two
+        # sets matched ESD's two nets, which is true even when dp_nets
+        # and dn_nets are the same single value.
+        want(dp_nets != dn_nets, f"J1 D+ and D- are on the same net (shorted): {dp_nets}")
+        want(
+            esd_io1_net in (dp_nets | dn_nets) and esd_io2_net in (dp_nets | dn_nets)
+            and esd_io1_net != esd_io2_net,
+            "ESD IO1/IO2 nets do not match J1's DP/DN nets, or match each other",
+        )
         vbus_nets_usbc = {info["net"] for info in usbc["pinInfoMap"].values() if info["name"] == "VBUS"}
         want(vbus_nets_usbc == {"VBUS"}, f"J1 VBUS pins not all on VBUS: {vbus_nets_usbc}")
         # J1 GND/shield (EH) pins: same deferral.
@@ -960,7 +1096,7 @@ _FLAG_POSITIONS = set()  # every net-flag/net-port anchor point chosen so far,
 # as a 3V3 stub wire whose own getState_Net() came back 'GND'.
 
 
-def _find_clear_offset(target):
+def _find_clear_offset(target, net=None):
     """A point a short, fixed distance from target that is neither an
     existing board pin, nor an already-chosen flag/port anchor from any
     net (see _FLAG_POSITIONS above), with a straight (single-segment)
@@ -979,22 +1115,13 @@ def _find_clear_offset(target):
         if pos in _ALL_PINS or pos in _FLAG_POSITIONS:
             continue
         seg = [pos, target]
-        if _path_collides(seg, {pos, target}):
-            continue
-        # A crossing with an already-drawn stub wire -- two different
-        # nets' stubs passing through each other at a point that is
-        # neither one's own endpoint -- does not register as a "pin on
-        # segment" collision (there is no pin there), but was confirmed
-        # live to still merge the two wires' nets. See _FLAG_POSITIONS'
-        # own comment for the case this caught.
-        crosses = False
-        for wa, wb in _ALL_SEGMENTS:
-            if pos in (wa, wb) or target in (wa, wb):
-                continue
-            if _segments_cross(pos, target, wa, wb):
-                crosses = True
-                break
-        if crosses:
+        # _path_collides() covers both a pin sitting on this segment and
+        # this segment crossing an already-drawn wire of a *different*
+        # net -- see its own docstring for the crossing case, which is
+        # exactly the shape of fault this function exists to avoid (a
+        # flag/port stub merging onto a different net's wire at an
+        # unregistered waypoint).
+        if _path_collides(seg, {pos, target}, net=net):
             continue
         _FLAG_POSITIONS.add(pos)
         _ALL_PINS.add(pos)
@@ -1025,7 +1152,7 @@ def place_power_flags(identification, net_name, points):
             seen.append(p)
     out = []
     for target in seen:
-        flag_pos = _find_clear_offset(target)
+        flag_pos = _find_clear_offset(target, net=net_name)
         js = (
             f'const f = await eda.sch_PrimitiveComponent.createNetFlag('
             f'"{identification}", "{net_name}", {flag_pos[0]}, {flag_pos[1]}, 0, false); '
@@ -1165,7 +1292,7 @@ def place_key_ports(pids):
     problems = []
     for name, gpio in zip(names, gpios):
         target = pin_xy(u1, f"GPIO{gpio}")
-        port_pos = _find_clear_offset(target)
+        port_pos = _find_clear_offset(target, net=name)
         js = (
             f'const p = await eda.sch_PrimitiveComponent.createNetPort("BI", "{name}", '
             f"{port_pos[0]}, {port_pos[1]}, 0, false); "
