@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: E402
 
 import params as P  # noqa: E402
 
-OUT = Path(__file__).parent / "out" / P.LAYOUT
+OUT = Path(__file__).parent / "out" / P.OUT_NAME
 VIEWS = {"iso": (28, -60), "top": (89, -90), "bottom": (-70, -90), "back": (6, 90)}
 
 

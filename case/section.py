@@ -23,19 +23,14 @@ import mock  # noqa: E402
 import params as P  # noqa: E402
 import parts  # noqa: E402
 
-OUT = Path(__file__).parent / "out" / P.LAYOUT
+OUT = Path(__file__).parent / "out" / P.OUT_NAME
 TMP = OUT / "tmp"
 
 STYLE = {
     "shell": ("#3d6ea8", 1.0),
     "bottom": ("#2f5583", 1.0),
-    "NeoKey + sockets": ("#1f7a4d", 0.75),
-    # A shade off the NeoKey rather than a colour of their own: the point
-    # of the section is that the three boards are one plane, so they
-    # should read as one thing with a seam, not as two kinds of part.
-    "breakouts + sockets": ("#2f9a63", 0.75),
+    "board + sockets + USB": ("#1f7a4d", 0.75),
     "switch bodies": ("#b06a1f", 0.55),
-    "QT Py + parts": ("#7a3f9c", 0.75),
 }
 
 CUTS = [

@@ -1,7 +1,6 @@
 """A real 3D viewer, because the flat renders lie about depth.
 
-    .venv/bin/python webgl.py dump                    # stacked
-    MPAD_LAYOUT=inline .venv/bin/python webgl.py dump # inline
+    .venv/bin/python webgl.py dump
     .venv/bin/python webgl.py page                    # -> out/viewer.html
 
 `product.py` sorts triangles by distance and paints them back to front.
@@ -10,9 +9,9 @@ two surfaces interpenetrate or one is concave -- which describes most of
 this case. A GPU depth buffer resolves it per pixel and the artefacts go
 away entirely.
 
-Geometry rides in the page as int16, quantised over each layout's own
-bounding box: about 0.002 mm a step over 130 mm, which is far finer than
-anything printed here, and a quarter the size of float32.
+Geometry rides in the page as int16, quantised over the bounding box:
+about 0.002 mm a step over 130 mm, which is far finer than anything
+printed here, and a quarter the size of float32.
 """
 
 import base64
@@ -47,41 +46,28 @@ def envelopes():
     consumed rather than left touching, which would fight just the same.
     """
     e = 0.02
-    neokey_slab = product.board(
-        P.NEOKEY_W + e, P.NEOKEY_D + e, P.NEOKEY_CORNER_R,
-        P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1],
-        P.Z_NEOKEY_BOTTOM - e, P.NEOKEY_T + 2 * e)
-    breakout_slabs = None
-    for cx, cy in P.BREAKOUT_CENTERS:
-        slab = product.board(
-            P.BREAKOUT_W + e, P.BREAKOUT_D + e, P.BREAKOUT_CORNER_R,
-            cx, cy, P.Z_NEOKEY_BOTTOM - e, P.BREAKOUT_T + 2 * e)
-        breakout_slabs = slab if breakout_slabs is None else breakout_slabs + slab
+    board_slab = product.board(
+        P.BOARD_W + e, P.BOARD_D + e, P.BOARD_CORNER_R,
+        P.BOARD_CENTER[0], P.BOARD_CENTER[1],
+        P.Z_BOARD_BOTTOM - e, P.BOARD_T + 2 * e)
     boards = {
-        "NeoKey + sockets": neokey_slab,
-        "breakouts + sockets": breakout_slabs,
-        # The switch bodies start exactly on a board's top face, so they
-        # need the same slabs taken out of them for the same reason --
-        # and now that is all three boards, not just the one.
-        "switch bodies": neokey_slab + breakout_slabs,
-        "QT Py + parts": product.board(
-            P.QTPY_PLAN_W + e, P.QTPY_PLAN_D + e, P.QTPY_CORNER_R,
-            P.QTPY_CENTER[0], P.QTPY_CENTER[1],
-            P.Z_QTPY_LOW - e, P.QTPY_T + 2 * e),
+        "board + sockets + USB": board_slab,
+        # The switch bodies start exactly on the board's top face, so they
+        # need the same slab taken out of them for the same reason.
+        "switch bodies": board_slab,
     }
     return {k: (v - boards[k]) for k, v in mock.everything().items()}
 
 
 def dump():
-    """Tessellate this layout's scene and write it next to its STLs."""
+    """Tessellate the scene and write it next to its STLs."""
     parts = []
     blobs = []
     # The viewer's boards are bare slabs; these are the envelopes the
     # interference check actually runs against. Shipping both means the
     # thing on screen can be compared with the thing that was verified,
     # instead of being taken on faith.
-    lift_of = {"NeoKey + sockets": 20.0, "breakouts + sockets": 20.0,
-               "switch bodies": 46.0, "QT Py + parts": 8.0}
+    lift_of = {"board + sockets + USB": 20.0, "switch bodies": 46.0}
     scene = list(product.scene()) + [
         (f"env-{k}", v, ENV_COLOR, 0.34, lift_of[k])
         for k, v in envelopes().items()
@@ -108,7 +94,7 @@ def dump():
     data = np.concatenate(quant).tobytes()
 
     payload = {
-        "layout": P.LAYOUT,
+        "layout": P.OUT_NAME,
         "case": [P.CASE_W, P.CASE_D, P.CASE_H],
         "keycapTop": float(allv[:, 2].max()),
         "lo": lo.tolist(),
@@ -116,7 +102,7 @@ def dump():
         "parts": parts,
         "data": base64.b64encode(data).decode(),
     }
-    path = OUT / P.LAYOUT / "geom.json"
+    path = OUT / P.OUT_NAME / "geom.json"
     path.write_text(json.dumps(payload))
     print(f"  {path}  {len(data) / 1024:.0f} KB of int16, "
           f"{sum(p['count'] for p in parts) // 3} triangles")
@@ -127,10 +113,8 @@ def dump():
 LABELS = {
     "shell": ("Shell", "printed"),
     "bottom": ("Bottom plate", "printed"),
-    "neokey": ("NeoKey 1x4 QT", "ADA-4980, keys 2-5 on I2C"),
-    "breakout": ("NeoKey Breakout \u00d72", "ADA-4978, keys 0-1 on GPIO"),
-    "qtpy": ("QT Py RP2040", "ADA-4900"),
-    "sw": ("Switches", "Durock Ice King"),
+    "board": ("PCB", "custom, 6\u00d7 Choc v2"),
+    "sw": ("Switches", "Kailh Choc v2"),
     "cap": ("Keycaps", "1U clear ABS"),
     "led": ("NeoPixels", "under each key"),
 }
@@ -144,11 +128,10 @@ STATUS = [
 
 def page():
     geoms = {}
-    for layout in ("stacked", "inline"):
-        f = OUT / layout / "geom.json"
-        if not f.exists():
-            sys.exit(f"missing {f} -- run `dump` for both layouts first")
-        geoms[layout] = json.loads(f.read_text())
+    f = OUT / P.OUT_NAME / "geom.json"
+    if not f.exists():
+        sys.exit(f"missing {f} -- run `dump` first")
+    geoms[P.OUT_NAME] = json.loads(f.read_text())
 
     html = TEMPLATE.replace("__DATA__", json.dumps(geoms))
     html = html.replace("__LABELS__", json.dumps(LABELS))
@@ -270,15 +253,7 @@ input[type=range]{width:100%; accent-color:var(--accent)}
   <aside class="rail">
     <div class="head">
       <h1>Canopy MacroPad</h1>
-      <p>Printed case, two layouts</p>
-    </div>
-
-    <div class="grp">
-      <p class="lbl">Layout</p>
-      <div class="seg" id="layout">
-        <button data-v="stacked" aria-pressed="true">Stacked</button>
-        <button data-v="inline" aria-pressed="false">Inline</button>
-      </div>
+      <p>Printed case</p>
     </div>
 
     <div class="grp">
@@ -510,7 +485,7 @@ function resize(w, h){
 function hex(h){ return [parseInt(h.slice(1,3),16)/255,
   parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]; }
 function group(name){
-  const m = name.match(/^(shell|bottom|neokey|breakout|qtpy|sw|cap|led)/);
+  const m = name.match(/^(shell|bottom|board|sw|cap|led)/);
   return m ? m[1] : name;
 }
 
@@ -543,7 +518,7 @@ for (const [key, g] of Object.entries(GEOM)) {
 }
 
 /* ---------- state ---------- */
-const S = {layout:'stacked', explode:0, env:false, shellMode:'solid',
+const S = {layout:Object.keys(GEOM)[0], explode:0, env:false, shellMode:'solid',
            ortho:false, hidden:new Set(),
            az:-0.72, el:0.42, dist:1, tAz:-0.72, tEl:0.42, tDist:1};
 /* Frame on the widest axis and the viewport's aspect, not on a constant:
@@ -773,13 +748,6 @@ function buildDims(){
 document.getElementById('keys').innerHTML = STATUS.map(([n,c]) =>
   `<div><span class="sw" style="background:${c}"></span>${n}</div>`).join('');
 
-document.getElementById('layout').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  S.layout = b.dataset.v;
-  [...e.currentTarget.children].forEach(x =>
-    x.setAttribute('aria-pressed', String(x === b)));
-  fit(); buildParts(); buildDims(); touch();
-});
 document.getElementById('explode').addEventListener('input', e => {
   S.explode = e.target.value / 100; touch();
 });

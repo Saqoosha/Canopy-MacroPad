@@ -37,14 +37,11 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: E402
 import params as P  # noqa: E402
 import parts  # noqa: E402
 
-OUT = Path(__file__).parent / "out" / P.LAYOUT
+OUT = Path(__file__).parent / "out" / P.OUT_NAME
 TMP = OUT / "tmp"
 
 # From README.md "Status colors". Left to right: idle, running, awaiting
 # approval, done-unread -- the three that matter plus a resting key.
-# One per key, left to right. The first four keep their indices because
-# STACK and LEGEND below name them by index; the two the breakouts added
-# are appended rather than woven in.
 KEY_COLORS = ["#273027", "#0040ff", "#ff8000", "#00ff00",
               "#00ffa0", "#ff0000"]
 
@@ -112,53 +109,26 @@ def scene():
         ("bottom", parts.bottom(), CASE_COLOR, 1.0, 0.0),
         ("shell", parts.shell(), CASE_COLOR, 1.0, 38.0),
         (
-            "qtpy",
-            board(P.QTPY_PLAN_W, P.QTPY_PLAN_D, P.QTPY_CORNER_R,
-                  P.QTPY_CENTER[0], P.QTPY_CENTER[1],
-                  P.Z_QTPY_LOW, P.QTPY_T),
-            BOARD_COLOR, 1.0, 8.0,
-        ),
-        (
-            "neokey",
-            board(P.NEOKEY_W, P.NEOKEY_D, P.NEOKEY_CORNER_R,
-                  P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1],
-                  P.Z_NEOKEY_BOTTOM, P.NEOKEY_T),
+            "board",
+            board(P.BOARD_W, P.BOARD_D, P.BOARD_CORNER_R,
+                  P.BOARD_CENTER[0], P.BOARD_CENTER[1],
+                  P.Z_BOARD_BOTTOM, P.BOARD_T),
             BOARD_COLOR, 1.0, 20.0,
         ),
     ]
-    # Same plane, same thickness, same lift: to the eye the three boards
-    # are one strip, which is the point of butting them.
-    for i, (cx, cy) in enumerate(P.BREAKOUT_CENTERS):
-        items.append((
-            f"breakout{i}",
-            board(P.BREAKOUT_W, P.BREAKOUT_D, P.BREAKOUT_CORNER_R,
-                  cx, cy, P.Z_NEOKEY_BOTTOM, P.BREAKOUT_T),
-            BOARD_COLOR, 1.0, 20.0,
-        ))
     for i, (sx, sy) in enumerate(P.SWITCH_XY):
         items.append((
             f"led{i}",
-            Pos(sx, sy, P.Z_NEOKEY_TOP + 0.6) * Box(3.5, 3.5, 1.2),
+            Pos(sx, sy, P.Z_BOARD_TOP + 0.6) * Box(3.5, 3.5, 1.2),
             KEY_COLORS[i], 1.0, 20.0,
         ))
         items.append((f"sw{i}", switch_body(sx, sy), SWITCH_COLOR, 0.45, 46.0))
         items.append((f"cap{i}", keycap(sx, sy), KEY_COLORS[i], 0.86, 56.0))
-    # The LEDs sit at the switch centres, so any of them landing off the
-    # board it belongs to means a board was placed by hand instead of
-    # from its origin. That is exactly how the NeoKey ended up 13 mm out
-    # in one layout, and three boards is more to get wrong, not less --
-    # so each switch is checked against its own board rather than against
-    # a single outline that used to be the only one there was.
-    owners = (
-        [(cx, cy, P.BREAKOUT_W, P.BREAKOUT_D) for cx, cy in P.BREAKOUT_CENTERS]
-        + [(P.NEOKEY_CENTER[0], P.NEOKEY_CENTER[1], P.NEOKEY_W, P.NEOKEY_D)]
-        * len(P.NEOKEY_SWITCH_XY)
-    )
-    assert len(owners) == len(P.SWITCH_XY), "a switch has no board"
-    for (sx, sy), (cx, cy, bw, bd) in zip(P.SWITCH_XY, owners):
-        assert abs(sx - cx) <= bw / 2, \
+    cx, cy = P.BOARD_CENTER
+    for sx, sy in P.SWITCH_XY:
+        assert abs(sx - cx) <= P.BOARD_W / 2, \
             f"switch at x={sx:.2f} is off its board"
-        assert abs(sy - cy) <= bd / 2, \
+        assert abs(sy - cy) <= P.BOARD_D / 2, \
             f"switch at y={sy:.2f} is off its board"
     return items
 
@@ -216,18 +186,11 @@ def draw(ax, pieces, elev, azim, explode=0.0, title=""):
 # Top to bottom, the order the exploded view stacks them in.
 STACK = [
     ("{} × keycap".format(len(P.SWITCH_XY)), "1U, clear ABS", KEY_COLORS[2]),
-    ("{} × Durock Ice King".format(len(P.SWITCH_XY)),
-     "linear 52 gf, clear housing", SWITCH_COLOR),
+    ("{} × Choc v2".format(len(P.SWITCH_XY)),
+     "low-profile, MX-compatible keycaps", SWITCH_COLOR),
     ("shell", "printed, plate face down", CASE_COLOR),
-    ("{} × NeoKey Breakout".format(P.BREAKOUT_COUNT),
-     "ADA-4978, hot-swap + NeoPixel, on GPIO", BOARD_COLOR),
-    ("NeoKey 1x4 QT", "ADA-4980, hot-swap + NeoPixel, on I2C", BOARD_COLOR),
-    ("QT Py RP2040", "ADA-4900, "
-     + ("face down under the keys" if P.STACKED else "face up beside them"),
-     BOARD_COLOR),
-    ("bottom plate", "printed, "
-     + ("carries the QT Py" if P.STACKED else "holds both boards up"),
-     CASE_COLOR),
+    ("custom PCB", "six Choc hot-swap + reverse-mount pixels", BOARD_COLOR),
+    ("bottom plate", "printed, pushes the board up", CASE_COLOR),
 ]
 
 LEGEND = [
@@ -251,7 +214,7 @@ def main():
     draw(fig.add_subplot(gs[1, 2], projection="3d"), pieces, 18, -62,
          explode=1.0, title="exploded")
 
-    fig.suptitle(f"Canopy MacroPad — {P.LAYOUT}", fontsize=20, y=0.975,
+    fig.suptitle(f"Canopy MacroPad — {P.OUT_NAME}", fontsize=20, y=0.975,
                  color="#1b1f26")
     fig.text(0.5, 0.945, f"{P.CASE_W:.1f} × {P.CASE_D:.1f} × {P.CASE_H:.1f} mm case"
              f"   ·   {top:.1f} mm to the top of a keycap",
