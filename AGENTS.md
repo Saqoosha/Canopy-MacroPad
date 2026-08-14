@@ -94,176 +94,157 @@ one, not necessarily the only one.
   still seal it off, or leave a port a millimetre short of seating. That
   same shape of mistake happened four times, on both Qwiic sockets and
   the USB-C port, and every stand-in models plugs because of it.
-- **A stand-in is only as true as what it was told, and the boolean
-  cannot tell you otherwise.** The first assembled six-key unit found
-  four separate versions of this in one afternoon, every one of them
-  green in `build.py` beforehand:
-  - **Summarised by hand.** The hot-swap socket was drawn as one
-    10.9 x 5.9 box. It is a body *plus a solder wing off each end*, 15.9
-    across, and the wings are what a column runs into -- the summary took
-    the biggest of three solids and dropped the rest. The reverse-mount
-    NeoPixel and the diode were not in it at all.
-  - **On the wrong face.** The STEP draws the switch on -z and the case
-    puts the switch side up, so the board is turned over and its
-    component face **mirrors left to right**. The z flip was implicit in
-    placing parts below the board; the in-plane one was missing.
-  - **Feature by feature instead of board by board.** Which way a board
-    sits is *one* fact. It was decided separately for the socket, the
-    components and the STEMMA receptacles, each time to satisfy the last
-    thing someone had pointed at, and the three answers contradicted each
-    other for six rounds. `BOARD_FLIP_X`/`BOARD_FLIP_Y` are that one fact
-    now and everything derives from them.
-  - **The deepest part is not the one you remember.** `SOCKET_CLEARANCE`
-    was a hand-written 2.80 whose comment reasoned from the socket's
-    1.85. The deepest thing under a board is the STEMMA receptacle at
-    2.96 -- modelled on the far side, so nothing had to clear it. The
-    printed case closes on a NeoKey pressed into the bottom plate by
-    0.16, which is too little to feel and was enough to strain the boards.
-    It is `UNDER_BOARD_MAX + 0.40` now.
+- **A green check is not evidence.** Everything below was green in
+  `build.py` while the fault was real, and they are one lesson wearing
+  five faces: what the check could not see. Each carries the number it
+  was watched failing at, because a guard nobody has seen go red is not
+  a guard.
 
-  So: `BREAKOUT_BACK_PARTS` is every part on that face as boxes out of
-  the STEP, mirrored once on the way into case space, and the tables
-  still read as the file does so they can be checked against it. Watched
-  to fail: the old supports against the real shape 15.659 mm³, the third
-  pad left on the old side 1.672 mm³.
-- **A margin check is not a boolean**, and neither is a sentence. The M3
-  post landed on the Qwiic plug while the margin that existed to prevent
-  exactly that read green, because it measured to the board edge and the
-  plug sticks out past it. Worse, because nothing at all was measuring
-  it: the reason the breakouts go left was written as "a mated plug
-  stands 2.50 proud and a butted breakout's switch body starts 2.525 --
-  0.025, which is the tolerance", and it stood in three files for weeks.
-  The plug hangs *below* the board and the switch stands *above* it, so
-  that pair was never in the same space. **A number borrowed from a
-  sentence that is true does not bring the truth with it** — 0.025 is
-  right where it was written, about a standoff and a switch, both above
-  the board, and it was carried across a Z boundary it does not cross.
-  A peer's replacement (the hot-swap socket's solder wing, which does
-  share the plug's Z band and does overlap it 0.258 in x) was two thirds
-  right and missed in y by 4.03. Booleaned, the plug clears everything at
-  0.000 mm³; moved +10.03 in y onto the wing the same probe reports
-  1.198. Arithmetic guards are worth having and are not evidence; prose
-  is not even a guard.
-- **A boolean cannot see a trench, in either direction.** Interference
-  asks what two solids share, and a cut removes material, so a feature
-  standing *over* a channel and a membrane left *under* one both report
-  0.000 forever. The wire channel ran across both screw positions: the
-  counterbore's ceiling at z 1.00, the trench floor at 1.20, so 0.70 of
-  y was spanned by 0.20 of plate — one layer, printed over the bore,
-  under the seat the screw head bears on — and 0.45 of the shell's post
-  stood on air beside it. `build.py` was green through all of it. **What
-  an interference check can find is material that should not exist; its
-  twin is material that should exist and does not, and that one is a
-  subtraction against the volume the part is required to fill** —
-  `_head_seat_probe()` builds the ring the screw head bears on and
-  subtracts the plate from it, watched failing at 0.790 mm³. Plan-view
-  floors sit beside it for the distance the boolean cannot report
-  (-0.455 on the screws, 0.005 on the columns), but the subtraction is
-  the evidence.
+  **1 — The stand-in was told the wrong thing.** All three boards had a
+  component face invented rather than read. The hot-swap socket was one
+  10.9 x 5.9 box and is a body *plus a solder wing off each end*, 15.9
+  across, and the wings are what a column runs into. The NeoKey had its
+  sockets and receptacles and nothing else -- 52 parts missing. The QT
+  Py's underside was one hand-written box with **24 of its 40 solids
+  outside it**. Two more shapes of the same thing: parts placed on the
+  wrong face (the STEP draws the switch on -z, the case puts it up, so
+  the component face mirrors left to right), and orientation decided
+  *per feature* instead of per board, which contradicted itself for six
+  rounds until `BOARD_FLIP_X`/`BOARD_FLIP_Y` became the single fact.
+  And the deepest part is never the one you remember: `SOCKET_CLEARANCE`
+  reasoned from the socket's 1.85 while a STEMMA receptacle hangs 2.96,
+  and the printed case closed on a NeoKey pressed 0.16 into the plate.
 
-  **And the subtraction has a boundary, which is the next place to get
-  this wrong.** A trench also meets things cut from the *other* face and
-  leaves a membrane between them: the left +y foot's recess comes up 0.50
-  under a channel going down 1.20, so 0.70 of plate spans an Ø8.00
-  pocket. The material is *there* — it is thin — so the required-volume
-  probe reports 0.000 and means nothing, and only a thickness says
-  anything (watched failing at 0.200 with `FOOT_RECESS` doubled).
-  Reaching for the shiny new check because it worked last time is the
-  same disease as trusting the arithmetic one, moved up a level.
-- **A case-space constant describes one layout.** `WIRE_LANE_Y` was
-  written as a pair of case-space numbers off an `inline` scan. `stacked`
-  seats the field 0.805 further back, so the same trench went 0.400 into
-  a NeoKey column there while `inline` stayed green — and the fault was
-  in the layout nobody prints, which is how it would have kept. Anything
-  positioned relative to the boards belongs board-local with
-  `FIELD_ORIGIN` applied once; the tell that it worked is the margin
-  coming out identical in both layouts.
+  So every board's face is now a table generated from its STEP --
+  `BREAKOUT_BACK_PARTS`, `NEOKEY_BACK_PARTS`, `QTPY_UNDER_PARTS` --
+  mirrored once through `_face_flip` on the way into case space, and
+  written as the file writes them so they can be checked against it.
+  Watched to fail: the old supports against the real socket 15.659 mm³,
+  a pad left on the pre-mirror side 1.672 mm³, and a rail moved onto a
+  QT Py component 0.014 mm³ where the old box stayed at 0.000.
+
+  **2 — Nothing was measuring it.** An M3 post landed on a Qwiic plug
+  while the margin meant to prevent that read green, because it measured
+  to the board edge and the plug stands past it. Worse, a *sentence* can
+  stand in for a check: "a mated plug stands 2.50 proud and a butted
+  breakout's switch body starts 2.525 -- 0.025, the tolerance" held in
+  three files for weeks. The plug hangs below the board and the switch
+  stands above it, so that pair was never in the same space. **A number
+  borrowed from a sentence that is true does not bring the truth with
+  it** -- 0.025 is right where it was written, about a standoff and a
+  switch, and it was carried across a Z boundary it does not cross.
+  Booleaned, that plug clears everything at 0.000 mm³; moved +10.03 in y
+  onto the socket wing the same probe reports 1.198. Arithmetic guards
+  are worth having and are not evidence; prose is not even a guard.
+
+  **3 — The question has a shape the check cannot take.** Interference
+  asks what two solids *share*, so a cut is invisible to it in both
+  directions: a feature standing over a trench and a membrane left under
+  one both report 0.000 forever. The wire channel ran across both screw
+  positions, leaving 0.20 of plate spanning the counterbore -- one layer,
+  over the bore, under the seat the screw head bears on -- with 0.45 of
+  the shell's post on air beside it.
+
+  The twin of an interference check is a **subtraction against the volume
+  the part is required to fill**: `_head_seat_probe()` builds the ring the
+  head bears on and subtracts the plate from it, watched failing at
+  0.790 mm³. Plan-view floors sit beside it for the distance a boolean
+  cannot report (-0.455 to the screws, 0.005 to the columns).
+
+  **And the subtraction has its own blind spot**, which is the next place
+  to get this wrong: material that is present but *thin*. The feet's
+  recesses come up 0.50 under a channel going down 1.20, so 0.70 of plate
+  spans an Ø8.00 pocket -- the required-volume probe reports 0.000 and
+  means nothing, and only a thickness says anything (watched failing at
+  0.200 with `FOOT_RECESS` doubled). Reaching for the check that worked
+  last time is the same disease as trusting the arithmetic one, a level
+  up.
+
+  **4 — The feature is not in the part.** A cut placed inside a void does
+  nothing: a chamfer written below the counterbore top would have printed
+  two identical coupon rows while the experiment concluded that
+  chamfering does not help. And a feature added before a trim is deleted
+  by it: a skirt below `Z_FLOOR` was removed on every build for three
+  rounds by `shell()`'s closing `part = part & outer`. Both times the
+  part was valid, the checks passed and the render looked right. A check
+  asks whether the part is valid; it cannot ask whether it is the part
+  you meant. **When a feature is meant to change a shape, measure the
+  shape** -- a probe asking two rows to disagree at a stated height, or a
+  volume before and after (the pad pocket removes 27.80 mm³, the sliver
+  beside it 2.76).
+
+  **5 — The check drifted off the geometry.** Two shapes. Positioned
+  *from the thing it measures*: the coupon's clearance label sits 1.00
+  from the counterbore rim, so a margin on that gap read 1.000 forever
+  and could never go red; what replaced it measures whether the label
+  still lands on the pad, failing at -4.327 with `LABEL_SIZE` at 12.0.
+  And measuring a feature *that no longer exists*: "board columns inside
+  the cavity" used `COLUMN_DIA` for every column after the field pads got
+  their own smaller one. **Whenever a constant stops being the only one
+  of its kind, grep the checks for it.**
 - **Prove a check fires before trusting it**, and **inject the fault by
   moving geometry, not by shrinking it to nothing.** A zero-width `Box`
-  makes OCCT throw, so the build dies before the check ever runs and the
-  test proves nothing. Injections also have to isolate one thing: growing
+  makes OCCT throw, so the build dies before the check runs and the test
+  proves nothing. Injections also have to isolate one thing: growing
   `QTPY_LIP` to reach a button grew its height too and tripped a
-  different check entirely. Moving the feature 60 mm sideways, or setting
-  one diameter past its limit, keeps the fault where it was aimed.
-  Watched-to-fail numbers so far: cable notch 28.4 mm³, rail over a
-  button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
-  3.8 mm³, a breakout support column moved back onto its second
-  mounting hole 5.675 mm³, the seam standoffs shifted half a pitch onto
-  the switches 26.260 mm³, and the breakout pegs grown from PEG_DIA to
-  COLUMN_DIA 64.796 mm³.
-- **A hole above a counterbore is a ring printed over air.** Ø6.10 of
-  counterbore under the Ø3.55 hole of the day leaves 1.275 mm unsupported
-  all the way round; it sags into the top of the bore, and the printed
-  coupon has filament in every hole. The built bottom plate has the same
-  feature, so this is a better candidate than hole shrink for why the
-  clearance holes guide the screw instead of clearing it. `coupon-clear`
-  prints the row twice, `C0.00` and `C0.60`, identical diameters
-  differing only in the transition, because a diameter sweep alone would
-  have found a number that works and left the reason unknown -- the same
-  answer a wrong theory gives. **Both explanations were right and neither
-  was the variable.** The eight holes sort by the ring left unsupported,
-  `(SCREW_HEAD_DIA - dia) / 2 - chamfer`: clean at 0.600 and below, a
-  little sag at 0.675, filament in the bore at 0.750 and up. So 0.60 is
-  this machine's limit for an annular ceiling printed over air --
-  `CLEAR_RING_MAX`, the same kind of constant as the 0.15 shrink -- and
-  the plate is now Ø3.70 chamfered 0.60, landing exactly on it. That ring
-  is also the screw head's seat, so it is the one dimension here with a
-  maximum as well as a minimum, and `build.py` checks it outside the
-  margins table because that table can only express floors.
-- **A feature can be absent from a valid part, and nothing says so.**
-  Twice, by two different mechanisms. A chamfer written *below* the
-  counterbore top cut into space the counterbore had already removed, so
-  the two coupon rows would have printed identical while the experiment
-  concluded that chamfering does not help. And a skirt built below
-  `Z_FLOOR` was deleted on every build for three rounds by `shell()`'s
-  closing `part = part & outer`, because `outer` starts at `Z_FLOOR`.
-  Both times: no error, `all checks passed`, a render that looked right,
-  and the part simply did not have the thing in it. A check asks whether
-  the part is *valid*; it cannot ask whether it is the part you meant.
-  **When a feature is meant to change a shape, measure the shape** -- a
-  probe asking two rows to disagree at a stated height, or a bounding
-  box. One line either way, and it is the only thing that catches this.
-- **A check drifts away from the geometry it was written for, and goes
-  on reporting.** Two shapes of it. One: a check *positioned from the
-  thing it measures* -- the coupon's clearance label sits 1.00 from the
-  counterbore's rim, so a margin on that gap reported 1.000 forever and
-  would have through any change. It was added and deleted, because a
-  guard that cannot go red reads as coverage; what replaced it measures
-  the part that is not derived, whether the label still lands on the pad,
-  watched failing at -4.327 with `LABEL_SIZE` at 12.0. Two: a check
-  measuring a feature *that no longer exists* -- "board columns inside
-  the cavity" used `COLUMN_DIA` for every column after the field pads had
-  been given their own smaller one, and put a pad 0.06 outside the cavity
-  that is really 0.44 inside it. Whenever a constant stops being the only
-  one of its kind, grep the checks for it. Same disease as the standoff
-  story, caught one step earlier.
-- **The standoff story is the reason for "prove a check fires".** Named
-  rather than pointed at: this bullet used to say "the rule above", and
-  the list has grown three times since, each insertion quietly moving
-  what "above" meant. Its diameter was cut on the stated grounds that
-  the check had flagged it, and it never had -- the 0.009 mm³ came from
-  the plate-hole corner instead. A check nobody has watched fail proves
-  nothing, and a *credited* catch that never happened is worse, because
-  it launders the reasoning that came with it.
-- **A diff cannot show a contradiction**, because a contradiction is a
-  relationship between two places and a diff only ever shows one of them.
-  This section introduced the pilot mouth as derived from
-  `SCREW_CLEAR_DIA` and, three paragraphs later, explained that the
-  derivation had been broken and the number pinned. Both sentences were
-  correct in the commit that wrote them; they landed a round apart, and
-  neither commit's diff contained the other. So: **when two commits a
-  round apart touch the same section, review the section, not the
-  diffs.** The reader who can see it is one going end to end with no
-  memory of which round wrote what -- which is not a skill but a
-  position, and the author never has it. Worth deliberately taking, or
-  handing to someone who already has it.
+  different check. Moving a feature 60 mm sideways, or setting one
+  diameter past its limit, keeps the fault where it was aimed. Restore
+  from a copy, never from git.
 
-  The general form, which is the useful half: **a reference is only as
-  stable as the thing it points at is named.** Position is a property of
-  the document, not of the fact. Every "see above", "the rule below" and
-  "the bullet after this one" in here has been replaced with the name of
-  what it means -- four of them, all correct on the day they were
-  written, none of them robust to the next insertion.
+  This rule exists because of the standoff: its diameter was cut on the
+  stated grounds that the check had flagged it, and it never had -- the
+  0.009 mm³ came from the plate-hole corner. **A credited catch that
+  never happened is worse than no catch**, because it launders the
+  reasoning that came with it.
+
+  Watched-to-fail so far: cable notch 28.4 mm³, rail over a button
+  68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed 3.8 mm³, a
+  breakout support column back onto its second hole 5.675 mm³, seam
+  standoffs shifted half a pitch onto the switches 26.260 mm³, breakout
+  pegs grown to `COLUMN_DIA` 64.796 mm³, the wire channel over the screws
+  -0.455 and the columns 0.005, the head seat 0.790 mm³, the plate under
+  the channel 0.200, and a column against a board's components 0.141 at
+  `FIELD_SUPPORT_DIA` 3.50 and 0.191 at 3.40.
+- **Measure before fixing, not after.** Two faults in one afternoon came
+  from believing a diagnosis and acting on it. The viewer's elevation was
+  clamped 0.0011 rad short of the pole with a comment saying the view
+  matrix collapsed there; it does not, and running the old and new side
+  by side gave *identical* numbers -- the residual in `Math.cos(PI/2)`
+  carries the right direction and the normalise recovers a unit vector
+  from it. Then the quaternion composition order was derived on paper and
+  was wrong the other way. Both were caught by a measurement that took
+  one call, after a rewrite that did not need to happen. **A comment
+  saying something is broken is a claim, not a finding.**
+- **Two places that derive the same edge will disagree.** The QT Py rail
+  starts at a clamped 14.714 and the pocket cut into it was written as a
+  fixed offset from the pad row, 14.910 -- 0.196 apart, under half an
+  extrusion, a hair rather than a wall. Nothing related the two numbers.
+  `_clear_strips()` is the one place the clamp happens now and the cut
+  takes its edge from there, so the sliver cannot exist at any value.
+- **A case-space constant describes one layout.** `WIRE_LANE_Y` was a
+  pair of case-space numbers off an `inline` scan. `stacked` seats the
+  field 0.805 further back, so the same trench went 0.400 into a NeoKey
+  column there while `inline` stayed green -- the fault living in the
+  layout nobody prints, which is how it would have kept. Anything
+  positioned relative to the boards belongs board-local with
+  `FIELD_ORIGIN` applied once; the tell is the margin coming out
+  identical in both layouts.
+- **A diff cannot show a contradiction**, because a contradiction is a
+  relationship between two places and a diff shows one. This section once
+  introduced the pilot mouth as derived from `SCREW_CLEAR_DIA` and, three
+  paragraphs later, explained that the derivation had been broken; both
+  sentences were correct in the commit that wrote them. It has since
+  happened twice more -- `README.md` naming two different power taps a
+  round apart, and the spec demanding a meter three sections above an
+  entry saying the measurement was never needed. **When two commits a
+  round apart touch the same section, review the section, not the
+  diffs.** The reader who can see it is going end to end with no memory
+  of which round wrote what, which is a position rather than a skill.
+
+  The general form: **a reference is only as stable as the thing it
+  points at is named.** Position is a property of the document, not of
+  the fact. Every "see above" in here has been replaced by the name of
+  what it means.
 - **Look for the STEP before assuming there isn't one.** `BREAKOUT_T`
   sat as a documented guess -- "Adafruit publishes no STEP for this
   board" -- through a whole session, and they publish one, in the same
@@ -273,6 +254,14 @@ one, not necessarily the only one.
   support columns dodge is measured now instead of carried over. The
   guess was right to three decimals, which is exactly why it survived:
   nothing downstream ever disagreed with it.
+- **A wall can fit the board and still make the case impossible to
+  wire.** Four times: both Qwiic sockets, the USB port, and the QT Py's
+  pocket frame, which surrounded the board so a wire soldered to JP3 had
+  nowhere to go. Every one was found by a person looking at the assembly
+  or the section, never by a check -- the boards fit, so nothing was red.
+  The way to ask is to lay a wire-sized box where a wire has to run and
+  boolean it: 34.501 mm³ against the shell along one route, 10.240 along
+  the one actually taken, 0.000 after the notch.
 - **A part added to `mock.everything()` reaches four files, and three of
   them fail loudly only if you run them.** `build.py` picks the new part
   up on its own; `section.py` has its own colour table keyed by the mock's
@@ -336,86 +325,62 @@ they cover different halves:
   "top"]').click()`), screenshot, and check `list_console_messages` for
   errors. Four real rendering bugs were found this way and none of them
   raised an error, so the screenshot is the test, not the console.
+  The console is not decoration either: it caught the whole viewer
+  throwing before it drew anything, because the state block sets the
+  opening camera and sat above helpers declared as `const` arrows -- a
+  temporal dead zone. They are function declarations for that reason.
+- **The page had no doctype and rendered in quirks mode from the day it
+  was written.** Every dimension tuned in that rail was tuned against the
+  old box model. `document.compatMode` reads `CSS1Compat` now; check it
+  after any change to the head.
+- **The camera is a quaternion, not two angles**, because two angles lose
+  a degree of freedom at the poles. Drags rotate it about the camera's
+  own axes and the increment goes on the **right** of the product --
+  `qBasis` returns the world-to-camera rows, which is its transpose, so
+  composing on the left applies the drag in world space and a horizontal
+  drag from the front turns the model about the wrong axis. Both were
+  settled by measuring which world axis the model turns about and
+  comparing against the turntable this replaced: right-drag [0,0,1],
+  down-drag [1,0,0]. A thousand steps over the pole leave the basis unit
+  to 8.9e-16, and the view direction moves at least 0.0364 every step --
+  against the old clamp it was exactly 0.
 
 ## Remaining on the case
 
-The `inline` case is printed and mostly proven on the real part. Settled
-by assembly: `SWITCH_HOLE` at 14.15 (a Durock Ice King seats right),
-`PEG_DIA` at 2.30 (the NeoKey drops on free with a little play),
-`QTPY_SLOP` at 0.40, and the USB-C port -- a real cable seats fully with
-about 1 mm around its housing, which matters because `USB_PLUG_W/H` were
-never measured off anything, just chosen generously.
+`inline` is the layout that exists as a physical object; `stacked` has
+never been printed. **The reasoning behind every settled number is in
+`case/README.md`** -- this is the state, not the story.
 
-`PILOT_DIA` is settled at **2.95**, on a coupon that carries one post per
-`PILOT_SWEEP` entry, engraved, driven with the same M3 minutes apart --
-2.50 is the tight one the built shell has, 2.95 is the one that bites
-without a fight. Every mouth also got a Ø3.40 x 0.60 lead-in so the screw
-has somewhere to start. That 3.40 was derived from `SCREW_CLEAR_DIA` when
-it was written and is a pinned number now -- the clearance hole moved
-and the derivation did not survive it, which the bottom plate's own
-paragraph covers.
+Settled on real parts: `SWITCH_HOLE` 14.15, `PEG_DIA` 2.30, `QTPY_SLOP`
+0.40, the USB-C opening, `PILOT_DIA` 2.95 with a Ø3.40 x 0.60 lead-in,
+and `SCREW_CLEAR_DIA` 3.70 with `CLEAR_CHAMFER` 0.60. The assembled
+six-key unit added two the model could not have: a breakout needs no
+locating peg (a plate-mount switch clips to the top plate and its pins
+go into the board's socket, so the switch ties the two together), and
+the field's outer edge has no seam to press on, which is what
+`EDGE_RIB_W` is for.
 
-Two things about 2.95 are worth keeping. It is **not** where the
-arithmetic pointed -- this machine pulls a hole in by ~0.15, the constant
-`SWITCH_HOLE` measures, so 2.95 arrives as ~2.80, which is 0.93x major
-against the 0.83x the tables want. The coupon outranks the tables here
-and that is the whole point of having one. And it won at the **top** of
-the sweep, so the stripping diameter was never found -- and is
-**deliberately not being looked for**, because finding it means driving
-screws into posts until they fail and the answer changes nothing. 2.95
-works, and the response to a strip is to come down from it, not to know
-where the cliff was. The failure mode is still real: this number lets go
-on the third opening rather than splitting a post on the first, and if
-that happens the sweep re-runs downward. The reprinted shell has 2.95 in
-it and the screw goes in clean.
+**The built case predates this round and has to be reprinted.** Since it
+came off the bed: `UNDER_BOARD_AIR` went 0.40 -> 1.40, so the case is
+13.33 rather than 12.33 and the boards have 4.36 under them; the wire
+channel appeared and then widened to 11.20; `FIELD_SUPPORT_DIA` went
+3.50 -> 3.00; and the QT Py gained pad reliefs and a notch out of its
+pocket. None of that is in the plastic on the desk.
 
-The 0.15 shrink then turned up a third time in the part nobody was
-looking at. **The bottom plate's screw holes are tight** -- Ø3.40 arrives
-as ~3.25 against an M3's 3.00, so they pass a screw while guiding it,
-which is not what a clearance hole is for. The first answer was 3.55 on
-the shrink arithmetic, and it was wrong -- see "a hole above a
-counterbore is a ring printed over air" -- and
-`SCREW_CLEAR_DIA` is now 3.70 with `CLEAR_CHAMFER` at 0.60. The built
-plate has since been reprinted at 3.70 with the chamfer and it is
-right -- clean bores, no filament in them, screws going in easily -- so
-this is proven on a part and not only on a coupon. Widening it also
-broke a derivation: `PILOT_MOUTH_DIA` used to read `SCREW_CLEAR_DIA`,
-on an argument that only held while the two happened
-to agree, and it is now pinned at 3.40 because what the funnel has to
-catch is the screw tip, not the plate's hole. `build.py` gained
-"counterbore ring under the head" at the same time, since widening the
-clearance hole eats the ring the head bears on and nothing else would
-have noticed.
+Open:
 
-The coupon now settles that one too: `CLEAR_SWEEP` is a second row, on a
-pad raised to the real `BOTTOM_T` with the counterbore on the **bed**
-face where `bottom()` puts it. Both details are load-bearing -- a hole is
-as free as the number of layers it passes through, and printed
-counterbore-up the through-hole would start at the squashed first layer
-and read tighter than the plate it stands in for. Its labels are on that
-same face and mirrored, because a face is seen from the other side once
-the part is in your hand. Two things this cost, both worth remembering:
-the label position is derived from the counterbore's rim rather than the
-pad edge, after a fixed offset put the top of the digits exactly on it;
-and `coupon_layout()` exists because a probe holding its own copy of the
-row positions kept measuring where the posts used to be, passing every
-"this hole is open" assertion by finding nothing at all.
+- `SEAM_SNAP_HOOK`. `out/inline/coupon-seam.stl` carries one pair per
+  `SEAM_SNAP_SWEEP` entry and takes minutes; the one that clicks on and
+  needs a deliberate pull is the answer. **Print this before the case**,
+  or the case gets printed twice.
+- `QTPY_STEMMA_NOTCH` at 1.00 works but the Qwiic plug takes some
+  working at; a reprint would want 1.5-2.0.
+- The Ø8 feet sit under the wire channel and leave 0.70 of plate over
+  their recesses. Nothing moves -- a Ø8 foot at y ±5.99 in a 25.99 case
+  cannot clear a channel reaching ±5.60, and the feet are where they are
+  so it does not rock -- so the number is the answer and
+  `plate left under the wire channel` holds it.
 
-The first assembled six-key unit settled two things the model could not.
-**A breakout needs no locating peg**: a plate-mount switch clips into the
-top plate and its pins go into the socket on the board, so the switch is
-what ties the two together -- the supports set the height and the shell
-presses down, and a peg carries nothing. They are gone, and with them the
-0.362 to the socket at the back-right hole and the only feature that made
-the board look like it had a wrong way round. **And the leftmost breakout
-was pressed on one side only**, because a seam is between two boards and
-the field's outer edge has none; `EDGE_RIB_W` is the plate reaching down
-along that edge, since a 4.20 standoff does not fit in the 2.525 a board
-has from its edge to its own switch body.
-
-Also noted: the Qwiic plug goes into the `inline` pocket but takes some
-working at, which is `QTPY_STEMMA_NOTCH` at 1.00 and would want 1.5-2.0
-on a reprint. `stacked` has not been printed at all.
 
 ## Editing the firmware
 
