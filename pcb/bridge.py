@@ -65,6 +65,23 @@ def execute(js, timeout=60.0):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             payload = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        # The bridge signals an EasyEDA-side JavaScript fault (or "no
+        # window connected") with a non-2xx status whose body still
+        # carries the real message -- the status code alone reads like a
+        # transport problem, but the fault text is sitting right there.
+        # urlopen() raises before that body is read, so read it back out
+        # rather than let it be discarded as "HTTP Error 500: ...".
+        # HTTPError is a URLError subclass, so it must be caught first.
+        message = None
+        try:
+            body = json.loads(e.read().decode())
+            message = body.get("error")
+        except (ValueError, UnicodeDecodeError, AttributeError):
+            pass
+        if message:
+            raise BridgeError(message) from e
+        raise BridgeError(f"transport failed: {e}") from e
     except (urllib.error.URLError, OSError) as e:
         raise BridgeError(f"transport failed: {e}") from e
     if not payload.get("success"):
