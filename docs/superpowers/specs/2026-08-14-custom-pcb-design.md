@@ -433,22 +433,25 @@ Ordered so that nothing expensive waits on something cheap.
 
 ## Open, deliberately
 
-- **The LED's aperture, not its package.** The part is settled and so is
-  the mount style, and that turned out to move the question rather than
-  answer it. A reverse-mounted pixel sits *under* the board and throws
-  light up through a hole in it, so the package never has to fit inside
-  a switch's window -- only the light does. What is unsettled is
-  therefore **where the hole goes**, and whether each of the three
-  housings is actually open above it.
+- ~~**The LED's aperture, not its package.**~~ **Closed, and not by
+  looking harder -- by copying.** The incumbent answer won: the NeoKey
+  1x4 puts its pixel **5.08 below the switch centre**, that board lights
+  these switches today, and Saqoosha confirmed the fit on the part.
 
-  Three windows disagree on position as well as size: 3535 on full MX,
-  2835 on GTMX at the offsets its drawing gives, 5.00 x 3.15 on Choc.
-  One hole has to serve all three or the board favours one switch.
+  Reading Adafruit's own `.brd` then corrected the shape as well as the
+  number. The opening is **not a round hole**: `NEO3535_REVERSE` draws a
+  **3.854 x 3.454 rectangle** on Eagle layer 46, the milling layer, with
+  its pads on layer 16 -- the reverse mount confirmed from the file
+  rather than from prose. A guess had put Ø3.00 there, wrong in shape
+  and size at once.
 
-  Settled by looking, and it costs nothing: **turn a GTMX and a Durock
-  and a Choc upside down and see where each one is open.** All three are
-  on the desk. The NeoKey's own LED position, 5.08 south of switch
-  centre, is the incumbent answer and the thing to check first.
+  That is why `pcb/` is now **CC BY-SA 3.0** while the rest of this
+  repository stays MIT: the key cell is a derivative of a CC BY-SA
+  board, and ShareAlike travels with it. `pcb/NOTICE.md` records what
+  was taken and what was left. The thing left behind is worth naming --
+  two of the NeoKey's four pixels sit 0.127 off their switch's x, which
+  is the chain's routing rather than a dimension, and cloning it would
+  have imported someone else's traces as geometry.
 
 - **Hot-swap socket stock at JLCPCB has not been checked**, and does not
   need to be. The sockets are hand-soldered after assembly on purpose,
