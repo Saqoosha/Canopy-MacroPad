@@ -10,6 +10,11 @@ from bridge import execute
 
 def placed_components():
     """Every component on the open PCB, in mil, sorted left to right."""
+    # The reference documents getState_X() / getState_Y() / getState_PrimitiveId()
+    # here, not plain properties. Confirmed live that both read the same values --
+    # protected in TypeScript is erased at runtime. If a future client stops
+    # exposing these fields, x/y go undefined, gaps go NaN, and the pitch
+    # assertion below fires instead of quietly passing.
     js = (
         "const all = await eda.pcb_PrimitiveComponent.getAll(); "
         "return (all || []).map(c => ({id: c.primitiveId, x: c.x, y: c.y}));"
