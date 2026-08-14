@@ -24,16 +24,43 @@ The six-key wired pad, built and working:
 The pad has to take three switches off the same board. Read out of the
 manufacturers' drawings, not product pages:
 
-| | full MX (Durock Ice King) | Outemu GTMX | Kailh Choc v1 |
+| | full MX (Durock Ice King) | Outemu GTMX | Kailh Choc **v2** |
 |---|---|---|---|
-| drawing | -- | GaoTe `PG618B65` | Kailh `CPG135001D01` |
-| plate cutout | 14.00 | **14.00** | 13.80 |
-| PCB to plate top | 5.00 | **5.00** | 2.20 |
-| plate thickness | 1.50 | **1.50** | 1.20 - 1.30 |
-| body above plate | ~10.0 | **7.00** | ~8.8 |
-| PCB pattern | Ø4.00 + 2 x Ø1.50 | **same** | Ø3.40 + 2 x Ø1.90 |
-| hot-swap socket | Kailh MX | **Kailh MX** | Kailh PG1350 |
-| LED window | 3535 | **2835** | 5.00 x 3.15 |
+| drawing | -- | GaoTe `PG618B65` | Kailh `CPG135301D01` |
+| **keycap stem** | MX cross | **MX cross** | **MX cross** |
+| plate cutout | 14.00 | **14.00** | **13.95 ± 0.05** |
+| PCB to plate top | 5.00 | **5.00** | **2.20** |
+| plate thickness | 1.50 | **1.50** | **1.30 ± 0.03** |
+| body | 14.80 sq | 14.80 sq | 15.00 sq |
+| PCB pattern | Ø4.00 + 2 x Ø1.50 | **same** | Ø5.00 + 2 x Ø1.20 + Ø1.60 |
+| hot-swap socket | Kailh MX | **Kailh MX** | Kailh PG1350, shared with v1 |
+| LED window | 3535 | **2835** | placed in the recommended layout |
+| travel | -- | 3.0, pre 1.2 | 3.2 ± 0.25, pre 1.3 ± 0.3, 50 ± 10 gf |
+
+**Choc v2 rather than v1, and the reason is the keycap.** The v2 swaps
+v1's 3.40 rectangular stem for a **5 mm MX cross**, so one set of
+keycaps covers all three switches and nothing has to be bought twice.
+It also means **19.05 is mandatory rather than merely convenient**: MX
+keycaps on Choc's own 18 x 17 spacing collide, so a board that offers
+MX caps has to be on MX pitch. This design already is, so the trap is
+avoided by construction and `SWITCH_PITCH` never becomes an axis.
+
+Its socket is the PG1350 one that v1 uses, so the switch choice does
+not add a part. Its footprint is its own -- 3 pins against v1's 5, and
+a centre hole that grows Ø3.40 to **Ø5.00** for the fatter centre pin
+-- which is what the combo footprint has to carry.
+
+**And its plate cutout nearly is the MX one already printed here.**
+13.95 plus this machine's 0.15 shrink lands at 14.10 against the 14.15
+that a Durock seats in: **0.05 apart, which is under the tolerance this
+printer works to.** Whether one hole serves both is a question for the
+coupon and not for arithmetic, but it is a much smaller question than
+two plates.
+
+What does differ is thickness. MX wants 1.50 and this case prints 1.60;
+Choc v2 wants **1.30**, and the switch's clips are what that number
+feeds. So the case axis reduces to two entries -- the plate's height
+above the board, and its thickness -- rather than a second geometry.
 
 **GTMX is MX below the plate and short above it.** Its cutout, its PCB
 pattern, its socket and its 5.00 are the numbers this case already has --
@@ -199,17 +226,29 @@ and the 3 mm GTMX saves is above the plate where the case ends.
 
 Derived from the switch:
 
-| | `mx` | `choc` |
+| | `mx` | `choc` (v2) |
 |---|---|---|
-| `SWITCH_HOLE` | 14.15 | 13.95 |
+| `SWITCH_HOLE` | 14.15 | 14.10 |
 | `PLATE_TOP_TO_PCB` | 5.00 | 2.20 |
 | `PLATE_T` | 1.60 | 1.30 |
 | `SOCKET_DROP` | 1.85 | 1.90 |
 | `CASE_H` | **12.25** | **9.50** |
 
 Both hole figures are nominal plus this machine's 0.15 shrink, the
-constant `SWITCH_HOLE` has always measured. 14.15 is settled on a printed
-part; 13.95 is arithmetic and goes to the coupon.
+constant `SWITCH_HOLE` has always measured. 14.15 is settled on a
+printed part; 14.10 is that arithmetic applied to a cutout read off
+Kailh's own drawing, and the coupon's job is now to find out whether
+the two are the same hole.
+
+```
+mx     2.40 floor + (1.85 socket + 1.40 air) + 1.60 board + 5.00  = 12.25
+choc   2.40 floor + (1.90 socket + 1.40 air) + 1.60 board + 2.20  =  9.50
+```
+
+`choc` is derivable because its 2.20 is measured rather than assumed.
+It is still not *built*: no Choc v2 has been on this desk, and 1.30 of
+printed plate holding a clip is the kind of claim only a coupon
+settles.
 
 `CASE_H` is derived, not chosen, and it is worth writing the sum out so
 it can be argued with:
@@ -415,13 +454,28 @@ Ordered so that nothing expensive waits on something cheap.
   need to be. The sockets are hand-soldered after assembly on purpose,
   so they cannot block an order.
 
-- **Choc's 2.20 was read off a drawing, and the drawing is a figure.**
-  It is the number the community uses and it is consistent with the
-  1.20 - 1.30 plate the same sheet calls for, but nothing here has
-  measured a Choc switch. `CASE_H` = 9.50 rests on it entirely. The `mx`
-  column does not -- its 5.00 is the number this case has been printing
-  against since the beginning, and the GTMX sheet independently agrees
-  with it.
+- ~~**Choc v2's whole column is unmeasured.**~~ **Closed on Kailh's own
+  drawing**, `CPG135301D01`, which is in the `keyboardio/
+  keyswitch_documentation` archive. The contested figure is settled and
+  both of the contestants were wrong: its plate slot is **1.30**, not
+  the 1.20 one source gave nor the 1.60 -- "the same as Cherry MX" --
+  that another did. Those two came from two answers by the same model,
+  hours apart, which is the cleanest argument available for reading the
+  drawing instead of collecting citations. The sheet is marked 临时版,
+  a provisional revision, so it is a primary source rather than a final
+  one.
+
+  What is still not measured is a **part**. Nothing about a printed
+  1.30 plate holding a clip follows from a drawing, and neither does
+  whether 14.10 and 14.15 are one hole.
+
+- **A low switch puts the pixel closer to the cap, and that is a new
+  failure mode rather than a smaller one.** Less distance means less
+  mixing, so a translucent cap shows the die as a hot spot instead of
+  an even glow. The fix is a diffuser -- roughly 0.6 of milky PLA -- and
+  the reason it belongs here rather than in a later polish pass is that
+  it is **height**, and height is what the low-profile build exists to
+  buy. Design the stack with it in place or find out after printing.
 
 - **The USB-C receptacle's 3.16 is a class figure, not a part.** No
   connector has been chosen, and the bottom-plate pocket is sized from
