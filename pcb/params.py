@@ -84,3 +84,38 @@ PIXEL_PADS = [                      # bottom side, 1.2 x 0.9 each
 # Do not copy the NeoKey's x nudge: two of its four pixels sit 0.127 off
 # their switch's x (chain routing, not a dimension). All six pixels here
 # share their switch's x exactly, so PIXEL_OFFSET_MM's x stays 0.0.
+
+# --- switch holes ----------------------------------------------------------
+# Offsets are from the switch centre, in mm, +y towards the board's back.
+#
+# The MX rows are MEASURED, out of Adafruit's own "NeoKey 1x4 QT I2C.brd" --
+# the board this project's working pad is built on. They are not derived from
+# a switch drawing, and the difference is not academic: a first pass written
+# from drawings had the pin drills at 1.50 (forgetting that the hot-swap
+# socket's barrel passes through, not just the switch pin) and omitted the
+# two plate-mount alignment posts entirely, which would have refused every
+# five-pin switch this pad uses.
+#
+# The Choc v2 rows are READ OFF Kailh's CPG135301D01 figure and have not been
+# checked against a part or a board. They are the weaker half of this table.
+#
+# The centre is Choc v2's Ø5.00 rather than MX's Ø3.9, because the hole only
+# has to clear a centre post -- the plate locates the switch -- so the larger
+# swallows the smaller and the reverse would not.
+SWITCH_HOLES = [
+    ("centre", (0.00, 0.00), 5.00),        # choc v2 drawing; MX board has 3.9
+    ("mx_pin_a", (-3.81, 2.54), 3.0635),   # measured
+    ("mx_pin_b", (2.54, 5.08), 3.0635),    # measured
+    ("mx_post_l", (-5.08, 0.00), 1.8135),  # measured, plate-mount alignment
+    ("mx_post_r", (5.08, 0.00), 1.8135),   # measured, plate-mount alignment
+    ("choc_a", (-5.00, 3.80), 1.20),       # drawing, unverified
+    ("choc_b", (5.00, 3.80), 1.20),        # drawing, unverified
+    ("choc_c", (0.00, 5.90), 1.60),        # drawing, unverified
+]
+
+# The Kailh socket's own solder pads, bottom side, measured off the same
+# board. These are what the socket is hand-soldered to after assembly.
+SOCKET_PADS = [
+    ((6.09, 5.08), (2.55, 2.50)),
+    ((-7.36, 2.50), (2.55, 2.50)),
+]

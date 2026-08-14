@@ -110,9 +110,12 @@ def verify_pixel_pairing(placed):
 
     This reads pairing off the document, not off what was asked for: a
     socket and its pixel share x exactly (PIXEL_OFFSET_MM's x is 0.0), so
-    each of the KEY_COUNT x-values must carry exactly two components, the
-    higher-y one the socket and the lower-y one the pixel, separated by
-    exactly -PIXEL_OFFSET_MM's y.
+    each of the KEY_COUNT x-values must carry exactly two components,
+    separated by exactly -PIXEL_OFFSET_MM's y. It does not determine which
+    of the pair is the socket and which is the pixel -- it only checks
+    `max(ys) - min(ys)` against the expected gap, so two components of the
+    same kind that happened to land that far apart would pass just as
+    silently as a correct pair.
     """
     want_gap = -params.mm_to_mil(params.PIXEL_OFFSET_MM[1])
     groups = {}
