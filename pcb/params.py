@@ -56,7 +56,31 @@ BOARD_LAYERS = 4
 # placing them. The library UUID is the local system library.
 LIB_UUID = "0819f05c4eef4c71ace90d822a990e87"
 DEV_MX_SOCKET = "96b68765c94c47e5851d5c1124075178"   # Kailh CPG151101S11
+DEV_PIXEL = "d9e1e1a9f4bb4f1e8bb56ab67689f9e6"        # SK6812MINI-E_C5149201,
+# matched on lib_Device.search("SK6812MINI-E") against LCSC_PIXEL below.
 
 # LCSC numbers for the BOM, from the spec.
 LCSC_RP2040 = "C2040"
 LCSC_PIXEL = "C5149201"          # SK6812MINI-E, reverse mount
+
+# --- the pixel ---------------------------------------------------------
+# Reverse-mount pixel under the board, shining up through an opening into the
+# switch's own window. Every number here is cloned from Adafruit's NeoKey 1x4
+# board file rather than chosen -- see pcb/NOTICE.md -- because that board
+# lights these exact switches today and Saqoosha has confirmed the fit on the
+# part.
+#
+# The opening is a RECTANGLE, not a round hole. That was the first thing a
+# guess got wrong here: Eagle layer 46 is milling, and NEO3535_REVERSE draws
+# a rectangle there spanning x -1.927..1.927 and y -1.727..1.727.
+PIXEL_OFFSET_MM = (0.0, -5.08)      # switch y 10.795 -> pixel y 5.715
+PIXEL_OPENING_MM = (3.854, 3.454)   # milled slot, from Eagle layer 46
+PIXEL_PADS = [                      # bottom side, 1.2 x 0.9 each
+    ((2.65, -0.75), (1.2, 0.9)),
+    ((2.65, 0.75), (1.2, 0.9)),
+    ((-2.65, -0.75), (1.2, 0.9)),
+    ((-2.65, 0.75), (1.2, 0.9)),
+]
+# Do not copy the NeoKey's x nudge: two of its four pixels sit 0.127 off
+# their switch's x (chain routing, not a dimension). All six pixels here
+# share their switch's x exactly, so PIXEL_OFFSET_MM's x stays 0.0.

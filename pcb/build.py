@@ -1,10 +1,12 @@
 # pcb/build.py
 """Build the key field and prove it landed where it was told to.
 
-Run with: python3 pcb/build.py [--inject]
+Run with: python3 pcb/build.py [--inject] [--inject-pixel]
 
---inject places the last socket half a pitch out. It exists so the check can
-be watched going red; a run that has only ever been green is not evidence.
+--inject places the last socket half a pitch out and --inject-pixel nudges
+one pixel's y off its switch's offset -- two distinct faults, so each check
+can be watched going red on its own rather than trusted from the other's
+failure. A run that has only ever been green is not evidence.
 """
 import os
 import sys
@@ -75,11 +77,74 @@ def place_sockets(inject=False):
     return xs
 
 
+def place_pixels(inject=False):
+    """One pixel per switch, at params.PIXEL_OFFSET_MM from its centre.
+
+    --inject-pixel nudges pixel 0's y off that offset while leaving its x
+    alone, so it fails the pairing check rather than the count -- a fault
+    distinct from place_sockets()'s, which moves an x.
+    """
+    dx = params.mm_to_mil(params.PIXEL_OFFSET_MM[0])
+    dy = params.mm_to_mil(params.PIXEL_OFFSET_MM[1])
+    xs = [params.mm_to_mil(x) + dx for x, _ in params.switch_centres_mm()]
+    y = params.mm_to_mil(params.SWITCH_Y) + dy
+    ys = [y] * len(xs)
+    if inject:
+        ys[0] += params.mm_to_mil(params.SWITCH_PITCH) // 4
+        print(f"INJECTED: pixel 0 moved to y={ys[0]}, the check must FAIL")
+    for x, py in zip(xs, ys):
+        js = (
+            f'const dev = {{libraryUuid: "{params.LIB_UUID}", '
+            f'uuid: "{params.DEV_PIXEL}"}}; '
+            f"const c = await eda.pcb_PrimitiveComponent.create("
+            f"dev, {TOP}, {x}, {py}, 0, false); "
+            "return c ? c.primitiveId : null;"
+        )
+        if not execute(js):
+            raise AssertionError(f"create returned nothing for x={x}, y={py}")
+    return list(zip(xs, ys))
+
+
+def verify_pixel_pairing(placed):
+    """Group every placed component by x and check each group is a pair.
+
+    This reads pairing off the document, not off what was asked for: a
+    socket and its pixel share x exactly (PIXEL_OFFSET_MM's x is 0.0), so
+    each of the KEY_COUNT x-values must carry exactly two components, the
+    higher-y one the socket and the lower-y one the pixel, separated by
+    exactly -PIXEL_OFFSET_MM's y.
+    """
+    want_gap = -params.mm_to_mil(params.PIXEL_OFFSET_MM[1])
+    groups = {}
+    for c in placed:
+        groups.setdefault(c["x"], []).append(c["y"])
+
+    if len(groups) != params.KEY_COUNT:
+        raise AssertionError(
+            f"expected {params.KEY_COUNT} x-groups, got {len(groups)}: "
+            f"{sorted(groups)}"
+        )
+
+    bad = []
+    for x, ys in sorted(groups.items()):
+        if len(ys) != 2:
+            bad.append((x, ys))
+            continue
+        gap = max(ys) - min(ys)
+        if gap != want_gap:
+            bad.append((x, ys))
+    if bad:
+        detail = ", ".join(f"x={x}: ys={ys}" for x, ys in bad)
+        raise AssertionError(f"pixel pairing: {detail} (wanted gap {want_gap})")
+    print(f"  [ok ] pixel pairing: {len(groups)} pairs, all gap {want_gap} mil")
+
+
 def main():
-    inject = "--inject" in sys.argv
+    inject_socket = "--inject" in sys.argv
+    inject_pixel = "--inject-pixel" in sys.argv
     open_project_pcb()
     probe.clear_components()
-    asked = place_sockets(inject)
+    asked = place_sockets(inject_socket)
     placed = probe.placed_components()
 
     if len(placed) != params.KEY_COUNT:
@@ -92,6 +157,16 @@ def main():
     print(f"  [ok ] positions: {got_xs}")
 
     probe.assert_pitch(placed, params.mm_to_mil(params.SWITCH_PITCH), "socket pitch")
+
+    place_pixels(inject_pixel)
+    placed_all = probe.placed_components()
+
+    want_total = 2 * params.KEY_COUNT
+    if len(placed_all) != want_total:
+        raise AssertionError(f"placed {len(placed_all)} total, wanted {want_total}")
+    print(f"  [ok ] total count: {len(placed_all)}")
+
+    verify_pixel_pairing(placed_all)
     print("\nall checks passed")
 
 
