@@ -718,6 +718,14 @@ def seam_coupon_layout():
         # features up. A snap tested in the wrong orientation is a snap
         # whose overhang printed differently from the one that ships.
         "wall_h": 6.0,
+        # A tab off the back of each shell fragment. It carries that
+        # fragment's number, because the barbs differ by 0.30 to 0.70 of
+        # protrusion on an otherwise identical 20 mm piece and there is
+        # no telling them apart by eye once they are off the bed. It is
+        # also somewhere to grip: the test is pulling a snapped pair
+        # apart, and there was nothing to hold.
+        "tab_d": 7.0,
+        "tab_t": 1.2,
     }
 
 
@@ -753,6 +761,13 @@ def seam_coupon():
                        y0 - skirt_t - hook, y0 - skirt_t,
                        L["wall_h"] + P.SEAM_STEP_H - P.SEAM_SNAP_H,
                        L["wall_h"] + P.SEAM_STEP_H)
+        # ...and the grip tab, with the number on it.
+        ty1 = y0 - P.WALL
+        ty0 = ty1 - L["tab_d"]
+        wall += _block(x - L["span"] / 2, x + L["span"] / 2,
+                       ty0, ty1, 0.0, L["tab_t"])
+        wall -= Pos(x, (ty0 + ty1) / 2, L["tab_t"] - 0.3) * extrude(
+            _label("%.2f" % hook), amount=0.4)
         part = wall if part is None else part + wall
 
         # --- the plate side: base, tongue, groove.
