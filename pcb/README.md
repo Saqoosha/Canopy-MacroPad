@@ -92,6 +92,97 @@ naming this exact fix.
   lands in the wrong place by a factor that isn't obviously wrong at a
   glance.
 
+## Schematic-side API traps (`schematic.py`)
+
+Everything above was learned placing sockets and pixels on the **PCB**.
+Building the RP2040 block on the **schematic** turned up a second, distinct
+set of traps, all confirmed live:
+
+- **`SCH_ManufactureData.getNetlistFile()` breaks permanently after
+  `createNetFlag()` or `createNetPort()`.** Not occasionally -- every time,
+  reproduced twice independently, on both calls. Before either is placed the
+  netlist reads fine (the very first read after a batch of edits can be
+  stale or `undefined`, but a short retry recovers it every time this was
+  watched). After either is placed, every subsequent `getNetlistFile()` call
+  on that document returns `undefined` forever, with no amount of retrying
+  or waiting fixing it -- only a full component clear does.
+  `schematic.py`'s `assert_nets()` reads the netlist once, early, for
+  everything that is a physical wire (QSPI, the crystal pair, VBUS, DVDD,
+  USB D+/D-, CC1/CC2), *before* placing any flag or port, and falls back to
+  `assert_nets_by_graph()` (a union-find over this file's own recorded wire
+  segments) for anything checked after that point.
+
+- **`eda.sch_PrimitiveComponent.getState_Component().uuid` is not the uuid
+  passed to `create()`.** EasyEDA clones the library device into the
+  project's own local library on placement and hands back *that* copy's
+  uuid from then on -- confirmed live: `params.DEV_RP2040` is
+  `"a550c651..."`, but the placed RP2040's own reported component uuid
+  reads `"a67eb1f3155fc4f9"`, 16 hex characters, unrelated-looking. The
+  netlist's `props.Device` field carries the same cloned uuid, not the
+  original. `params.LCSC_OF` matches on the netlist's `props.Supplier Part`
+  (the LCSC number) instead, which survives the clone unchanged.
+
+- **A placed part's Designator is assigned by placement order within its
+  own default prefix, not by anything this file controls.** The crystal
+  (`Y1` in this file's own naming) landed on Designator `"U4"`, not the
+  USBLC6-2SC6 -- EasyEDA numbers every `"U?"`-prefixed device (chips,
+  crystals, LDOs alike) in one shared counter, in the order they were
+  placed. Match components by LCSC number, not Designator.
+
+- **A pin placed exactly coincident with another primitive is not provably
+  on its net.** A `Ground`/`Power` net flag, or a net port, placed at the
+  exact same coordinate as a target pin, with no wire at all, creates
+  successfully and reads back at the right position -- but nothing in the
+  API distinguishes that from a symbol merely occupying the same pixel.
+  `getAllPinsByPrimitiveId()` on the flag itself shows it does have its own
+  real connection point; the fix is a short, real, two-point wire from the
+  flag's point to the target pin, not reliance on coincidence.
+
+- **`eda.sch_PrimitiveWire.create()`'s coincidence-based net inheritance
+  (rule 1 in its own doc comment: "if one endpoint lands on a primitive
+  with a net, follow it") does not populate `getState_Net()` the way an
+  explicit `net` argument does.** A stub wire from a net flag to a target
+  pin, created with `net` left `undefined` so it should inherit the flag's
+  declared net by coincidence, reads back `getState_Net() === ''` --
+  every time this was tried. The same stub, created with the net name
+  passed explicitly, reads back correctly. Pass `net` explicitly; do not
+  rely on inference from a touched flag or port.
+
+- **Two wires sharing any coordinate -- not just their nominal endpoints --
+  get silently merged into one wire object, and the merge can reassign
+  which net the combined object reports.** Confirmed via
+  `ISCH_PrimitiveWire.getState_Line()`: a wire object's line array showed
+  two unrelated 2-point segments concatenated together after two separate
+  `create()` calls happened to touch the same point. In the densest area
+  of this board (the ten 100 nF decoupling caps, all at the same y) a
+  handful of GND/3V3 flag stub wires ended up merged into the *other*
+  rail's wire object despite passing this file's own pin- and
+  segment-crossing checks -- meaning the merge criterion is not fully
+  captured by "does a registered pin or a previously-drawn segment sit on
+  this new segment", the check `schematic.py`'s `elbow()` and
+  `_find_clear_offset()` both use. `assert_power_flags()` samples a few
+  stub wires per rail with `getState_Net()` rather than trusting placement
+  alone, and reports (not silently swallows) any sample that came back on
+  the wrong net -- see its own docstring for the exact count on the last
+  run.
+
+- **A single-bend Manhattan route between two pins routinely passes
+  through a third, unrelated pin on the same crowded column or row, and
+  the collision is a real electrical short, not a cosmetic overlap.**
+  Every densely-pinned cluster on this board -- the RP2040's own 57-pin
+  symbol, the crystal's 4-pad footprint, the flash's two pin columns, the
+  USB-C connector's packed 12-signal column -- produced at least one
+  wiring attempt where both of the two "obvious" bend points landed on an
+  unrelated pin instead of empty space. `schematic.py`'s `elbow()` checks
+  every candidate route against every pin on the board
+  (`getAllPinsByPrimitiveId()`, read back once after placement) before
+  committing to it, and searches a widening set of detour offsets before
+  raising -- six pin columns needed that search before a route was found,
+  one (the crystal's boxed-in first pin, and the USB-C connector's
+  fully-packed 545-655 column) needed a hand-built path instead. A route
+  that "looks like" the obvious 3-point elbow is not evidence it avoids
+  every pin in between; only checking it against the actual pin list is.
+
 ## The RP2040 reference: GUI-only
 
 Raspberry Pi's Minimal Viable Board reference design needs to come in by
