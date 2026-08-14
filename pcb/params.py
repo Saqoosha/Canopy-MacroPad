@@ -55,7 +55,9 @@ BOARD_LAYERS = 4
 # EasyEDA library identifiers, found with lib_Device.search() and confirmed by
 # placing them. The library UUID is the local system library.
 LIB_UUID = "0819f05c4eef4c71ace90d822a990e87"
-DEV_MX_SOCKET = "96b68765c94c47e5851d5c1124075178"   # Kailh CPG151101S11
+DEV_CHOC_SOCKET = "f3e2517f939147fe98be0c77b26c4c09"  # Kailh CPG135001S30,
+# the Choc v1 hot-swap socket, shared by v2 -- no separate v2 part exists.
+# Footprint CONN-SMD_HOTPLUGPAKAGE__C9900010116, LCSC C9900010116.
 DEV_PIXEL = "d9e1e1a9f4bb4f1e8bb56ab67689f9e6"        # SK6812MINI-E_C5149201,
 # matched on lib_Device.search("SK6812MINI-E") against LCSC_PIXEL below.
 
@@ -65,57 +67,64 @@ LCSC_PIXEL = "C5149201"          # SK6812MINI-E, reverse mount
 
 # --- the pixel ---------------------------------------------------------
 # Reverse-mount pixel under the board, shining up through an opening into the
-# switch's own window. Every number here is cloned from Adafruit's NeoKey 1x4
-# board file rather than chosen -- see pcb/NOTICE.md -- because that board
-# lights these exact switches today and Saqoosha has confirmed the fit on the
-# part.
+# switch's own window. Every number here is off foostan/crkbd's
+# keyswitch_choc12_hotswap_1u + YS-SK6812MINI-E, not derived -- see the
+# design spec's "The cell, borrowed rather than derived" -- because the MX
+# cell this board used to clone from Adafruit's NeoKey 1x4 does not fit a
+# Choc switch and there is no Choc board in hand to measure directly. The
+# offset has two independent witnesses: 46 switch/pixel pairs on Corne's own
+# Choc board measure 4.737-4.749 along the key axis, and marbastlib's Choc
+# add-on carries an alignment arrow its author drew at 4.7.
 #
-# The opening is a RECTANGLE, not a round hole. That was the first thing a
-# guess got wrong here: Eagle layer 46 is milling, and NEO3535_REVERSE draws
-# a rectangle there spanning x -1.927..1.927 and y -1.727..1.727.
-PIXEL_OFFSET_MM = (0.0, -5.08)      # switch y 10.795 -> pixel y 5.715
-PIXEL_OPENING_MM = (3.854, 3.454)   # milled slot, from Eagle layer 46
-PIXEL_PADS = [                      # bottom side, 1.2 x 0.9 each
-    ((2.65, -0.75), (1.2, 0.9)),
-    ((2.65, 0.75), (1.2, 0.9)),
-    ((-2.65, -0.75), (1.2, 0.9)),
-    ((-2.65, 0.75), (1.2, 0.9)),
+# The opening is a RECTANGLE, not a round hole, same shape choice as the MX
+# cell it replaces -- Corne cuts 3.6 x 3.1 for this same SK6812MINI-E part.
+PIXEL_OFFSET_MM = (0.0, -4.74)      # switch y 10.795 -> pixel y 6.055
+PIXEL_OPENING_MM = (3.6, 3.1)       # milled opening, crkbd choc12_hotswap_1u
+PIXEL_PADS = [                      # bottom side, 1.7 x 0.825 each
+    ((2.8, -0.7), (1.7, 0.825)),
+    ((2.8, 0.7), (1.7, 0.825)),
+    ((-2.8, -0.7), (1.7, 0.825)),
+    ((-2.8, 0.7), (1.7, 0.825)),
 ]
-# Do not copy the NeoKey's x nudge: two of its four pixels sit 0.127 off
-# their switch's x (chain routing, not a dimension). All six pixels here
-# share their switch's x exactly, so PIXEL_OFFSET_MM's x stays 0.0.
+# All six pixels here share their switch's x exactly -- crkbd's own layout
+# has no chain-routing nudge to avoid copying, unlike the NeoKey's -- so
+# PIXEL_OFFSET_MM's x stays 0.0.
 
 # --- switch holes ----------------------------------------------------------
 # Offsets are from the switch centre, in mm, +y towards the board's back.
 #
-# The MX rows are MEASURED, out of Adafruit's own "NeoKey 1x4 QT I2C.brd" --
-# the board this project's working pad is built on. They are not derived from
-# a switch drawing, and the difference is not academic: a first pass written
-# from drawings had the pin drills at 1.50 (forgetting that the hot-swap
-# socket's barrel passes through, not just the switch pin) and omitted the
-# two plate-mount alignment posts entirely, which would have refused every
-# five-pin switch this pad uses.
+# MX and Choc hot-swap holes do not fit in one position -- the alignment
+# posts alone sit 0.42 mm apart where they need 1.86 -- so this board is
+# Choc v2 only and there is no combo footprint. Every row below is off
+# foostan/crkbd's keyswitch_choc12_hotswap_1u, not derived, because this
+# project has neither a Choc v2 board nor a Choc v2 switch in hand to
+# measure, and four separate figures read from drawings elsewhere in this
+# design turned out to be wrong in ways no arithmetic would have caught.
 #
-# The Choc v2 rows are READ OFF Kailh's CPG135301D01 figure and have not been
-# checked against a part or a board. They are the weaker half of this table.
+# A round hole's size is its diameter (mm). The v2 mount is not round: it
+# is an oblong slot, (width, height) in mm. EPCB_PrimitivePadHoleType has
+# exactly two shapes, ROUND and SLOT (see pcb/README.md) -- there is no
+# OVAL hole type, only an OVAL *pad* shape paired with a SLOT hole. So a
+# non-plated oblong hole is pad=["OVAL", w, h], hole=["SLOT", w, h], and
+# SLOT's length argument cannot go below its diameter argument (h >= w
+# here, so that never binds).
 #
-# The centre is Choc v2's Ø5.00 rather than MX's Ø3.9, because the hole only
-# has to clear a centre post -- the plate locates the switch -- so the larger
-# swallows the smaller and the reverse would not.
+# The centre is Choc v2's Ø5.00, sized to its switch's mounting boss --
+# a fatter centre pin than a plain switch pin, which is what the combo
+# footprint used to have to carry when this board still meant to take MX
+# too.
 SWITCH_HOLES = [
-    ("centre", (0.00, 0.00), 5.00),        # choc v2 drawing; MX board has 3.9
-    ("mx_pin_a", (-3.81, 2.54), 3.0635),   # measured
-    ("mx_pin_b", (2.54, 5.08), 3.0635),    # measured
-    ("mx_post_l", (-5.08, 0.00), 1.8135),  # measured, plate-mount alignment
-    ("mx_post_r", (5.08, 0.00), 1.8135),   # measured, plate-mount alignment
-    ("choc_a", (-5.00, 3.80), 1.20),       # drawing, unverified
-    ("choc_b", (5.00, 3.80), 1.20),        # drawing, unverified
-    ("choc_c", (0.00, 5.90), 1.60),        # drawing, unverified
+    ("centre", (0.00, 0.00), 5.00),           # switch mounting boss
+    ("pin_a", (0.00, 5.90), 3.00),            # switch pin
+    ("pin_b", (5.00, 3.70), 3.00),            # switch pin
+    ("post_l", (-5.50, 0.00), 1.90),          # alignment post
+    ("post_r", (5.50, 0.00), 1.90),           # alignment post
+    ("v2_mount", (-5.00, -5.15), (1.50, 2.00)),  # v2 mount, OVAL not round
 ]
 
-# The Kailh socket's own solder pads, bottom side, measured off the same
-# board. These are what the socket is hand-soldered to after assembly.
+# The Kailh socket's own solder pads, bottom side. These are what the socket
+# is hand-soldered to after assembly.
 SOCKET_PADS = [
-    ((6.09, 5.08), (2.55, 2.50)),
-    ((-7.36, 2.50), (2.55, 2.50)),
+    ((8.1, 3.7), (2.3, 2.6)),
+    ((-3.1, 5.9), (2.3, 2.6)),
 ]

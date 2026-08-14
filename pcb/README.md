@@ -55,7 +55,7 @@ naming this exact fix.
 - **`pcb_PrimitiveComponent.create()` takes a device, not a footprint.**
   The first argument is `{libraryUuid, uuid}` naming a *device* (symbol +
   footprint + 3D model bundled together, EasyEDA's unit of "a part"), not
-  a bare footprint UUID. `params.DEV_MX_SOCKET` and `params.DEV_PIXEL` are
+  a bare footprint UUID. `params.DEV_CHOC_SOCKET` and `params.DEV_PIXEL` are
   both device UUIDs, found with `lib_Device.search()` and confirmed live
   by placing them and reading the result back — not read off a footprint
   browser.

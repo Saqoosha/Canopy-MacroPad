@@ -67,7 +67,7 @@ def place_sockets(inject=False):
     for x in xs:
         js = (
             f'const dev = {{libraryUuid: "{params.LIB_UUID}", '
-            f'uuid: "{params.DEV_MX_SOCKET}"}}; '
+            f'uuid: "{params.DEV_CHOC_SOCKET}"}}; '
             f"const c = await eda.pcb_PrimitiveComponent.create("
             f"dev, {TOP}, {x}, {y}, 0, false); "
             "return c ? c.primitiveId : null;"
