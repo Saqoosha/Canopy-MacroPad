@@ -14,10 +14,14 @@ def placed_components():
     # here, not plain properties. Confirmed live that both read the same values --
     # protected in TypeScript is erased at runtime. If a future client stops
     # exposing these fields, x/y go undefined, gaps go NaN, and the pitch
-    # assertion below fires instead of quietly passing.
+    # assertion below fires instead of quietly passing. `layer` is read the
+    # same way, live-confirmed against getState_Layer() -- every check here
+    # used to ask where a thing is in x and y and nothing asked which side
+    # of the board it's on, which is exactly how a pixel placed on the
+    # wrong face passed every existing check.
     js = (
         "const all = await eda.pcb_PrimitiveComponent.getAll(); "
-        "return (all || []).map(c => ({id: c.primitiveId, x: c.x, y: c.y}));"
+        "return (all || []).map(c => ({id: c.primitiveId, x: c.x, y: c.y, layer: c.layer}));"
     )
     got = execute(js) or []
     return sorted(got, key=lambda c: c["x"])

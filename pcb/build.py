@@ -92,7 +92,13 @@ def place_sockets(inject=False):
 
 
 def place_pixels(inject=False):
-    """One pixel per switch, at params.PIXEL_OFFSET_MM from its centre.
+    """One pixel per switch, at params.PIXEL_OFFSET_MM from its centre, on
+    BOTTOM -- a reverse-mount pixel is soldered to the back and shines up
+    through the board's opening; on TOP it lights the inside of the case
+    instead. Adafruit's own Choc board (adafruit/Adafruit-NeoKey-CHOC-
+    Breakout-PCB) places both SW1 and LED1 with Eagle's MR0 (mirrored),
+    confirming this is true of the socket and the pixel alike, not just
+    the socket Fault 1 already fixed.
 
     --inject-pixel nudges pixel 0's y off that offset while leaving its x
     alone, so it fails the pairing check rather than the count -- a fault
@@ -111,7 +117,7 @@ def place_pixels(inject=False):
             f'const dev = {{libraryUuid: "{params.LIB_UUID}", '
             f'uuid: "{params.DEV_PIXEL}"}}; '
             f"const c = await eda.pcb_PrimitiveComponent.create("
-            f"dev, {TOP}, {x}, {py}, 0, false); "
+            f"dev, {BOTTOM}, {x}, {py}, 0, false); "
             "return c ? c.primitiveId : null;"
         )
         if not execute(js):
@@ -178,6 +184,28 @@ def verify_socket_pads(socket_components):
         f"  [ok ] socket pads: {len(socket_components)} sockets, both pads "
         f"within {SOCKET_PAD_TOLERANCE_MM} mm of crkbd's SOCKET_PADS"
     )
+
+
+def assert_component_layer(components, want_layer, label):
+    """Every component in the list must be on want_layer.
+
+    Fault 3: every check this project had asked where a component is in x
+    and y; none asked which side of the board it is on. A reverse-mount
+    pixel placed on TOP instead of BOTTOM passed count, position, and
+    pairing checks perfectly while lighting the inside of the case instead
+    of the keycap -- the component's origin was exactly where it should
+    be, on the wrong face. Applies to sockets and pixels alike, since both
+    are meant to live on BOTTOM (Fault 1's finding, for the socket;
+    Adafruit's own Choc board -- both elements carry Eagle's MR0, mirrored
+    -- for the pixel).
+    """
+    bad = [c for c in components if c["layer"] != want_layer]
+    if bad:
+        detail = ", ".join(
+            f"{c['id']} at ({c['x']}, {c['y']}) is on layer {c['layer']}" for c in bad
+        )
+        raise AssertionError(f"{label}: wanted layer {want_layer}, {detail}")
+    print(f"  [ok ] {label}: {len(components)} on layer {want_layer}")
 
 
 def verify_component_positions(placed):
@@ -377,6 +405,7 @@ def main():
 
     probe.assert_pitch(placed, params.mm_to_mil(params.SWITCH_PITCH), "socket pitch")
     verify_socket_pads(placed)
+    assert_component_layer(placed, BOTTOM, "socket layer")
 
     place_pixels(inject_pixel)
     placed_all = probe.placed_components()
@@ -387,6 +416,9 @@ def main():
     print(f"  [ok ] total count: {len(placed_all)}")
 
     verify_component_positions(placed_all)
+    sock_ids = {c["id"] for c in placed}
+    pixels = [c for c in placed_all if c["id"] not in sock_ids]
+    assert_component_layer(pixels, BOTTOM, "pixel layer")
 
     draw_board_outline()
     assert_within_outline()

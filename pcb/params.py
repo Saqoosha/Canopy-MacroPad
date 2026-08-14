@@ -76,8 +76,19 @@ LCSC_PIXEL = "C5149201"          # SK6812MINI-E, reverse mount
 # Choc board measure 4.737-4.749 along the key axis, and marbastlib's Choc
 # add-on carries an alignment arrow its author drew at 4.7.
 #
-# The opening is a RECTANGLE, not a round hole, same shape choice as the MX
-# cell it replaces -- Corne cuts 3.6 x 3.1 for this same SK6812MINI-E part.
+# A third source exists now, and it does not move this number: Adafruit's
+# own Choc board (adafruit/Adafruit-NeoKey-CHOC-Breakout-PCB) places SW1 at
+# (9.525, 9.525) and LED1 at (9.525, 4.826), which computes to a 4.699 mm
+# offset -- close to 4.7 but not equal to crkbd's 4.737-4.749, and the gap
+# is the LED package, not disagreement between sources. Adafruit's Choc
+# board uses a 3535 part (NEO3535_REVERSE); crkbd uses the 3528 SK6812MINI-E.
+# This board's DEV_PIXEL is the SK6812MINI-E (see LCSC_PIXEL below), the
+# same package crkbd uses, not the one Adafruit's Choc board uses -- so
+# crkbd's 4.737-4.749 is the source that matches this board's actual part,
+# and marbastlib's 4.7 sits between the two because it's a hand-drawn
+# alignment arrow, not a package-specific measurement. Do not "correct"
+# this to 4.7 or to 4.699 -- both are the right number for a different LED
+# package than the one this board actually places.
 PIXEL_OFFSET_MM = (0.0, -4.74)      # switch y 10.795 -> pixel y 6.055
 PIXEL_OPENING_MM = (3.6, 3.1)       # milled opening, crkbd choc12_hotswap_1u
 PIXEL_PADS = [                      # bottom side, 1.7 x 0.825 each
