@@ -1,52 +1,70 @@
-# What this board is derived from, and why it is licensed differently
+# What this board borrowed, and from whom
 
-`pcb/` is **CC BY-SA 3.0**, not MIT like the rest of this repository. The
-licence text is in `LICENSE` beside this file. `firmware/` and `case/` are
-unaffected and stay MIT.
+`pcb/` is **MIT**, like the rest of this repository. There is no separate
+licence file here any more — an earlier revision carried CC BY-SA 3.0 and
+the reason for it is gone. That story is at the bottom, because it is the
+useful part.
 
-## Why
+## Attribution
 
-This board's key cell is **cloned from the Adafruit NeoKey 1x4 QT I2C**
-(product 4980), whose PCB files Adafruit publish under CC BY-SA 3.0:
+The key cell — every hole, every pad offset, the pixel's position and its
+milled opening — is taken from **[foostan/crkbd](https://github.com/foostan/crkbd)**,
+the Corne keyboard, which publishes its PCB files under **CC BY-4.0**.
+Specifically from `pcbs/corne-chocolate/hotswap/corne-chocolate.kicad_pcb`
+and `pcbs/common/kbd/kicad-footprints/kbd.pretty/`.
 
-- https://github.com/adafruit/Adafruit-NeoKey-1x4-PCB
+CC BY-4.0 asks for attribution and does not impose ShareAlike, so this
+directory can be MIT. The attribution is not a formality: **this geometry
+is on a board that ships, and that is the only reason to trust it.**
 
-The NeoKey is the board this project's six-key pad was built on. It works,
-it has been assembled and used, and its arrangement is the reason the status
-colours in `README.md` are calibrated the way they are. Redesigning that
-from datasheets would mean re-deriving something already proven, and getting
-it subtly wrong is the likely outcome rather than the unlikely one — the
-first pass at this file's hole table, written from two switch drawings,
-had the pin drills at 1.50 where the real board uses 3.0635, and omitted
-the two plate-mount alignment posts entirely. A five-pin switch would not
-have seated.
+Cross-checked against [ebastler/marbastlib](https://github.com/ebastler/marbastlib),
+which arrives at the same pixel offset independently.
 
-CC BY-SA's ShareAlike term applies to derivative works, so a board that
-copies footprints and layout carries the licence forward. Attribution and
-ShareAlike are a small price for a cell that is known to seat a switch and
-light a keycap.
+## What was taken
 
-## What is cloned
+| | value | source |
+|---|---|---|
+| switch centre (boss) | (0, 0) Ø5.0 | `keyswitch_choc12_hotswap_1u` |
+| switch pins | (0, 5.9) and (5, 3.7), Ø3.0 | same |
+| alignment posts | (±5.5, 0) Ø1.9 | same |
+| v2 mount | (-5, -5.15), **oval** 1.5 x 2 | same |
+| socket pads | (8.1, 3.7), (-3.1, 5.9), 2.3 x 2.6 | same |
+| pixel offset | **(0, -4.74)** | measured across 46 switch/pixel pairs on the Choc Corne |
+| pixel opening | 3.6 x 3.1 | `YS-SK6812MINI-E`, Edge.Cuts |
+| pixel pads | (±2.8, ±0.7), 1.7 x 0.825 | same |
 
-Read out of `Adafruit NeoKey 1x4 QT I2C.brd`:
+The pixel offset is the one number with two witnesses. Corne's board
+measures 4.737-4.749 along each key's own axis across all 46 keys;
+marbastlib's Choc add-on carries an alignment arrow its author drew at
+4.7. Two designs with no shared author agreeing is the strongest evidence
+available short of a fabricated part.
 
-| | |
-|---|---|
-| switch pitch | 19.05 |
-| switch centre, y | 10.795 |
-| pixel centre, y | 5.715, i.e. **5.08 below its switch** |
-| `KAILH_SOCKET` pads | (6.09, 5.08) and (-7.36, 2.50), 2.55 x 2.5, bottom |
-| `KAILH_SOCKET` holes | Ø3.9 centre; Ø3.0635 at (2.54, 5.08) and (-3.81, 2.54); Ø1.8135 at (±5.08, 0) |
-| `NEO3535_REVERSE` opening | 3.854 x 3.454 milled rectangle (Eagle layer 46) |
-| `NEO3535_REVERSE` pads | (±2.65, ±0.75), 1.2 x 0.9, bottom |
+## What is not from crkbd
 
-## What is deliberately not cloned
+`SWITCH_PITCH` 19.05, `FIRST_SWITCH_X` 9.525, `SWITCH_Y` 10.795 and
+`KEY_FIELD_D` 21.59 are inherited from this project's own earlier pad,
+which was built on the Adafruit NeoKey 1x4. 19.05 is 0.75 inch and is the
+Cherry MX industry pitch rather than anyone's invention; 9.525 is half of
+it; the other two are measurements of a physical board. They are kept
+because the keycaps and the printed plate already work against them.
 
-- **The two pixels sitting 0.127 off their switch's x.** LED4 is at 9.652
-  against SW1's 9.525 and LED2 at 47.752 against SW3's 47.625, while the
-  other two are dead on. That is a routing nudge for the chain, not a
-  requirement, and copying it would carry someone else's trace layout in as
-  a dimension.
-- **The seesaw, its I2C address jumpers, and the STEMMA QT connectors.**
-  This board has an RP2040 and a USB-C receptacle instead.
-- **Four keys.** This one has six.
+## Why this file exists at all
+
+The first version of this cell was derived from switch drawings rather
+than borrowed, and it was wrong four times over. Two of those would have
+reached the fabricator:
+
+- The MX pin drills were sized for a switch pin at 1.50, where the real
+  board uses **3.0635** — the hot-swap socket's barrel passes through the
+  hole, not just the pin.
+- The two plate-mount alignment posts at ±5.08 were **omitted entirely**.
+  Every five-pin switch would have refused to seat.
+- The MX pin positions were read out of the package and used without
+  applying the board's **`MR0` mirror**, so they were flipped in x.
+- The pixel opening was guessed as a Ø3.00 round hole; it is a milled
+  rectangle.
+
+None of those is a mistake arithmetic would have caught, and all four
+disappear the moment the numbers come off something that works. That is
+the whole argument for borrowing, and this file is where the borrowing is
+declared.
