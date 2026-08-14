@@ -26,8 +26,8 @@ MULTI = 12   # EPCB_LayerId.MULTI; the enum object is absent from the bridge
 # can disagree by up to 0.5 + 0.5 = 1 mil, so 1 mil is the tolerance below
 # the smallest gap that still means "the same hole" -- and it stays far
 # under the table's smallest real gap between two different diameters
-# (Ø1.20 vs Ø1.60 is 16 mil apart), so it cannot mask an actually-wrong
-# drill.
+# (choc_c's Ø1.60 vs mx_post_l/mx_post_r's Ø1.8135 is 8 mil apart: 63 mil
+# vs 71 mil), so it cannot mask an actually-wrong drill.
 DIAMETER_TOLERANCE_MIL = 1
 
 

@@ -142,6 +142,41 @@ def verify_pixel_pairing(placed):
     print(f"  [ok ] pixel pairing: {len(groups)} pairs, all gap {want_gap} mil")
 
 
+def assert_drc():
+    """Run EasyEDA's own DRC and raise unless it comes back clean.
+
+    userInterface=true so a failure also leaves the bottom DRC panel open
+    with the actual error list, since the boolean alone does not say what
+    is wrong.
+    """
+    passed = execute("return await eda.pcb_Drc.check(true, true, false);")
+    if not passed:
+        raise AssertionError("DRC reported errors; open the PCB and read them")
+    print("  [ok ] DRC")
+
+
+def export_fabrication():
+    """Pull Gerber, BOM and pick-and-place from the open PCB and demand
+    each came back with bytes in it.
+
+    A `File` that EasyEDA declines to fill still round-trips as a truthy
+    object with a zero `.size` -- checking for the object's existence is
+    not the same claim as checking that it holds data, and only the
+    latter is what a fabricator can use.
+    """
+    js = (
+        'const g = await eda.pcb_ManufactureData.getGerberFile("canopy_macropad"); '
+        'const b = await eda.pcb_ManufactureData.getBomFile("canopy_macropad"); '
+        'const p = await eda.pcb_ManufactureData.getPickAndPlaceFile("canopy_macropad"); '
+        "return {gerber: g ? g.size : 0, bom: b ? b.size : 0, place: p ? p.size : 0};"
+    )
+    got = execute(js, timeout=120.0)
+    for name, size in got.items():
+        if not size:
+            raise AssertionError(f"{name} came back empty")
+    print(f"  [ok ] fabrication: {got}")
+
+
 def main():
     inject_socket = "--inject" in sys.argv
     inject_pixel = "--inject-pixel" in sys.argv
@@ -170,6 +205,10 @@ def main():
     print(f"  [ok ] total count: {len(placed_all)}")
 
     verify_pixel_pairing(placed_all)
+
+    assert_drc()
+    export_fabrication()
+
     print("\nall checks passed")
 
 
