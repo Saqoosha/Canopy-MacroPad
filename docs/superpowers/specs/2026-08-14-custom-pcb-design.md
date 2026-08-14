@@ -237,11 +237,13 @@ before anything is printed, and the mock has to gain the new board and
 lose three old ones. Every stand-in models the mated plug, not the
 connector, because that mistake has happened four times here.
 
-## The EDA tool, which is not settled yet
+## The EDA tool: EasyEDA
 
-Both candidates can be driven by an agent, and the question that
-separates them is the one this repository always asks: **can the result
-be read back and asserted, rather than looked at.**
+Both candidates were driven by an agent and measured against the
+question this repository always asks: can the result be read back and
+asserted, rather than looked at. **Both passed it.** The decision
+therefore turned on what neither of them proved about placement, and on
+one observation about this repository's own habits.
 
 ### KiCad, measured
 
@@ -266,11 +268,41 @@ Python. One trap, recorded because it cost a wrong diagnosis: a write to
 `/tmp` is killed by the sandbox with **SIGKILL and no traceback**, which
 reads exactly like a crash inside `pcbnew`.
 
-### EasyEDA, not yet run
+### EasyEDA, measured
 
-The English-language search for this returns third-party MCP servers
-whose write paths are beta or disabled. **They are the wrong tooling.**
-The real path is first-party and is a *skill*, not an MCP:
+Six **Kailh `CPG151101S11`** hot-swap sockets -- the exact part this
+board's BOM names, found in the library by its manufacturer number --
+placed through the API and read back from it:
+
+```
+xs:   [1000, 1750, 2500, 3250, 4000, 4750]
+gaps: [750, 750, 750, 750, 750]
+pass: true
+```
+
+750 mil is 19.05 mm exactly, and that row is this pad's key field. The
+check was **watched failing first**, at an injected 700, and the
+injected run also reported `clearedTo: 0` so it was measuring the new
+placement rather than surviving components.
+
+`pcb_ManufactureData` then produced a real Gerber: `[object File]`,
+9522 bytes. Beside it are `getBomFile`, `getPickAndPlaceFile`, and
+`placePcbOrder()` -- the order itself, from the API.
+
+Three things cost a round each and are worth carrying:
+`createProject()` is beta and returns `undefined` silently (use an
+existing project); enums are **not** in the execution context, so
+`EPCB_LayerId.TOP` throws and the documented literal `1` is what works;
+and `pcb_PrimitiveComponent.create` wants a **device**, not a footprint
+-- passing a footprint item fails with a destructuring error about a
+property the item plainly has.
+
+### Getting there, and the tooling that is not it
+
+The English-language search returns third-party MCP servers whose write
+paths are beta or disabled. **They are the wrong tooling**, and one of
+them was installed and removed here before the right one was found. The
+real path is first-party and is a *skill*, not an MCP:
 
 - `github.com/easyeda/easyeda-api-skill`, the `easyeda` org's own repo
 - extension `run-api-gateway.eext`, publisher `oshwhub-official`
@@ -287,12 +319,40 @@ PCB coordinates there are in **1 mil**, so the pitch is exactly 750
 units and rounding cannot be blamed for anything. Schematic coordinates
 are 0.01 inch; mixing the two misplaces parts by 10x.
 
-Known and unrun: whether placement can be **read back** through the same
-API, which is the half that decides this. Also unrun, and needed before
-an order: DRC, and manufacturing output with correct rotations.
-
 **Do not install a third-party EasyEDA MCP alongside the official
 bridge** -- they squat the same 49620-49629 range and fight.
+
+**The gateway needs a permission that its manifest does not request.**
+`run-api-gateway`'s `extension.json` has no `allowExternalInteraction`,
+so `eda.sys_WebSocket.register()` opens no socket at all until *Allow
+interactive with external* is ticked by hand in Extension Manager →
+Config. Until then the extension reports `Bridge not found` while a
+perfectly healthy bridge answers, and *Show at header menu* on the same
+panel is what makes its `API Gateway` → `Reconnect` menu exist. Two
+symptoms, one screen, and neither is a bug.
+
+### Why not KiCad, given it also passed
+
+KiCad placed `SW_Cherry_MX_1.00u_Plate` at 19.050000 exactly, read it
+back, was watched failing at 19.00, and exported Gerbers -- all headless
+with no GUI. It keeps two properties EasyEDA gives up: it runs without
+an application open, and its board is s-expression text, so `(at 28.575
+10.795)` is greppable and diffable. EasyEDA's project is a single
+SQLite `.eprj2`.
+
+That second loss is smaller than it looks, because **this repository
+already commits binary artefacts and keeps the source parametric.**
+`case/out/` holds STLs, STEPs and PNGs; what is reviewed is
+`params.py`. A `.eprj2` is that same shape of thing, and the reviewable
+source is the script that builds it -- which can hold `9.525 + n *
+19.05` and share it with `case/params.py`, exactly as intended.
+
+What EasyEDA has and KiCad does not is the back half: the socket in the
+BOM was in the library under its own part number, the fabrication
+outputs are native rather than a plugin, and the order can be placed
+from the API. The failures this board can actually suffer -- a
+footprint that is not the real part, a part not in stock, a rotation
+that turns six LEDs sideways -- all live there.
 
 ## Host tools and documentation
 
