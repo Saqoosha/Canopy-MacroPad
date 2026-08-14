@@ -69,6 +69,17 @@ naming this exact fix.
   silently: reading a nonexistent `holeDiameter` doesn't throw, it just
   reads `undefined` forever.
 
+- **`eda.lib_Symbol.get()` carries no pin data.** Its return's keys are
+  `name`, `libraryType`, `uuid`, `libraryUuid`, `classification`, `type`,
+  `description`, `subPartNames` — confirmed live, nothing resembling a pin
+  list or a pad-number-to-signal mapping anywhere in it. The instinct when
+  a question is "which pad is which signal" is to reach for the symbol,
+  since that's where a schematic tool would put it — it isn't here.
+  `params.PIXEL_PAD_SIGNALS` (the SK6812MINI-E's pad-number-to-signal
+  mapping `build.assert_pixel_signal_orientation()` checks against) comes
+  from the datasheet (LCSC C5149201) instead, because the library has
+  nowhere to get it from.
+
 - **PCB coordinates are 1 mil; schematic coordinates are 0.01 inch.**
   `params.mm_to_mil()` is the PCB-side conversion the whole placement
   pipeline runs on. The schematic side is a different unit entirely: a

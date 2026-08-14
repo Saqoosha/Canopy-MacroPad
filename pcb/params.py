@@ -101,6 +101,35 @@ PIXEL_PADS = [                      # bottom side, 1.7 x 0.825 each
 # has no chain-routing nudge to avoid copying, unlike the NeoKey's -- so
 # PIXEL_OFFSET_MM's x stays 0.0.
 
+# The SK6812MINI-E's pad-number-to-signal mapping. Cited source: the
+# datasheet for LCSC C5149201 (this board's own DEV_PIXEL part) --
+# eda.lib_Symbol.get() does not carry pin data (its keys are name,
+# libraryType, uuid, libraryUuid, classification, type, description,
+# subPartNames, confirmed live; see pcb/README.md), so this cannot come
+# from the library and has to come from the datasheet.
+PIXEL_PAD_SIGNALS = {
+    "1": "VDD",
+    "2": "DOUT",
+    "3": "GND",
+    "4": "DIN",
+}
+
+# The orientation this board's pixels must be placed in, as a sign pair
+# (x, y) per signal -- not a property of the part, a property of the
+# chain. Two independent reference boards agree on it: Adafruit's own
+# Choc board (adafruit/Adafruit-NeoKey-CHOC-Breakout-PCB) and crkbd both
+# put DOUT on +x and DIN on -x, so a chain running switch 0 through
+# switch 5 left to right feeds DOUT of one pixel straight into DIN of the
+# next. The reverse -- DOUT on -x, DIN on +x, which is what this board had
+# before this constant existed to check for it -- makes every hop double
+# back past its own component, six times over.
+PIXEL_SIGNAL_QUADRANT = {
+    "VDD": (1, -1),
+    "DOUT": (1, 1),
+    "GND": (-1, 1),
+    "DIN": (-1, -1),
+}
+
 # --- switch holes ----------------------------------------------------------
 # Offsets are from the switch centre, in mm, +y towards the board's back.
 #
