@@ -205,6 +205,22 @@ one, not necessarily the only one.
   -0.455 and the columns 0.005, the head seat 0.790 mm³, the plate under
   the channel 0.200, and a column against a board's components 0.141 at
   `FIELD_SUPPORT_DIA` 3.50 and 0.191 at 3.40.
+- **A sweep can only answer a question the mechanism can answer.** The
+  seam got a snap -- barbs on the shell's skirt into a groove round the
+  plate's tongue -- and a coupon sweeping the barb 0.30 to 0.70. All four
+  came back too weak, which reads as "sweep higher" and is not: the skirt
+  is 0.90 thick over a 1.20 free length, so even the shallowest hook asks
+  it for **19% surface strain where PLA yields near 2**. It never bent;
+  it was forced, which is why it fought going on and held nothing after.
+  A cantilever deflecting 0.40 inside 2% wants about 5 mm and the plate
+  is 2.40 thick, so no hook works and a taller sweep only finds a stiffer
+  press fit. **Two lines of beam arithmetic before the print would have
+  said so.** The snap is gone; the step aligns the halves and hides the
+  gap, which was the original complaint, and the next thing to try if the
+  centre lifts is a magnet pair rather than a plastic spring. A third
+  screw at mid-span is out for its own reason -- the boards fill the case
+  wall to wall there, 0.200 against the 5.60 a post needs, which is why
+  there are two screws and not three.
 - **Measure before fixing, not after.** Two faults in one afternoon came
   from believing a diagnosis and acting on it. The viewer's elevation was
   clamped 0.0011 rad short of the pole with a comment saying the view
@@ -360,12 +376,11 @@ go into the board's socket, so the switch ties the two together), and
 the field's outer edge has no seam to press on, which is what
 `EDGE_RIB_W` is for.
 
-**The built case predates this round and has to be reprinted.** Since it
-came off the bed: `UNDER_BOARD_AIR` went 0.40 -> 1.40, so the case is
-13.33 rather than 12.33 and the boards have 4.36 under them; the wire
-channel appeared and then widened to 11.20; `FIELD_SUPPORT_DIA` went
-3.50 -> 3.00; and the QT Py gained pad reliefs and a notch out of its
-pocket. None of that is in the plastic on the desk.
+**The six-key `inline` case is printed, assembled and closing**, at
+13.33 with 4.36 under the boards, an 11.20 wire channel, 3.00 field pads
+and the QT Py's pad pockets and wire notch. The wires have room. The one
+change since that print is the pad pocket running off the near end, which
+removes a rail stub the wires were bending round; it needs no reprint.
 
 Open:
 
