@@ -11,8 +11,14 @@ exactly one pitch wide with its switch centred in it. Which board a key
 sits on is invisible to the host: the protocol has one index space and
 the device reports its size.
 
-![The inline case, closed with keycaps on, and open with the NeoKey and
-the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
+![The four-key inline case, closed with keycaps on, and open with the
+NeoKey and the QT Py seated in the shell above the bottom
+plate](case/images/inline-built.jpg)
+
+**That photograph is the four-key print**, which is the pad that existed
+before the breakouts. The six-key `inline` case is printed, wired and
+closing; the photograph of *it* is the wiring shot further down, taken
+with the shell turned over. Nothing here is waiting on hardware.
 
 The enclosure is the `inline` layout, printed on a Bambu A1 mini. It is
 parametric, and it is also **[a model you can turn in a
@@ -415,17 +421,17 @@ Global brightness 60. Every period is 2000 ms; only the floor changes,
 and that is what separates "alive" from "answer me".
 
 **These values are tuned against a supply voltage nobody has written
-down.** The pixels sit on the incoming Qwiic rail rather than behind the
-NeoKey's regulator, so the number that produced this table is whatever
-the QT Py hands the cable, minus whatever 50 mm of thin Qwiic conductor
-drops under load. Until it is measured the whole table rests on a
-variable. Measuring it:
+down, and that is no longer a debt.** The pixels sit on the incoming
+Qwiic rail rather than behind the NeoKey's regulator, so the number that
+produced this table is whatever the QT Py hands the cable, minus whatever
+the wire drops under load. It was never metered — see
+[Hardware](#hardware): the voltage was only ever a proxy for whether the
+two halves of the keypad match, and six pixels side by side answer that
+directly. They do.
 
-```
-tools/mpad.py --load       # every key full white at brightness 100
-```
-
-Three things about that reading, each of which changes what it means:
+If a number is ever wanted anyway, `tools/mpad.py --load` puts every key
+at full white and brightness 100. Two things about that reading, each of
+which changes what it means:
 
 - **Probe at an LED's `VDD`, not at the QT Py.** The two differ by
   exactly the cable drop being looked for.
@@ -433,12 +439,6 @@ Three things about that reading, each of which changes what it means:
   is not the case that browns out. `--load` exists to produce the other
   one; the shipped brightness of 60 is not what the supply has to
   survive.
-- **Take it at four keys and again at six.** One number cannot separate a
-  cable drop from a regulator giving up; two can, because they fail
-  differently — a regulator at its limit lets go all at once, a cable
-  sags gradually and shifts colour on the way. If six reads much below
-  four, suspect the cable first: it is the cheapest thing in the stack to
-  replace, and a shorter or thicker one needs no redesign.
 
 What the bench actually taught, none of which was predictable on paper:
 
@@ -472,13 +472,16 @@ What the bench actually taught, none of which was predictable on paper:
   construction** — the grey-axis values are corrected individually
   instead, by eye, like every other colour here. The five saturated status
   colours need none of this.
-- **Some of the cast is per-LED, and that part is left alone.** With all
-  four keys set to one value, key 1 reads neutral while 0, 2 and 3 do
-  not. Correcting that needs a per-key gain table, which would be valid
-  for this one assembled unit and wrong for the next — so only the
-  systematic part is corrected, and the residual spread is accepted. Idle
-  is the one colour carrying no hue meaning, so a little variation in it
-  costs nothing.
+- **Some of the cast is per-LED, and that part is left alone.** On the
+  four-key pad, one of the NeoKey's four read neutral at a value the
+  other three did not; on six, one pixel reads faintly purple against the
+  rest. Same finding twice, and the second time it was checked against
+  the supply and cleared — that pixel is on the same node as its
+  neighbours, and they agree. Correcting it needs a per-key gain table,
+  which would be valid for this one assembled unit and wrong for the next
+  — so only the systematic part is corrected, and the residual spread is
+  accepted. Idle is the one colour carrying no hue meaning, so a little
+  variation in it costs nothing.
 - **Equal amplitude does not read as equal motion across hues.** Cyan sits
   near the eye's sensitivity peak and looks far brighter than blue, so the
   same modulation reads as less movement. Cyan's floor is 40 against
@@ -602,16 +605,20 @@ cables sold with phones carry no data pairs), a hub or dock passing power
 but not data, or a dead cable. Try a known-good data cable straight into
 the Mac before suspecting the board.
 
-## Phase 1 scope
+## Where this is
 
-Six keys, USB wired, status out and focus in. The enclosure was a later
-phase and arrived early: `inline` is printed and in use, `stacked` exists
-only as geometry. See [case/](case/).
+Six keys, USB wired, status out and focus in — **built, wired and in
+use.** The enclosure was meant to be a later phase and arrived early:
+`inline` is printed, assembled and closing, `stacked` exists only as
+geometry. See [case/](case/).
 
-The six-key half of what used to be Phase 2 is built in software and
-geometry and **has never been assembled** — the two 4978 boards are not
-bought yet, so nothing below the protocol has been seen working. The
-`inline` case in the photo above is the four-key one.
+What the assembled unit settled, none of which the model could have:
+both halves of the keypad read as the same white at `B 100`, so the
+Snap-Apart fallback is not needed; a breakout wants no locating peg,
+because the switch clips to the plate and ties the board to it through
+its socket; and the five wires needed a millimetre of case they did not
+have. The one thing still open is `QTPY_STEMMA_NOTCH` at 1.00, which
+works and is tight.
 
 The rest of the later phases — low-profile Choc switches, and wireless on
 a MagSafe charger — are sketched in

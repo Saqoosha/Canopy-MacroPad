@@ -86,12 +86,14 @@ because it is there as a load and a reservoir, not for runtime.
 Free height under the boards, measured off `params.py`:
 
 ```
-inline    2.80 floor-to-PCB, minus 1.85 of hot-swap socket  ->  0.95 free
+inline    4.36 floor-to-PCB, minus 1.85 of hot-swap socket  ->  2.51 free
 stacked   8.52 floor-to-PCB, minus 1.85                     ->  6.67 free
 ```
 
-`inline` cannot take a cell without growing. Every millimetre of cell
-thickness lands directly on the case height (`inline` is 11.77 today):
+`inline` gained a millimetre of that when the six-key unit was wired —
+`UNDER_BOARD_AIR` went 0.40 → 1.40 for the harness, not for a battery —
+and it still cannot take a cell without growing. Every millimetre of cell
+thickness lands directly on the case height (`inline` is 13.33 today):
 
 | cell | gap needed | case height |
 |---|---|---|

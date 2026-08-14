@@ -301,6 +301,20 @@ one, not necessarily the only one.
   .venv/bin/python webgl.py page                     # once, after both dumps
   ```
 
+  **A dirty `shell.stl` after a rebuild is not evidence of anything.**
+  The shell's exports are not byte-reproducible: two runs of unchanged
+  source give two different files, because OCCT emits its solids in a
+  different order each time. `shell.stl`, `shell.step`, `shell.png` and
+  `viewer.html` all churn; `bottom.*`, `sections.png` and the coupons do
+  not, which is what makes the shell look guilty. Sorting the triangle
+  table shows the two meshes agreeing to 0.0, same count, same volume,
+  same bounds -- that is the check to run before believing a geometry
+  changed. This was first read the other way round, as a commit that had
+  half-run the sweep, and written up as one; **`git status` said
+  "modified" and the reasoning went downhill from there.** Rebuild,
+  compare the geometry rather than the bytes, and `git checkout --
+  case/out/` when it matches.
+
   **Run the whole sweep after every geometry fix, not at the end of a
   batch of them.** Saqoosha reads the viewer, not the diff, and a fix he
   cannot see is a fix he has to take on trust -- which during a

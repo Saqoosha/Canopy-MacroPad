@@ -10,9 +10,10 @@ Print target: Bambu A1 mini, 0.4 nozzle, 0.2 layer, PLA Basic.
 Two layouts share this file, chosen with MPAD_LAYOUT:
 
   stacked             the QT Py lies under the keys, face down.
-                      97.6 x 27.6 x 17.5 -- compact and tall.
+                      135.7 x 27.6 x 17.49 -- compact and tall.
   inline   (default)  the QT Py sits beside the keys, face up, USB-C out
-                      the right edge. Long and low instead.
+                      the right edge. 158.6 x 25.99 x 13.33 -- long and
+                      low instead, and the only one ever printed.
 
 Everything above the "Derived" line is common to both; the split is only
 in where the QT Py goes and what that does to the Z stack.
@@ -1036,57 +1037,38 @@ BREAKOUT_HOLE_XY = [(ox + BREAKOUT_W - hx, oy + hy)
                     for ox, oy in BREAKOUT_ORIGINS
                     for hx, hy in BREAKOUT_HOLES]
 
-# Where the bottom plate holds a breakout up. Three of the board's four
-# corners, and the socket is what picks them: it spans 4.733 .. 15.633
-# across the board and 11.653 .. 17.553 up it, so a COLUMN_DIA pad clears
-# everywhere except the back right. There it would cross by 0.738, which
-# is why the back-right corner gets only the slim peg and no pad.
-# Watched to fail: putting a pad back on that hole reports 5.675 mm3
-# against the breakout mock.
+# Where the bottom plate holds a breakout up, beyond the seam columns.
 #
-# Three is worth the third entry rather than two. The NeoKey is held in a
-# sandwich -- a column under every hole and a standoff directly above it
-# -- so its force path is a straight line through the board and there is
-# no moment anywhere. A breakout cannot have that: nothing can stand
-# above it except at the seams (see SEAM_XY), so the push down and the
-# push up are never collinear. Supporting three corners is how that is
-# paid for.
+# The NeoKey is held in a sandwich -- a column under every hole and a
+# standoff directly above it -- so its force path is a straight line
+# through the board and there is no moment anywhere. A breakout cannot
+# have that: nothing can stand above it except at the seams (see
+# SEAM_XY), so its push down and its push up are never collinear.
 #
-# Both mounting holes get a locating peg, and the second one is why the
-# supports and the pegs are two different lists. A support is a
-# COLUMN_DIA pad the board rests on; a peg is PEG_DIA and only has to
-# reach into a hole. At the second hole the socket leaves 0.362 for a
-# 2.30 pillar and nothing at all for a 4.50 one, so the peg goes up from
-# the floor on its own there rather than standing on a support.
+# Two pads, both on the field's outer left edge -- the one end no seam
+# reaches. Everywhere else the breakouts are carried from below by the
+# seam columns, and adding pads per board on top of those would put five
+# columns inside 5.3 mm around each seam.
 #
-# 0.362 is thin by this file's standards. The boolean is the evidence and
-# it reads 0.000 mm3; the arithmetic is the warning. If a printed pillar
-# fouls the socket the board rocks instead of seating, which is loud at
-# assembly and a file stroke to fix -- so the second locating point is
-# worth the risk that the first alone was not.
-# One pad, at the field's outer left end. Everything else the breakouts
-# need from below is a seam column, and three pads per board on top of
-# those put five columns inside 5.3 mm around each seam -- which is what
-# the model looked like before anyone drew it.
+# The board's mounting holes do not come into it any more. This used to
+# be three pads on three of the four corners, with the back-right one
+# left to a slim peg because the hot-swap socket -- 4.733 .. 15.633
+# across the board, 11.653 .. 17.553 up it -- crosses a COLUMN_DIA pad
+# there by 0.738. Watched to fail then, and still true of a pad on that
+# hole: 5.675 mm3 against the breakout mock. All of it went with the
+# pegs, for the reason recorded after BREAKOUT_SUPPORT_XY below.
 #
-# The back row is the reason there is only one. A column there has to
-# clear a socket body spanning y 11.680 .. 17.580 across most of the
-# board, and nowhere on that row is free -- even hard against a board
-# edge it fouls by 0.378. The seams are the single exception, because a
-# column centred on one straddles two boards and sits on the outermost
-# strip of each. So: seams carry the back row, and this carries the one
-# end no seam reaches.
-# 19.200, not the seam row's 19.390. The socket envelope reaches 16.894
-# and the cavity wall is at 21.790, so a COLUMN_DIA pad has 4.896 of
-# board to sit in and needs 4.50 of it: at 19.390 it cleared the socket
-# but left only 0.150 to the wall, which is what "board columns inside
-# the cavity" is for. 19.200 splits the difference -- 1.908 to the
-# socket, 0.440 to the wall.
-# Both ends of the field's outer left edge. The near one has 4.696 of
-# free board to sit in and the far one 4.010, which is why they are not
-# symmetric: 19.600 is where the far one clears the last component by
-# 0.486 and the cavity wall by 0.440, and there is about 0.4 of room to
-# move it in either direction before one of those goes.
+# There was one pad here for a round, on the front row only, because the
+# back row looked impossible: a socket body spans y 11.680 .. 17.580
+# across most of the board, and at COLUMN_DIA 4.50 nothing fits beside it
+# -- hard against the board edge it still fouls by 0.378. What changed is
+# the pad, not the socket. FIELD_SUPPORT_DIA came down to 3.00 for an
+# unrelated reason and the back row opened up.
+#
+# The two are not symmetric because the free board is not: the near one
+# has 4.696 to sit in and the far one 4.010. 19.600 is where the far pad
+# clears the last component by 0.486 and the cavity wall by 0.440, with
+# about 0.4 of room to move either way before one of those goes.
 FIELD_SUPPORT_LOCAL = [(2.45, 2.450), (2.45, 19.600)]
 # Thinner than COLUMN_DIA, and it has to be. A seam column clears the
 # back face in x, by sitting on the outermost strip of two boards at
