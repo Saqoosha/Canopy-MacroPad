@@ -109,6 +109,29 @@ def _qtpy_rect():
     return min(xs), max(xs), min(ys), max(ys)
 
 
+def _clear_strips():
+    """The clear margins in board-local X, trimmed back off the parts.
+
+    Split out so that whatever cuts into a rail measures from the same
+    edge the rail is built from. Deriving the two independently left a
+    0.196 mm sliver of rail standing beside the pad pocket -- under half
+    an extrusion, so not a wall at all, just something for the slicer to
+    drop or to draw as a single thin trace.
+    """
+    for a0, a1 in P.QTPY_CLEAR_X:
+        # Whichever end of the strip faces the middle of the board is the
+        # one that gives way; the strips are given outer-edge-first on one
+        # side and the reverse on the other, so decide by which is nearer
+        # the centre rather than by their order.
+        mid = P.QTPY_W / 2
+        u0, u1 = P.QTPY_UNDER_X
+        if abs(a0 - mid) > abs(a1 - mid):
+            a1 = min(a1, u0 - P.QTPY_RAIL_CLEAR)
+        else:
+            a0 = max(a0, u1 + P.QTPY_RAIL_CLEAR)
+        yield min(a0, a1), max(a0, a1)
+
+
 def _clear_rects():
     """The board's two component-free margins, as case-space rectangles.
 
@@ -129,17 +152,7 @@ def _clear_rects():
     axis, because which axis they land on depends on the layout and no
     caller should have to know.
     """
-    for a0, a1 in P.QTPY_CLEAR_X:
-        # Whichever end of the strip faces the middle of the board is the
-        # one that gives way; the strips are given outer-edge-first on one
-        # side and the reverse on the other, so decide by which is nearer
-        # the centre rather than by their order.
-        mid = P.QTPY_W / 2
-        u0, u1 = P.QTPY_UNDER_X
-        if abs(a0 - mid) > abs(a1 - mid):
-            a1 = min(a1, u0 - P.QTPY_RAIL_CLEAR)
-        else:
-            a0 = max(a0, u1 + P.QTPY_RAIL_CLEAR)
+    for a0, a1 in _clear_strips():
         xs, ys = [], []
         for lx in (a0, a1):
             for ly in (0.0, P.QTPY_D):
@@ -164,9 +177,15 @@ def _pad_reliefs():
     """
     ys = [y for _name, y in P.QTPY_PADS_USED]
     y0, y1 = min(ys) - P.QTPY_PAD_RELIEF, max(ys) + P.QTPY_PAD_RELIEF
-    # Out past the board's edge so the pocket really opens, and in as far
-    # as the pad row itself.
-    x0 = P.QTPY_PAD_X - P.QTPY_PAD_RELIEF
+    # The whole width of whichever rail carries the pads, not a fixed
+    # offset from the pads themselves. Measuring from the pad left 0.196
+    # of rail standing between the pocket and the rail's own inner edge,
+    # which is half an extrusion and prints as a hair rather than a wall.
+    # Taking the rail's edge means no sliver can exist, whatever these
+    # numbers become.
+    strip = next(s for s in _clear_strips()
+                 if s[0] - 1e-9 <= P.QTPY_PAD_X <= s[1] + 1e-9)
+    x0 = strip[0]
     x1 = P.QTPY_W + 1.0
     xs, cs = [], []
     for lx in (x0, x1):
