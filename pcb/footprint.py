@@ -16,6 +16,20 @@ MULTI = 12   # EPCB_LayerId.MULTI; the enum object is absent from the bridge
              # execution context (see build.py's TOP), so the documented
              # literal is what works.
 
+# params.mm_to_mil() rounds to the nearest whole mil, so any single
+# conversion is off the true value by at most 0.5 mil. The diameter this
+# module asks EasyEDA to create with, and the diameter it later reads back
+# and compares against, are each the result of one such rounding -- not
+# necessarily the *same* rounding, once a hole's origin is a hand-placed
+# pad or a different code path rather than this module's own
+# place_switch_holes(). Two independent roundings of the same nominal value
+# can disagree by up to 0.5 + 0.5 = 1 mil, so 1 mil is the tolerance below
+# the smallest gap that still means "the same hole" -- and it stays far
+# under the table's smallest real gap between two different diameters
+# (Ø1.20 vs Ø1.60 is 16 mil apart), so it cannot mask an actually-wrong
+# drill.
+DIAMETER_TOLERANCE_MIL = 1
+
 
 def place_switch_holes(centre_mm):
     """Create every params.SWITCH_HOLES entry as a hole at centre_mm.
@@ -69,8 +83,9 @@ def _pads_near(x_mil, y_mil, radius_mil):
     # IPCB_PrimitivePad has no `holeDiameter` property -- confirmed live,
     # and absent from the class reference. The real shape is `hole`:
     # `[EPCB_PrimitivePadHoleType.ROUND, diameter]` or null for an SMD pad
-    # with no hole at all. `d` here is only used for a human-readable
-    # future error, not for the presence check below.
+    # with no hole at all. `d` is None for the latter, and is what the
+    # presence check below actually checks -- proximity alone does not
+    # mean a hole is there.
     js = (
         "const all = await eda.pcb_PrimitivePad.getAll(); "
         "return (all || []).map(p => ({x: p.x, y: p.y, "
@@ -84,15 +99,35 @@ def _pads_near(x_mil, y_mil, radius_mil):
 
 
 def assert_holes_present(centre_mm):
-    """Every entry in params.SWITCH_HOLES must exist at its offset."""
+    """Every entry in params.SWITCH_HOLES must exist, as a hole, at its
+    offset, sized within DIAMETER_TOLERANCE_MIL of its nominal diameter.
+
+    A pad near the right position with no hole (`d is None`) or a hole of
+    the wrong diameter both fail this -- proximity is necessary but not
+    sufficient.
+    """
     cx, cy = centre_mm
-    missing = []
+    problems = []
     for name, (dx, dy), dia in params.SWITCH_HOLES:
         want_x = params.mm_to_mil(cx + dx)
         want_y = params.mm_to_mil(cy + dy)
+        want_d = params.mm_to_mil(dia)
         near = _pads_near(want_x, want_y, 4)
-        if not near:
-            missing.append(f"{name} (Ø{dia:.2f}) at ({want_x}, {want_y})")
-    if missing:
-        raise AssertionError("combo footprint is missing: " + "; ".join(missing))
+        holed = [p for p in near if p["d"] is not None]
+        right = [
+            p for p in holed
+            if abs(p["d"] - want_d) <= DIAMETER_TOLERANCE_MIL
+        ]
+        if right:
+            continue
+        if holed:
+            got_d = holed[0]["d"]
+            problems.append(
+                f"{name} at ({want_x}, {want_y}) has Ø{got_d} mil, "
+                f"wanted Ø{want_d} mil (Ø{dia:.2f} mm)"
+            )
+        else:
+            problems.append(f"{name} (Ø{dia:.2f}) at ({want_x}, {want_y})")
+    if problems:
+        raise AssertionError("combo footprint is missing: " + "; ".join(problems))
     print(f"  [ok ] combo footprint: {len(params.SWITCH_HOLES)} holes present")
