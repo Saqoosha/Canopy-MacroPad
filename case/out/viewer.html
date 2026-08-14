@@ -784,9 +784,18 @@ cv.addEventListener('pointermove', e => {
   } else {
     /* About the camera's own axes, so the grab feels the same whichever
        way up the model already is -- and so there is no attitude at which
-       one of the two drags stops doing anything. */
-    S.tq = qnorm(qmul(qmul(qAxis([0,1,0], px*0.008),
-                           qAxis([1,0,0], py*0.008)), S.tq));
+       one of the two drags stops doing anything.
+    
+       The increment goes on the *right* of the product, and that is not a
+       stylistic choice. `qBasis` hands back the rows of the world-to-
+       camera rotation, which is its transpose, so composing on the left
+       applies the increment in world space instead: shipped that way, a
+       horizontal drag from the front view turned the model about its long
+       axis rather than about the one it stands on. Measured, not
+       reasoned: the old camera turned about world [0,0,1] and this now
+       does too, where `qmul(incr, q)` gave [0,-1,0]. */
+    S.tq = qnorm(qmul(S.tq, qmul(qAxis([0,1,0], -px*0.008),
+                                 qAxis([1,0,0], -py*0.008))));
   }
   drag = {x:e.clientX, y:e.clientY, pan: drag.pan};
 });
