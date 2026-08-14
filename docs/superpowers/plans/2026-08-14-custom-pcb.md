@@ -593,14 +593,30 @@ Replace the "The LED's aperture, not its package" bullet with what was seen. If 
 
 ```python
 # --- the pixel -------------------------------------------------------------
-# Reverse-mount SK6812MINI-E under the board, shining up through a hole into
-# the switch's own window. Offset is from the switch centre, +y towards the
-# board's back edge. Settled by looking through <the switches you checked>,
-# not by arithmetic: the three housings' windows disagree and only the parts
-# can say whether one hole serves them.
-PIXEL_OFFSET_MM = (0.0, -5.08)   # replace with what was measured
-PIXEL_HOLE_DIA = 3.00            # replace with what clears the window
+# Reverse-mount pixel under the board, shining up through an opening into the
+# switch's own window. Every number here is cloned from Adafruit's NeoKey 1x4
+# board file rather than chosen -- see pcb/NOTICE.md -- because that board
+# lights these exact switches today and Saqoosha has confirmed the fit on the
+# part.
+#
+# The opening is a RECTANGLE, not a round hole. That was the first thing a
+# guess got wrong here: Eagle layer 46 is milling, and NEO3535_REVERSE draws
+# a rectangle there spanning x -1.927..1.927 and y -1.727..1.727.
+PIXEL_OFFSET_MM = (0.0, -5.08)      # switch y 10.795 -> pixel y 5.715
+PIXEL_OPENING_MM = (3.854, 3.454)   # milled slot, from Eagle layer 46
+PIXEL_PADS = [                      # bottom side, 1.2 x 0.9 each
+    ((2.65, -0.75), (1.2, 0.9)),
+    ((2.65, 0.75), (1.2, 0.9)),
+    ((-2.65, -0.75), (1.2, 0.9)),
+    ((-2.65, 0.75), (1.2, 0.9)),
+]
 ```
+
+**Do not copy the x nudge.** Two of the NeoKey's four pixels sit 0.127 off
+their switch's x (LED4 at 9.652 against SW1's 9.525, LED2 at 47.752 against
+SW3's 47.625) while the other two are dead on. That is the chain's routing,
+not a dimension, and carrying it in would import someone else's trace layout
+as geometry. All six pixels here share their switch's x exactly.
 
 - [ ] **Step 6: Commit**
 
@@ -836,22 +852,39 @@ rather than conflict — MX wants Ø4.00 centre with 2 x Ø1.50, Choc v2 wants
 ```python
 # --- switch holes ----------------------------------------------------------
 # Offsets are from the switch centre, in mm, +y towards the board's back.
-# MX: GaoTe PG618B65 (GTMX) and Cherry share this pattern.
-# Choc v2: Kailh CPG135301D01. Its centre hole is the larger of the two, so
-# the combined centre is Choc's -- an MX centre post is happy in a bigger
-# hole, and the reverse is not true.
+#
+# The MX rows are MEASURED, out of Adafruit's own "NeoKey 1x4 QT I2C.brd" --
+# the board this project's working pad is built on. They are not derived from
+# a switch drawing, and the difference is not academic: a first pass written
+# from drawings had the pin drills at 1.50 (forgetting that the hot-swap
+# socket's barrel passes through, not just the switch pin) and omitted the
+# two plate-mount alignment posts entirely, which would have refused every
+# five-pin switch this pad uses.
+#
+# The Choc v2 rows are READ OFF Kailh's CPG135301D01 figure and have not been
+# checked against a part or a board. They are the weaker half of this table.
+#
+# The centre is Choc v2's Ø5.00 rather than MX's Ø3.9, because the hole only
+# has to clear a centre post -- the plate locates the switch -- so the larger
+# swallows the smaller and the reverse would not.
 SWITCH_HOLES = [
-    ("centre", (0.00, 0.00), 5.00),      # Choc v2's Ø5.00 swallows MX's Ø4.00
-    ("mx_a", (-3.81, 2.54), 1.50),
-    ("mx_b", (2.54, 5.08), 1.50),
-    ("choc_a", (-5.00, 3.80), 1.20),
-    ("choc_b", (5.00, 3.80), 1.20),
-    ("choc_c", (0.00, 5.90), 1.60),
+    ("centre", (0.00, 0.00), 5.00),        # choc v2 drawing; MX board has 3.9
+    ("mx_pin_a", (-3.81, 2.54), 3.0635),   # measured
+    ("mx_pin_b", (2.54, 5.08), 3.0635),    # measured
+    ("mx_post_l", (-5.08, 0.00), 1.8135),  # measured, plate-mount alignment
+    ("mx_post_r", (5.08, 0.00), 1.8135),   # measured, plate-mount alignment
+    ("choc_a", (-5.00, 3.80), 1.20),       # drawing, unverified
+    ("choc_b", (5.00, 3.80), 1.20),        # drawing, unverified
+    ("choc_c", (0.00, 5.90), 1.60),        # drawing, unverified
+]
+
+# The Kailh socket's own solder pads, bottom side, measured off the same
+# board. These are what the socket is hand-soldered to after assembly.
+SOCKET_PADS = [
+    ((6.09, 5.08), (2.55, 2.50)),
+    ((-7.36, 2.50), (2.55, 2.50)),
 ]
 ```
-
-**These offsets are read from the two drawings and have not been checked
-against each other on a board.** Step 3 is what checks them.
 
 - [ ] **Step 2: Write the probe**
 
