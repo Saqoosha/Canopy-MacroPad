@@ -18,7 +18,7 @@
 - **`pcb_PrimitiveComponent.create` takes a device, not a footprint.** Passing a footprint item fails with a destructuring error naming a property the item visibly has.
 - **`dmt_Project.createProject()` is beta and returns `undefined` silently.** Open an existing project.
 - **Every placement is asserted by reading it back**, and **every assertion is watched failing before it is believed.** A check nobody has seen go red is not coverage.
-- **`build.py` must end in `all checks passed` for both `MPAD_SWITCH` values before anything is printed.**
+- **`build.py` must end in `all checks passed` before anything is printed.** There is one switch and no axis: MX and Choc hot-swap holes cannot share a position, so this board is Choc v2 only.
 - **Never guess an EasyEDA API signature.** Read `~/.claude/skills/easyeda-api/references/classes/<Class>.md` first.
 - Python in `pcb/` is **stdlib only**, like `tools/mpad.py`, so it runs on a fresh machine and can be imported from `case/.venv` without installing anything there.
 
@@ -33,7 +33,7 @@
 | `pcb/probe.py` | Read-back assertions. Given expected placements, fetches actual ones and reports per-item deltas. |
 | `pcb/build.py` | Entry point: opens the project, clears, places the key field, asserts, reports. |
 | `pcb/README.md` | The bridge setup, the permission checkbox, the three API traps, how to re-run. |
-| `case/params.py` | Modified: imports the key field from `pcb/params.py`; gains `MPAD_SWITCH`; loses `MPAD_LAYOUT` and the QT Py block. |
+| `case/params.py` | Modified: imports the key field from `pcb/params.py`; loses `MPAD_LAYOUT` and the QT Py block; the switch numbers become constants, not an axis. |
 | `case/parts.py` | Modified: QT Py pocket, rails, lip, STEMMA notch, wire lane and cable bay deleted. |
 | `case/mock.py` | Modified: one board stand-in replaces NeoKey + 2 breakouts + QT Py. |
 | `firmware/code.py` | Modified: one GPIO key source; I2C, seesaw and `PAD_ADDRESSES` deleted. |
@@ -637,7 +637,7 @@ git commit -m "Settle the pixel's hole by looking through the switches"
 
 **Interfaces:**
 - Consumes: `pcb/params.py`'s `SWITCH_PITCH`, `switch_centres_mm`, `KEY_FIELD_W`, `KEY_FIELD_D`, `BOARD_W`, `BOARD_D`, `BOARD_T`.
-- Produces: `MPAD_SWITCH` in `{"mx", "choc"}`, and `SWITCH_HOLE`, `PLATE_TOP_TO_PCB`, `PLATE_T`, `SOCKET_DROP`, `CASE_H` derived from it.
+- Produces: `SWITCH_HOLE` 14.10, `PLATE_TOP_TO_PCB` 2.20, `PLATE_T` 1.30, `SOCKET_DROP` 1.90, `CASE_H` 9.50 — all constants, no switch axis.
 
 - [ ] **Step 1: Import the field instead of deriving it**
 
@@ -666,20 +666,17 @@ SWITCH_Y = pcb.SWITCH_Y
 - [ ] **Step 2: Replace the layout axis with the switch axis**
 
 ```python
-# MPAD_LAYOUT selected where the QT Py sat. There is no QT Py. What varies
-# now is the switch, and only two numbers depend on it -- how high the plate
-# rides above the board and how thick it is.
-SWITCH = os.environ.get("MPAD_SWITCH", "mx")
-if SWITCH not in ("mx", "choc"):
-    raise SystemExit(f"MPAD_SWITCH must be mx or choc, got {SWITCH!r}")
-CHOC = SWITCH == "choc"
-
-# mx:   14.00 cutout + this machine's 0.15 shrink, settled on a printed part
-# choc: 13.95 off Kailh CPG135301D01, + the same shrink
-SWITCH_HOLE = 14.10 if CHOC else 14.15
-PLATE_TOP_TO_PCB = 2.20 if CHOC else 5.00
-PLATE_T = 1.30 if CHOC else 1.60      # choc's clips need 1.30, not 1.60
-SOCKET_DROP = 1.90 if CHOC else 1.85
+# MPAD_LAYOUT selected where the QT Py sat, and there is no QT Py. It was
+# briefly going to be replaced by MPAD_SWITCH, and that is gone too: MX and
+# Choc hot-swap holes cannot share a position -- their alignment posts sit
+# 0.42 apart and need 1.86 -- so this board is Choc v2 and nothing else.
+# With one switch there is no axis, and every number below is a constant.
+#
+# 13.95 cutout off Kailh CPG135301D01, plus this machine's 0.15 shrink.
+SWITCH_HOLE = 14.10
+PLATE_TOP_TO_PCB = 2.20
+PLATE_T = 1.30          # Choc's clips need 1.30; there is no fallback now
+SOCKET_DROP = 1.90
 ```
 
 - [ ] **Step 3: Delete the QT Py geometry**
@@ -696,15 +693,15 @@ In `case/mock.py`, replace the NeoKey, both breakouts and the QT Py with a singl
 
 ```bash
 cd case
-MPAD_SWITCH=mx .venv/bin/python build.py
-MPAD_SWITCH=choc .venv/bin/python build.py
+.venv/bin/python build.py
 ```
 
-Expected: both end in `all checks passed`, and the `mx` run reports `CASE_H` 12.25, the `choc` run 9.50.
+Expected: `all checks passed`, and `CASE_H` 9.50 — **3.83 below the wired
+pad's 13.33**, which is the entire reason this switch was worth its cost.
 
 - [ ] **Step 6: Watch a check fail**
 
-Set `SWITCH_HOLE` to 20.0 and rebuild `mx`. Expected: the switch-body interference check goes red with a non-zero mm³. Restore by the reverse edit. **Move geometry or push one number past its limit — do not shrink a feature to nothing**, because a zero-width `Box` makes OCCT throw and the build dies before any check runs.
+Set `SWITCH_HOLE` to 20.0 and rebuild. Expected: the switch-body interference check goes red with a non-zero mm³. Restore by the reverse edit. **Move geometry or push one number past its limit — do not shrink a feature to nothing**, because a zero-width `Box` makes OCCT throw and the build dies before any check runs.
 
 - [ ] **Step 7: Run the whole figure sweep**
 
@@ -712,13 +709,11 @@ Set `SWITCH_HOLE` to 20.0 and rebuild `mx`. Expected: the switch-body interferen
 
 ```bash
 cd case
-for s in mx choc; do
-  MPAD_SWITCH=$s .venv/bin/python build.py
-  MPAD_SWITCH=$s .venv/bin/python product.py
-  MPAD_SWITCH=$s .venv/bin/python render.py
-  MPAD_SWITCH=$s .venv/bin/python section.py
-  MPAD_SWITCH=$s .venv/bin/python webgl.py dump
-done
+.venv/bin/python build.py
+.venv/bin/python product.py
+.venv/bin/python render.py
+.venv/bin/python section.py
+.venv/bin/python webgl.py dump
 .venv/bin/python webgl.py page
 open -a "Google Chrome" out/viewer.html
 ```
@@ -728,19 +723,24 @@ Reload the tab: regenerating the page does not refresh an open one, and the stal
 - [ ] **Step 8: Add the two questions the coupon has to answer**
 
 `case/params.py` already carries sweep tuples for the numbers a printer
-settles. Add one for the switch hole, because Choc v2's 14.10 and MX's
-14.15 are 0.05 apart and **one hole may serve both**:
+settles. Add one for the switch hole:
 
 ```python
-# 14.15 seats a Durock; 14.10 is Kailh's 13.95 plus the same 0.15 shrink.
-# If a Durock, a GTMX and a Choc v2 all seat in one of these, the plate has
-# no switch axis at all and only its thickness does.
-HOLE_SWEEP = (14.05, 14.10, 14.15)
+# Kailh CPG135301D01 gives 13.95; this machine pulls a hole in by 0.15, the
+# constant SWITCH_HOLE has always measured, so 14.10 is the arithmetic. It
+# has never been checked against a Choc v2 -- none has been on this desk --
+# so the sweep brackets it rather than trusting it.
+HOLE_SWEEP = (14.00, 14.10, 14.20)
 ```
 
 The second question cannot be swept, only printed: **does 1.30 of printed
 plate hold a Choc v2's clips?** Add a coupon fragment at `PLATE_T` 1.30
 carrying one `HOLE_SWEEP` hole, in the orientation the real plate prints in.
+
+**This coupon is blocking now, where it used to be optional.** With MX gone
+there is no fallback thickness and no switch already on the desk that fits
+the board, so a wrong 1.30 is discovered on the finished case rather than on
+a fragment.
 
 - [ ] **Step 9: Print the coupon before the case**
 
