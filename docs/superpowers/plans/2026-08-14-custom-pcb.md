@@ -428,13 +428,21 @@ Run with: python3 pcb/build.py [--inject]
 --inject places the last socket half a pitch out. It exists so the check can
 be watched going red; a run that has only ever been green is not evidence.
 """
+import os
 import sys
 
 import params
 import probe
 from bridge import execute
 
-PROJECT_NAME = "Canopy MacroPad"
+# The project is opened by name and never created. dmt_Project.createProject()
+# returns undefined under every argument shape tried -- six of them, no
+# exception raised, no project appearing -- and the sibling
+# dmt_Folder.getAllFoldersUuid() throws on a missing internal `rootList`. The
+# folder subsystem simply is not populated in this client's local, half-offline
+# mode, and creation rides on it. So the project is made by hand in the GUI
+# once, and this constant names whichever one that is.
+PROJECT_NAME = os.environ.get("MPAD_EDA_PROJECT", "Canopy MacroPad")
 TOP = 1          # EPCB_LayerId.TOP; the enum object is absent from the bridge
                  # execution context, so the documented literal is what works.
 
