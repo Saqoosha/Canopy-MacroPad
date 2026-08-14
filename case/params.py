@@ -622,23 +622,29 @@ WIRE_CHANNEL_D = 1.20   # leaves 1.20 of plate under it
 SEAM_STEP_W = 1.00
 SEAM_STEP_H = 1.20
 
-# Barbs on the inside of that skirt, and a groove round the tongue for
-# them to drop into. Only where the plate's own columns leave room: the
-# screws sit at +/-63.05 and the true mid-span at x=0 is a NeoKey column,
-# so these go either side of it, in the 15.05 and 33.60 wide clear spans.
-SEAM_SNAP_X = (-9.53, 19.05)
-SEAM_SNAP_W = 4.00     # along the wall
-SEAM_SNAP_HOOK = 0.40  # how far the barb reaches into the groove
-SEAM_SNAP_H = 0.60     # its height, and the groove's
 SEAM_FIT = 0.20        # total clearance between skirt and tongue
 
-# What the seam coupon asks. Engagement -- how far the barb actually
-# reaches into the groove -- is SEAM_SNAP_HOOK minus half the fit, and it
-# is the only number that matters: it sets how far the skirt has to
-# spring to let the tongue past, and how hard the joint is to pull open
-# again. Sweeping the hook with the fit held is therefore a sweep of one
-# variable and not two.
-SEAM_SNAP_SWEEP = (0.30, 0.40, 0.55, 0.70)
+# **The step is the whole joint. There was a snap and it is gone**, and
+# the reason is arithmetic rather than a number that wanted tuning.
+#
+# Barbs on the inside of the skirt dropped into a groove round the
+# tongue, swept 0.30 to 0.70 of reach on a coupon. All four came back too
+# weak, 0.70 the best of them and still no lock, and both complaints --
+# hard to fit, does not hold -- are the same fault: **the skirt is not a
+# spring.** It is 0.90 thick over a 1.20 free length, so even the
+# shallowest hook asks it for 19% surface strain where PLA yields near 2.
+# It never bent. It was forced.
+#
+# A cantilever that deflects 0.40 at 2% wants roughly 5 mm of length and
+# the plate is 2.40 thick, so no hook in this geometry can work and a
+# sweep upward would only have found a stiffer press fit. A third screw
+# at mid-span is out too: the boards fill the case wall to wall there,
+# 0.200 between the field and the cavity, against the 5.60 a post needs.
+#
+# So the step does what the step already did -- align the halves and put
+# the residual gap inside the joint instead of on the outside. If the
+# centre ever lifts, the next thing to try is a magnet pair under the
+# boards, not a plastic spring.
 
 # --- inline layout only -------------------------------------------------
 # Beside the keys, the NeoKey fills the cavity front to back, so a screw

@@ -369,10 +369,6 @@ pocket. None of that is in the plastic on the desk.
 
 Open:
 
-- `SEAM_SNAP_HOOK`. `out/inline/coupon-seam.stl` carries one pair per
-  `SEAM_SNAP_SWEEP` entry and takes minutes; the one that clicks on and
-  needs a deliberate pull is the answer. **Print this before the case**,
-  or the case gets printed twice.
 - `QTPY_STEMMA_NOTCH` at 1.00 works but the Qwiic plug takes some
   working at; a reprint would want 1.5-2.0.
 - The Ø8 feet sit under the wire channel and leave 0.70 of plate over

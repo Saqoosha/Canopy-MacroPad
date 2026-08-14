@@ -105,12 +105,6 @@ def main():
         # are settled, so re-asking the fourth should not cost a reprint
         # of the other three.
         "coupon-clear": parts.clear_coupon(),
-        # The seam joint on its own. It is the one feature here that has
-        # to spring, and springiness is not calculable at this wall
-        # thickness -- so it gets asked the same way every other fit in
-        # this case was, on a part that costs two minutes instead of
-        # twenty.
-        "coupon-seam": parts.seam_coupon(),
     }
 
     print("exported")

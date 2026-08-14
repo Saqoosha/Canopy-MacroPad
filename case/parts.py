@@ -255,19 +255,6 @@ def shell():
                 skirt_z0 - 0.1, P.Z_FLOOR + 0.1)
     )
 
-    # ...and a barb on the inside of it, at each of the few places along
-    # the wall where the plate's own columns leave room. This is the part
-    # that pulls: the step only aligns.
-    for sx in P.SEAM_SNAP_X:
-        for sign in (-1, 1):
-            y_in = sign * (P.CASE_D / 2 - P.SEAM_STEP_W + P.SEAM_FIT / 2)
-            part += _block(
-                sx - P.SEAM_SNAP_W / 2, sx + P.SEAM_SNAP_W / 2,
-                min(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
-                max(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
-                skirt_z0, skirt_z0 + P.SEAM_SNAP_H,
-            )
-
     # Standoffs that set the board height, each ending in a locating peg.
     # These two features are the entire NeoKey mount -- there is no screw.
     for x, y in P.MOUNT_XY:
@@ -428,21 +415,6 @@ def bottom():
     part += _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
                   max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                   P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
-
-    # A groove round the tongue for the shell's barbs to drop into. Cut
-    # the whole way round rather than only where a barb is: a continuous
-    # groove prints as one clean overhang, and four short pockets are
-    # four chances to have put one in the wrong place.
-    gz = P.BOTTOM_T - P.SEAM_STEP_H
-    part -= (
-        _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
-              max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
-              gz, gz + P.SEAM_SNAP_H)
-        - _slab(P.CASE_W - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
-                P.CASE_D - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
-                max(P.OUTER_CORNER_R - P.SEAM_STEP_W - P.SEAM_SNAP_HOOK, 0.5),
-                gz - 0.1, gz + P.SEAM_SNAP_H + 0.1)
-    )
 
     # The wire channel, sunk into the plate along the one lane the boards
     # and columns leave. Cut before the columns go on, so a column that
@@ -695,99 +667,6 @@ def coupon():
         post_x[0], sy, P.PLATE_T + so_h,
         P.PLATE_T + so_h + P.PEG_H, P.PEG_DIA,
     )
-    return part
-
-
-def seam_coupon_layout():
-    """Where the seam coupon puts each pair.
-
-    Same reason as the other two layouts: the only thing that checks a
-    test part is a script, and a script holding its own copy of these
-    numbers is a check that quietly moves to empty air.
-    """
-    n = len(P.SEAM_SNAP_SWEEP)
-    span = 20.0        # along the wall, per pair
-    gap = 4.0          # between the shell piece and its plate piece
-    pitch = span + 6.0
-    w = n * pitch
-    return {
-        "n": n, "span": span, "gap": gap, "pitch": pitch, "w": w,
-        "xs": [(-w / 2) + pitch / 2 + i * pitch for i in range(n)],
-        # Both pieces are printed the way their real part is: the shell
-        # fragment with its plate face on the bed, the plate fragment
-        # features up. A snap tested in the wrong orientation is a snap
-        # whose overhang printed differently from the one that ships.
-        "wall_h": 6.0,
-        # A tab off the back of each shell fragment. It carries that
-        # fragment's number, because the barbs differ by 0.30 to 0.70 of
-        # protrusion on an otherwise identical 20 mm piece and there is
-        # no telling them apart by eye once they are off the bed. It is
-        # also somewhere to grip: the test is pulling a snapped pair
-        # apart, and there was nothing to hold.
-        "tab_d": 7.0,
-        "tab_t": 1.2,
-    }
-
-
-def seam_coupon():
-    """One shell fragment and one plate fragment per SEAM_SNAP_SWEEP entry.
-
-    The joint is the one part of this case that has to *spring*, and the
-    number that decides whether it does is engagement -- the barb's reach
-    minus half the fit. Too little and the halves come apart in the hand;
-    too much and the skirt either will not go on or splits. Neither end
-    is calculable from PLA's datasheet at this wall thickness, and the
-    whole case is a twenty-minute print to ask a question a two-minute
-    one can answer.
-
-    Each pair is engraved with its hook. Snap them together by hand: the
-    one that goes on with a click and needs a deliberate pull to come off
-    is the answer, and it goes into SEAM_SNAP_HOOK.
-    """
-    L = seam_coupon_layout()
-    part = None
-    for hook, x in zip(P.SEAM_SNAP_SWEEP, L["xs"]):
-        y0 = -L["gap"] / 2
-
-        # --- the shell side: wall, skirt, barb -- lying the way the
-        # shell lies on the bed, so the barb's ledge prints as it will.
-        wall = _block(x - L["span"] / 2, x + L["span"] / 2,
-                      y0 - P.WALL, y0, 0.0, L["wall_h"])
-        skirt_t = P.SEAM_STEP_W - P.SEAM_FIT / 2
-        wall += _block(x - L["span"] / 2, x + L["span"] / 2,
-                       y0 - skirt_t, y0,
-                       L["wall_h"], L["wall_h"] + P.SEAM_STEP_H)
-        wall += _block(x - P.SEAM_SNAP_W / 2, x + P.SEAM_SNAP_W / 2,
-                       y0 - skirt_t - hook, y0 - skirt_t,
-                       L["wall_h"] + P.SEAM_STEP_H - P.SEAM_SNAP_H,
-                       L["wall_h"] + P.SEAM_STEP_H)
-        # ...and the grip tab, with the number on it.
-        ty1 = y0 - P.WALL
-        ty0 = ty1 - L["tab_d"]
-        wall += _block(x - L["span"] / 2, x + L["span"] / 2,
-                       ty0, ty1, 0.0, L["tab_t"])
-        wall -= Pos(x, (ty0 + ty1) / 2, L["tab_t"] - 0.3) * extrude(
-            _label("%.2f" % hook), amount=0.4)
-        part = wall if part is None else part + wall
-
-        # --- the plate side: base, tongue, groove.
-        y1 = L["gap"] / 2
-        plate = _block(x - L["span"] / 2, x + L["span"] / 2,
-                       y1, y1 + P.WALL + 2.0,
-                       0.0, P.BOTTOM_T - P.SEAM_STEP_H)
-        plate += _block(x - L["span"] / 2, x + L["span"] / 2,
-                        y1 + P.SEAM_STEP_W, y1 + P.WALL + 2.0,
-                        P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
-        plate -= _block(x - L["span"] / 2, x + L["span"] / 2,
-                        y1 + P.SEAM_STEP_W, y1 + P.SEAM_STEP_W + hook,
-                        P.BOTTOM_T - P.SEAM_STEP_H,
-                        P.BOTTOM_T - P.SEAM_STEP_H + P.SEAM_SNAP_H)
-        part += plate
-
-        # The number, on the plate piece's top face where it stays
-        # readable once the pair is snapped together.
-        part -= Pos(x, y1 + P.WALL + 0.5, P.BOTTOM_T - 0.3) * extrude(
-            _label("%.2f" % hook), amount=0.4)
     return part
 
 
