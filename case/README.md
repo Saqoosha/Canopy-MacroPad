@@ -496,7 +496,12 @@ narrowed once, held 1.80 back off the board's edge so they missed the
 castellated pads — which spent clearance along their whole length to
 solve a problem in three places, and left 1.10 mm and 0.89 mm of ledge to
 carry the board. They are 2.90 and 2.69 now, and `QTPY_PADS_USED` cuts a
-pocket only where `SCK`, `MISO` and `MOSI` are soldered. Which three pads
+pocket where `SCK`, `MISO` and `MOSI` are soldered, and that pocket runs
+off the near end rather than stopping short of the first pad: stopping
+left a 3.671 mm stub of rail between the pads and the notch the wires
+leave through, and every wire had to bend round it. What carries the
+board is the other rail full length and 8.750 of this one past the pads,
+on the side nothing runs along. Which three pads
 those are is a wiring fact, so it lives in `params.py` next to the wiring
 rather than in the geometry.
 

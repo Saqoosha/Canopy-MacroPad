@@ -176,7 +176,13 @@ def _pad_reliefs():
     this follows.
     """
     ys = [y for _name, y in P.QTPY_PADS_USED]
-    y0, y1 = min(ys) - P.QTPY_PAD_RELIEF, max(ys) + P.QTPY_PAD_RELIEF
+    # Open all the way off the near end rather than stopping a relief's
+    # width short of the first pad. Stopping left a 3.671 stub of rail at
+    # case x 56.20..59.87 -- between the pads and the notch the wires
+    # leave through, so every wire had to bend round it. The board is
+    # carried by the other rail full length and by 8.750 of this one on
+    # the far side of the pads, which is the side nothing runs along.
+    y0, y1 = -1.0, max(ys) + P.QTPY_PAD_RELIEF
     # The whole width of whichever rail carries the pads, not a fixed
     # offset from the pads themselves. Measuring from the pad left 0.196
     # of rail standing between the pocket and the rail's own inner edge,
