@@ -19,10 +19,42 @@ The six-key wired pad, built and working:
 | wiring | five hand-soldered wires plus a 50 mm Qwiic cable |
 | key reads | four on I2C seesaw, two on GPIO, one index space |
 
-## Three switches, one footprint
+## One switch, and why the other two had to go
 
-The pad has to take three switches off the same board. Read out of the
-manufacturers' drawings, not product pages:
+~~The pad has to take three switches off the same board.~~ **It cannot,
+and the claim was mine to check and I did not.** MX and Choc hot-swap
+holes do not fit in one position. Measured, from Adafruit's NeoKey for
+the MX side and `foostan/crkbd`'s Choc board for the other:
+
+| pair | centres | radii need | result |
+|---|---|---|---|
+| MX pin b / Choc pin a | 2.669 | 3.055 | **0.39 overlap** |
+| MX pin a / Choc pin b | 1.733 | 3.055 | **1.32 overlap** |
+| MX post r / Choc post r | **0.42** | 1.857 | **1.44 overlap** |
+
+The alignment posts sit 0.42 apart and need 1.86. This is not a
+tolerance argument.
+
+Two things corroborate it. **`kiswitch` is a generated, maintained
+library and ships MX+Alps hybrids but no MX+Choc hot-swap hybrid** --
+the gap in a thorough library is itself evidence. And the one MX+Choc
+combo footprint that does exist, `siderakb`'s, is **through-hole only**,
+where the pins are Ø1.5 and Ø1.27 and genuinely do fit. Hot-swap needs
+Ø3.0 barrels for the socket, and those do not.
+
+So the board is **Choc v2 only**, chosen over MX-only, two boards, or
+going THT. The cost is stated plainly because it is real: **it will not
+take the GTMX or the Durock already on the desk**, and no Choc v2 has
+ever been in hand here — so the first board and the first switch have to
+arrive together or nothing can be checked.
+
+What survives from the three-switch idea is the reason it was attractive:
+**Choc v2 takes MX keycaps**, so the keycaps are unaffected and 19.05
+stays the pitch.
+
+### The old comparison, kept because it is what forced the decision
+
+Read out of the manufacturers' drawings, not product pages:
 
 | | full MX (Durock Ice King) | Outemu GTMX | Kailh Choc **v2** |
 |---|---|---|---|
@@ -38,12 +70,42 @@ manufacturers' drawings, not product pages:
 | travel | -- | 3.0, pre 1.2 | 3.2 ± 0.25, pre 1.3 ± 0.3, 50 ± 10 gf |
 
 **Choc v2 rather than v1, and the reason is the keycap.** The v2 swaps
-v1's 3.40 rectangular stem for a **5 mm MX cross**, so one set of
-keycaps covers all three switches and nothing has to be bought twice.
-It also means **19.05 is mandatory rather than merely convenient**: MX
-keycaps on Choc's own 18 x 17 spacing collide, so a board that offers
-MX caps has to be on MX pitch. This design already is, so the trap is
-avoided by construction and `SWITCH_PITCH` never becomes an axis.
+v1's 3.40 rectangular stem for a **5 mm MX cross**, so the MX keycaps
+already owned still fit and nothing has to be bought twice. It also
+means **19.05 is mandatory rather than merely convenient**: MX keycaps
+on Choc's own 18 x 17 spacing collide, so a board that offers MX caps
+has to be on MX pitch. This design already is, so the trap is avoided by
+construction and `SWITCH_PITCH` never becomes an axis.
+
+### The cell, borrowed rather than derived
+
+Every number below is off a board that ships, because four separate
+times in this design a figure read from a drawing turned out to be
+wrong in a way no arithmetic would have caught. Sources: `foostan/crkbd`
+`keyswitch_choc12_hotswap_1u` and `YS-SK6812MINI-E`, cross-checked
+against `ebastler/marbastlib`.
+
+| | offset from switch centre | size |
+|---|---|---|
+| centre (switch boss) | (0, 0) | Ø5.0 |
+| pin | (0, 5.9) | Ø3.0 |
+| pin | (5, 3.7) | Ø3.0 |
+| alignment posts | (±5.5, 0) | Ø1.9 |
+| v2 mount | (-5, -5.15) | **oval** 1.5 x 2 |
+| socket pads | (8.1, 3.7), (-3.1, 5.9) | 2.3 x 2.6 |
+| **pixel** | **(0, -4.74)** | opening **3.6 x 3.1**, pads (±2.8, ±0.7) 1.7 x 0.825 |
+
+**The Ø5.0 is the switch's mounting boss, not a light path** -- a
+mistake made here first, which then produced two more: that Choc needed
+no opening, and that it needed a 2020 rather than the SK6812MINI-E. Both
+wrong. Corne cuts a 3.6 x 3.1 opening and uses the same SK6812MINI-E
+this board already specifies.
+
+The pixel offset is the one number with two independent witnesses: 46
+switch/pixel pairs on Corne's Choc board measure 4.737-4.749 along the
+key's own axis, and marbastlib's Choc add-on carries an alignment arrow
+its author drew at 4.7. Two designs with no shared author agreeing is
+the strongest evidence available short of a fabricated part.
 
 Its socket is the PG1350 one that v1 uses, so the switch choice does
 not add a part. Its footprint is its own -- 3 pins against v1's 5, and
@@ -226,13 +288,17 @@ and the 3 mm GTMX saves is above the plate where the case ends.
 
 Derived from the switch:
 
-| | `mx` | `choc` (v2) |
-|---|---|---|
-| `SWITCH_HOLE` | 14.15 | 14.10 |
-| `PLATE_TOP_TO_PCB` | 5.00 | 2.20 |
-| `PLATE_T` | 1.60 | 1.30 |
-| `SOCKET_DROP` | 1.85 | 1.90 |
-| `CASE_H` | **12.25** | **9.50** |
+**`MPAD_SWITCH` never gets built.** With one switch there is no axis --
+the case is Choc v2 and nothing else, and every number below is a
+constant rather than a branch:
+
+| | value |
+|---|---|
+| `SWITCH_HOLE` | 14.10 |
+| `PLATE_TOP_TO_PCB` | 2.20 |
+| `PLATE_T` | 1.30 |
+| `SOCKET_DROP` | 1.90 |
+| `CASE_H` | **9.50** |
 
 Both hole figures are nominal plus this machine's 0.15 shrink, the
 constant `SWITCH_HOLE` has always measured. 14.15 is settled on a
@@ -241,14 +307,16 @@ Kailh's own drawing, and the coupon's job is now to find out whether
 the two are the same hole.
 
 ```
-mx     2.40 floor + (1.85 socket + 1.40 air) + 1.60 board + 5.00  = 12.25
-choc   2.40 floor + (1.90 socket + 1.40 air) + 1.60 board + 2.20  =  9.50
+2.40 floor + (1.90 socket + 1.40 air) + 1.60 board + 2.20  =  9.50
 ```
 
-`choc` is derivable because its 2.20 is measured rather than assumed.
-It is still not *built*: no Choc v2 has been on this desk, and 1.30 of
-printed plate holding a clip is the kind of claim only a coupon
-settles.
+That is **3.83 below the wired pad's 13.33**, and it is the whole reason
+this variant was worth the switches it costs.
+
+It is still not *built*, and one claim in it now has to be settled
+before anything is printed rather than after: **1.30 of printed plate
+holding a Choc's clips.** With MX gone there is no fallback thickness,
+so the coupon moves from optional to blocking.
 
 `CASE_H` is derived, not chosen, and it is worth writing the sum out so
 it can be argued with:
