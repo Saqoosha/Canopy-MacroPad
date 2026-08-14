@@ -8,11 +8,12 @@ it is the only way to catch a parameter edit that quietly moved a hole,
 since nothing here is dimensioned on a drawing anyone reads.
 """
 
+import math
 import re
 import sys
 from pathlib import Path
 
-from build123d import Pos, Rotation, export_step, export_stl
+from build123d import Cylinder, Pos, Rotation, export_step, export_stl
 
 import mock
 import params as P
@@ -36,6 +37,58 @@ def export_step_stable(part, path):
                         f.read_text(), count=1))
 
 
+def _head_seat_probe():
+    """The plate that has to be there above each counterbore.
+
+    An interference check asks what two solids share, so it can only ever
+    find material that should not exist. The channel's failure was the
+    opposite -- material that should exist and did not, 0.20 of plate
+    spanning the bore under the screw head's seat -- and no boolean run
+    against a mock can see that, because the missing part is a void.
+
+    So the polarity flips: build the volume the plate is required to fill
+    and subtract the plate from it. Anything left over is plate that is
+    not there. Starts above the lead-in cone, which is a void on purpose.
+    """
+    z0 = P.SCREW_SINK + P.CLEAR_CHAMFER
+    part = None
+    for x, y in P.POST_XY:
+        ring = (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
+                * Cylinder(radius=P.SCREW_HEAD_DIA / 2,
+                           height=P.BOTTOM_T - z0))
+        ring -= (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
+                 * Cylinder(radius=P.SCREW_CLEAR_DIA / 2,
+                            height=P.BOTTOM_T - z0 + 0.2))
+        part = ring if part is None else part + ring
+    return part
+
+
+def _circ_rect(cx, cy, r, x0, x1, y0, y1):
+    """True clearance from a circle to an axis-aligned rectangle.
+
+    Not the four-way separating-axis form used for the channel: a column
+    is round, and treating it as its bounding square reported a socket
+    wing as a hit at -0.017 when the real clearance is +0.699. Where the
+    answer is a number somebody will act on, the square is not close
+    enough.
+    """
+    nx = min(max(cx, x0), x1)
+    ny = min(max(cy, y0), y1)
+    return math.hypot(cx - nx, cy - ny) - r
+
+
+def _rect_gap(xs, ys, cx, cy, r):
+    """Plan-view clearance between an axis-aligned rect and a circle.
+
+    Separated on any one axis is separated, so the largest of the four
+    one-axis gaps is the answer; negative means the footprints overlap.
+    Used for features a boolean cannot see -- a trench takes material
+    away, so nothing standing over one ever reports interference.
+    """
+    return max(xs[0] - (cx + r), (cx - r) - xs[1],
+               ys[0] - (cy + r), (cy - r) - ys[1])
+
+
 def check(label, got, want, tol=0.01):
     ok = abs(got - want) <= tol
     print(f"  [{'ok ' if ok else 'BAD'}] {label:<38} {got:8.3f}  (want {want:.3f})")
@@ -48,6 +101,10 @@ def main():
         "shell": parts.shell(),
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
+        # The clearance row on its own. Three of the coupon's four fits
+        # are settled, so re-asking the fourth should not cost a reprint
+        # of the other three.
+        "coupon-clear": parts.clear_coupon(),
     }
 
     print("exported")
@@ -86,14 +143,21 @@ def main():
               (P.SWITCH_XY[0][1] + P.SWITCH_XY[-1][1]) / 2,
               P.NEOKEY_ORIGIN[1] + P.NEOKEY_SW_Y),
         check("plate thickness", P.Z_PLATE_TOP - P.Z_PLATE_BOTTOM, P.PLATE_T),
+        # From the top of the plate down to the bottom of the skirt, which
+        # reaches below the seam so the two halves overlap rather than
+        # butting. The skirt is why this is not simply CASE_H - Z_FLOOR.
         check("shell height", built["shell"].bounding_box().size.Z,
-              P.CASE_H - P.Z_FLOOR),
+              P.CASE_H - P.Z_FLOOR + P.SEAM_STEP_H),
     ]
     if P.STACKED:
         ok += [
             check("key field centred on x=0",
                   (P.SWITCH_XY[0][0] + P.SWITCH_XY[-1][0]) / 2, 0.0),
-            check("USB-C centred across the case", P.USB_CX, 0.0),
+            # USB-C used to be asserted centred across the case. The
+            # six-key field moved the QT Py off centre to get it out of a
+            # support column -- see QTPY_CX -- so the property worth
+            # asserting is the one that displaced it, and it lives in the
+            # margins below as "QT Py clear of the board columns".
             check("depth is set by the QT Py, not the NeoKey", P.CASE_D,
                   P.WALL + P.QTPY_D + P.QTPY_SLOP + P.QWIIC_PLUG_L + P.WALL),
         ]
@@ -108,6 +172,18 @@ def main():
     print(f"  [{'ok ' if bh <= P.Z_PLATE_BOTTOM else 'BAD'}] "
           f"{'bottom plate fits under the shell':<38} {bh:8.3f}  "
           f"(limit {P.Z_PLATE_BOTTOM:.3f})")
+
+    # The one clearance in the design with a ceiling as well as a floor.
+    # The ring left over the counterbore is both the screw head's seat and
+    # a piece of unsupported printing, so it has to stay wide enough to
+    # bear on and narrow enough not to sag into the bore. The margins
+    # below are all minimums and cannot express the second half.
+    ring = (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2 - P.CLEAR_CHAMFER
+    good = 0.25 <= ring <= P.CLEAR_RING_MAX + 1e-6
+    ok.append(good)
+    print(f"\n  [{'ok ' if good else 'BAD'}] "
+          f"{'ring over the counterbore':<38} {ring:8.3f}  "
+          f"(0.250 to {P.CLEAR_RING_MAX:.3f})")
 
     # Clearances that are not derived from anything, so nothing else fails
     # first if they go negative.
@@ -133,9 +209,52 @@ def main():
             - ((P.USB_CY if P.STACKED else P.USB_CX) + P.USB_OVERHANG)
         ),
         "plate web between switches": P.SWITCH_PITCH - P.SWITCH_HOLE,
-        "screw post bite depth": P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0,
-        "post wall around the pilot": (P.POST_DIA - P.PILOT_DIA) / 2,
+        # Thread only. The 1.0 is the blind end the hole stops short of,
+        # and the mouth is a funnel that does not hold anything, so both
+        # come off or this reports engagement the screw never gets.
+        "screw post bite depth": (
+            P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
+        ),
+        # At the mouth, which is where the post is thinnest -- measuring
+        # the wall around the pilot instead would report 1.48 for a ring
+        # that is really 1.10.
+        "post wall at the pilot mouth": (P.POST_DIA - P.PILOT_MOUTH_DIA) / 2,
         "plate left under the screw head": P.BOTTOM_T - P.SCREW_SINK,
+        # The counterbore floor the head actually sits on is a ring, and
+        # widening the clearance hole eats it from the inside. Nothing
+        # else notices if it goes to nothing -- the plate keeps its
+        # thickness and the head keeps its diameter, and the screw just
+        # pulls through.
+        "counterbore ring under the head": (
+            (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2
+        ),
+        # The coupon drills wider than the case does, and a swept hole
+        # that eats its own counterbore tests nothing -- the screw falls
+        # straight through and the entry reads as "free" for the wrong
+        # reason.
+        "counterbore ring at the widest swept hole": (
+            (P.SCREW_HEAD_DIA - max(P.CLEAR_SWEEP)) / 2
+        ),
+        # The plate's own ring is checked above instead, where it can be
+        # held to a maximum as well. This is the coupon's worst row, and
+        # it gets the minimum only on purpose: the coupon exists to print
+        # rings outside the limit -- its C0.00 row is at 1.200 and that
+        # row is the control.
+        "seat left on the coupon's worst row": (
+            (P.SCREW_HEAD_DIA - max(P.CLEAR_SWEEP)) / 2
+            - max(P.CLEAR_CHAMFER_SWEEP)
+        ),
+        # A swept hole nobody can name is not a test, and the counterbore
+        # is the widest thing on the pad -- it reached the top of the
+        # digits once already, which reads as a clean part right up until
+        # the label comes out with its head cut off. The gap to the
+        # counterbore is not checked here on purpose: the label is now
+        # positioned from that edge, so a check on it would report the
+        # constant it was built from and could never fail. What is left
+        # over, and can, is whether the label still lands on the pad.
+        "coupon label inside the pad": (
+            parts.coupon_layout()["clear_label_edge"]
+        ),
         # A proud button head on the underside is only fine while the feet
         # are taller than it is.
         "feet clear the screw heads": (
@@ -144,13 +263,94 @@ def main():
         # Against the plug, not the board. Measuring to the board edge is
         # what let an M3 post land on the Qwiic connector with this check
         # still reading green.
+        # Measured from the plug's own outer face, and to the *nearest*
+        # post rather than to a post picked by index. The field stopped
+        # being centred in the case when the breakouts went on one end,
+        # so a half-width from the middle no longer points at the board
+        # edge the plug is on.
         "screw post clears the mated plug": (
-            abs(P.POST_XY[0][0]) - P.POST_DIA / 2
-            - (P.NEOKEY_W / 2 + P.QWIIC_PLUG_L)
+            min(abs(px - (P.NEOKEY_CENTER[0] + P.NEOKEY_W / 2
+                          + P.QWIIC_PLUG_L))
+                for px, _ in P.POST_XY)
+            - P.POST_DIA / 2
         ),
-        "NeoKey column inside the cavity": (
-            P.CASE_D / 2 - P.WALL
-            - max(abs(y) for _, y in P.MOUNT_XY) - P.COLUMN_DIA / 2
+        # Per column, because they are not all one diameter any more: the
+        # field pads are FIELD_SUPPORT_DIA because they have to clear the
+        # board's own components in y, where a seam column escapes in x.
+        # Measuring both against COLUMN_DIA reported a pad 0.06 outside
+        # the cavity that is really 0.44 inside it -- a check describing a
+        # column that no longer exists.
+        "board columns inside the cavity": min(
+            [P.CASE_D / 2 - P.WALL - abs(y) - P.COLUMN_DIA / 2
+             for _, y in P.MOUNT_XY]
+            + [P.CASE_D / 2 - P.WALL - abs(y) - P.FIELD_SUPPORT_DIA / 2
+               for _, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
+        ),
+        # Nothing booleans a trench: what it removes is material, so a
+        # feature standing over one still reports zero interference and a
+        # membrane left under one is a valid solid. These are the only
+        # guard the wire channel has, and they are floors on the plan
+        # view -- the channel's rectangle against every circle that
+        # matters, separated on any one axis being enough.
+        #
+        # Against the screw features first, because that is the pair that
+        # was wrong: the channel ran over both counterbores and left
+        # 0.20 of plate spanning them, one layer over the bore. Measured
+        # to the larger of the counterbore and the shell's post, since
+        # the post's foot has to land on plate that is still there.
+        "wire channel clear of the screws": min(
+            _rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                      max(P.SCREW_HEAD_DIA, P.POST_DIA) / 2)
+            for x, y in P.POST_XY
+        ),
+        # ...and against the columns that stand up out of the plate, per
+        # column because they are not one diameter.
+        "wire channel clear of the columns": min(
+            [_rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                       P.COLUMN_DIA / 2) for x, y in P.MOUNT_XY]
+            + [_rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y, x, y,
+                         P.FIELD_SUPPORT_DIA / 2)
+               for x, y in P.BREAKOUT_SUPPORT_XY + P.SEAM_XY]
+        ),
+        # ...and the third thing a trench does, which is neither of the
+        # other two: meet something cut from the *other* face and leave a
+        # membrane between them. The screws were the 0.20 case and are
+        # clear now; the feet are not, and cannot be -- a Ø8.00 foot at
+        # y 5.99 in a 25.99-deep case has nowhere to go that clears a
+        # channel reaching y 5.60, and moving it to the other side would
+        # put two feet on one edge. So the left +y foot keeps 0.70 of
+        # plate over its recess and this is the number that says so.
+        #
+        # Not a boolean, and deliberately: the material is there, it is
+        # thin. Reaching for the subtraction probe here would report
+        # 0.000 and mean nothing.
+        "plate left under the wire channel": min(
+            [P.BOTTOM_T - P.WIRE_CHANNEL_D] + [
+                P.BOTTOM_T - P.WIRE_CHANNEL_D - P.FOOT_RECESS
+                for x, y in P.FOOT_XY
+                if _rect_gap(P.WIRE_CHANNEL_X, P.WIRE_LANE_Y,
+                             x, y, P.FOOT_DIA / 2) < 0
+            ]
+        ),
+        # A plate column rises the whole way to a board's underside, so
+        # whatever hangs off that face it has to dodge sideways. The
+        # interference boolean says whether it touches; this says by how
+        # much, which is the number that decides whether a printed column
+        # 0.1 fat still misses. Both boards, every column, every part on
+        # the face -- the NeoKey's was invisible here until its face went
+        # into the mock.
+        "column to a board's components": min(
+            [_circ_rect(cx, cy, dia / 2,
+                        ox + x0, ox + x1, oy + y0, oy + y1)
+             for cx, cy, dia in (
+                 [(x, y, P.COLUMN_DIA) for x, y in P.MOUNT_XY]
+                 + [(x, y, P.FIELD_SUPPORT_DIA)
+                    for x, y in P.SEAM_XY + P.BREAKOUT_SUPPORT_XY])
+             for ox, oy, table in (
+                 [(P.NEOKEY_ORIGIN[0], P.NEOKEY_ORIGIN[1], P.NEOKEY_BACK_PARTS)]
+                 + [(o[0], o[1], P.BREAKOUT_BACK_PARTS)
+                    for o in P.BREAKOUT_ORIGINS])
+             for x0, x1, y0, y1, _pr in table]
         ),
         # A USB-C plug's overmold is roughly 6.5 tall. Sitting this low in
         # the case, the question stops being whether it fits the opening
@@ -163,6 +363,15 @@ def main():
         # Only meaningful with one board over the other.
         margins["QT Py to the NeoKey's sockets"] = (
             P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP - P.Z_QTPY_HIGH
+        )
+        # Sideways, against the columns that hold the boards above it.
+        # This is the arithmetic guard for the collision that moved the
+        # QT Py off centre; the interference boolean below is still the
+        # evidence.
+        margins["QT Py clear of the board columns"] = (
+            min(abs(P.QTPY_CX - cx)
+                for cx, _ in P.MOUNT_XY + P.BREAKOUT_SUPPORT_XY)
+            - P.QTPY_PLAN_W / 2 - P.COLUMN_DIA / 2
         )
     print("\nmargins")
     for label, v in margins.items():
@@ -192,6 +401,15 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'shell':<7} vs {'bottom plate':<18}"
           f" {hit:9.3f} mm3")
+
+    # And the one that runs the other way: material required, not
+    # material shared. Nothing above could have found the wire channel
+    # eating the screw head's seat, because what it left was a void.
+    missing = (_head_seat_probe() - built["bottom"]).volume
+    good = missing < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
+          f"head {missing:9.3f} mm3")
 
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1

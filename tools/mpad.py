@@ -2,7 +2,7 @@
 """Host-side console for the Canopy MacroPad firmware.
 
 Stdlib only, so there is nothing to install before bring-up. Serves two
-jobs during Phase 1 — probe, and talk — plus two scripted variants of
+jobs during Phase 1 — probe, and talk — plus three scripted variants of
 talking:
 
     tools/mpad.py                 probe, then open a console on the data port
@@ -16,6 +16,10 @@ talking:
                                   against real ambient light. Prints the
                                   post-brightness 8-bit values, which is
                                   where dark colors fall apart.
+    tools/mpad.py --load          hold every key at full white, brightness
+                                  100. Not for looking at — it is the
+                                  worst case the pixel rail has to
+                                  survive, and the state to meter it in.
 """
 
 import argparse
@@ -30,7 +34,9 @@ import time
 PROBE_TIMEOUT_S = 1.5
 CANDIDATE_GLOB = "/dev/cu.usbmodem*"
 ADAFRUIT_VID = "9114"  # 0x239A
-DEMO_COLORS = ["ff0000", "00ff00", "0040ff", "ff8000"]
+# Six distinct hues, so a six-key pad has no two neighbours the same.
+# Cycled if the device ever reports more keys than there are entries.
+DEMO_COLORS = ["ff0000", "00ff00", "0040ff", "ff8000", "00ffa0", "ff00ff"]
 # Equal RGB does not come out neutral on these LEDs — the green channel
 # is the weak one, so ffffff reads visibly purple through a clear keycap.
 # Trimming red and blue ~6% is enough; measured as the smallest cut that
@@ -41,7 +47,12 @@ DEMO_HELD = "f0fff0"
 # in the README's status-colour table and are repeated on page 1 here for
 # reference. These pages exist to re-tune against a new keycap, a new
 # diffuser, or a different desk lamp; they are the question, not the
-# answer. Four entries per page because the pad has four keys.
+# answer.
+#
+# A page is a list of candidates, not a picture of the pad: entry n goes
+# on key n and any keys past the end of the page are turned off. Four
+# entries against six keys is fine and arguably better for an A/B -- two
+# dark keys between the samples and nothing else competing.
 PALETTE_PAGES = [
     ("the shipped palette", [
         ("0040ff", "running"),
@@ -310,6 +321,72 @@ def do_probe(verbose=True):
     return data_ports[0] if data_ports else None
 
 
+def read_key_count(reader, timeout=PROBE_TIMEOUT_S):
+    """How many keys the device says it has, or None if it never says.
+
+    `HELLO <ver> <keys>` arrives unprompted on connect and `PONG <ver>
+    <keys>` answers `P`, so either will do and whichever lands first
+    wins. Lines are echoed as they are read because this is a console:
+    swallowing the handshake to parse it would hide the one exchange
+    worth seeing.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for line in reader.poll():
+            print("< {}".format(line))
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] in ("PONG", "HELLO"):
+                try:
+                    return int(parts[2])
+                except ValueError:
+                    pass  # a mangled line is not a key count
+        time.sleep(0.02)
+    return None
+
+
+def load(path):
+    """Hold every key at full white, which is what a rail is measured under.
+
+    Idle is the flattering case and it is not the case that browns out.
+    The pixels on both board kinds hang off the incoming Qwiic rail rather
+    than off the regulated 3.3 V behind it -- see README "Hardware" -- so
+    what the LEDs see is the QT Py's rail minus whatever 50 mm of thin
+    Qwiic conductor drops under load, and that drop only exists when there
+    is load.
+
+    Probe at the LED end, not at the QT Py: the two differ by exactly the
+    thing being measured. Take the reading at four keys before the
+    breakouts land and again at six afterwards -- one number cannot
+    separate cable drop from a regulator giving up, and two can.
+    """
+    fd = open_raw(path)
+    reader = LineReader(fd)
+    keys = read_key_count(reader)
+    if keys is None:
+        keys = len(DEMO_COLORS)
+        print("no PONG within {}s - assuming {} keys.".format(
+            PROBE_TIMEOUT_S, keys))
+    # No crossfade and no pulse: the point is a steady worst case, not a
+    # transition. Full brightness on purpose -- the shipped 60 is not what
+    # the supply has to survive.
+    send(fd, "X 0")
+    send(fd, "B 100")
+    for idx in range(keys):
+        send(fd, "C {} ffffff".format(idx))
+    print("{} keys at full white, brightness 100.".format(keys))
+    print("meter the pixel VDD at an LED, not at the QT Py.")
+    print("[Ctrl-C] to stop and blank them")
+    try:
+        while True:
+            for line in reader.poll():
+                print("< {}".format(line))
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        send(fd, "R")
+        print("\nblanked.")
+    return 0
+
+
 def console(path, demo=False):
     fd = open_raw(path)
     reader = LineReader(fd)
@@ -318,14 +395,25 @@ def console(path, demo=False):
     try:
         send(fd, "P")
         if demo:
+            # Ask rather than assume. The key count is the second field
+            # of PONG, and carrying it is the whole reason the protocol
+            # has it -- this tool used to paint exactly len(DEMO_COLORS)
+            # keys, which was right only while the pad had four.
+            keys = read_key_count(reader)
+            if keys is None:
+                keys = len(DEMO_COLORS)
+                print("demo: no PONG within {}s - assuming {} keys."
+                      .format(PROBE_TIMEOUT_S, keys))
             # This mode answers "does a press reach the host and light
             # the key". Crossfading a tap into a partial fade is exactly
             # the ambiguity it exists to remove.
             send(fd, "X 0")
-            for idx, color in enumerate(DEMO_COLORS):
-                send(fd, "C {} {}".format(idx, color))
+            for idx in range(keys):
+                send(fd, "C {} {}".format(
+                    idx, DEMO_COLORS[idx % len(DEMO_COLORS)]))
                 time.sleep(0.25)
-            print("demo: keys lit. press them — each press turns its key white.")
+            print("demo: {} keys lit. press them — each press turns its "
+                  "key white.".format(keys))
 
         while True:
             ready, _, _ = select.select([fd, sys.stdin], [], [], 0.1)
@@ -384,6 +472,10 @@ def palette(path, brightness=60):
 
     def show():
         name, entries = PALETTE_PAGES[page % len(PALETTE_PAGES)]
+        # Clear first: a shorter page would otherwise leave the previous
+        # one's colours sitting on the keys past its end, which reads as
+        # part of the comparison rather than as leftovers.
+        send(fd, "R")
         send(fd, "B {}".format(brightness))
         print("\n--- {} --- (brightness {}%)".format(name, brightness))
         for idx, (hexcolor, label) in enumerate(entries):
@@ -439,6 +531,9 @@ def main():
                       help="light all keys, mirror presses to white")
     mode.add_argument("--palette", action="store_true",
                       help="step through candidate status colors")
+    mode.add_argument("--load", action="store_true",
+                      help="every key full white at 100%% — the worst case, "
+                           "for metering the pixel rail")
     args = parser.parse_args()
 
     if args.probe:
@@ -461,6 +556,8 @@ def main():
     try:
         if args.palette:
             return palette(port)
+        if args.load:
+            return load(port)
         return console(port, demo=args.demo)
     except (OSError, termios.error) as err:
         print("cannot open {}: {}\ntry --probe to list ports."

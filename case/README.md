@@ -39,9 +39,21 @@ because `USB_PLUG_W/H` were never measured off anything.
 
 Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
 1.00 takes some working at — the Qwiic plug does go in, but a reprint
-would want 1.5–2.0. And `PILOT_DIA` is still open: no M3 has been driven
-into a post yet, which is the one remaining guess that fails
-destructively. **`stacked` has never been printed.**
+would want 1.5–2.0. And the M3 has now been driven into a post: it goes,
+but hard enough to be the first thing anyone says about the part. That
+sent `PILOT_DIA` to the coupon, which settled it at 2.95 — the how is
+under "Print the coupon first" — and put a Ø3.40 × 0.60 lead-in at every
+mouth. The reprinted shell has both and the screw goes in clean.
+
+Then the part nobody was looking at: the bottom plate's screw holes are
+tight. They pass a screw, but they guide it, and a clearance hole is
+supposed to be free. The obvious answer was the same 0.15 shrink a third
+time, and it was wrong — see "Print the coupon first", where two rows of
+holes found the real cause under the counterbore. **A plate has been
+printed at Ø3.70 with the 0.60 chamfer and it is right**: the bores come
+out clean, with no filament hanging in them, and the screws go in easily.
+That is the last number on this case to stop being a prediction.
+`stacked` has never been printed at all.
 
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
 Both parts print flat and **neither needs supports**. If the slicer wants
@@ -49,23 +61,108 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-`out/<layout>/coupon.stl` is 36 × 24 mm and takes about fifteen minutes.
+There are two, and the small one exists so that re-asking one question
+does not cost a reprint of the answers already settled:
+`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own.
+
+`out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
 
 | Test | What it settles | Status |
 |---|---|---|
 | switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
-| M3 self-tapper into the 2.50 pilot | `PILOT_DIA` | open — tight splits the post, loose strips on the second open |
+| M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
+| M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled, and confirmed on a printed plate** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
-`PILOT_DIA` is the last one open, and the only one the coupon can still
-save a reprint on: it is the guess that fails destructively.
+`PILOT_DIA` was the last one open, and the only one the coupon could
+still save a reprint on: it is the guess that fails destructively. So it
+is the one test the coupon runs more than once. `PILOT_SWEEP` puts a post
+down for every candidate, each engraved with its own diameter, because
+the answer is a feel rather than a measurement — the screw that goes in
+too easily and the one that needs a fight only separate side by side,
+same screw, same plastic, minutes apart. Driving an M3 into all four
+picked 2.95.
 
-Edit the number, rerun `build.py`, print the real thing. The coupon
-carries the real features at their real sizes — the plate is 1.6 mm and
-the post is whatever that layout's post is, 7.8 mm inline and 13.5 mm
-stacked — so a fit that works here works in the case.
+Two things about that answer are worth carrying. It is **not** where the
+arithmetic pointed: 2.95 prints as ~2.80 here, or 0.93× major, against
+the 0.83× the tables want. The tables do not know this screw or this
+plastic. And it won at the **top** of the range, so the diameter that
+strips was never found — **and is deliberately not being looked for**,
+because finding it means driving screws into posts until they fail and
+the answer changes nothing. 2.95 works. The failure mode is still real:
+this number does not split a post on the first turn, it lets go on the
+third time the case is opened. If one ever does, re-run the sweep
+downward from 2.95.
+
+`CLEAR_SWEEP` is the same idea pointed at the other end of the same
+screw, and it took the longest to answer. Its row is a pad raised to the
+bottom plate's real `BOTTOM_T`, not the 1.6 the rest of the coupon is:
+how free a hole is depends on how many layers it passes through, and it
+is the 12 that ships. The counterbore is on the **bed** face, where
+`bottom()` puts it, so the through-hole starts 1.00 up and never meets
+the squashed first layer — printed the other way up, the coupon would
+read tighter than the plate it stands in for and the answer would be
+wrong in the safe-looking direction. The labels are on that same face and
+mirrored, so the side you read is the side the screw goes in. **Turn the
+coupon over for this row.** The right hole is the smallest one a screw
+falls through under its own weight while its head is still fully caught
+by the counterbore.
+
+When the clearance row is the *only* thing open — which is where this
+sits today — print `out/<layout>/coupon-clear.stl` instead. Same holes,
+same pitch, same relative positions, on a 57 × 28 × 2.4 pad of its own:
+minutes rather than the full coupon's twenty, and no switch-sized hole
+spent on a fit that was settled months ago. It shares the row with the
+big coupon rather than restating it, so the two cannot drift.
+
+It prints the row **twice**, and that is what settled the number. The
+first one printed came back with filament hanging in every bore, and the
+geometry says why: the counterbore is a Ø6.10 void and the hole above it
+was Ø3.55 at the time, so the layer closing it is a ring 1.275 mm
+wide printed over air, all the way round. It sags, and what it sags into
+is the top of the hole. **The built bottom plate has exactly this
+feature** — the coupon did not invent it, it made it visible — which
+means it is a better candidate for why the screws are guided rather than
+cleared than the 0.15 hole shrink is.
+
+Sweeping the diameter alone cannot separate those two explanations: it
+would find a diameter that works and leave the reason unknown, which is
+the same answer a wrong theory gives. So the rows differ only in the
+transition — `C0.00` is the plate as it shipped, `C0.60` puts a 45° cone
+above the counterbore. **Do not add supports** — the plate prints without
+them, so a supported coupon stands in for nothing.
+
+**Both explanations were right, and neither was the variable.** The eight
+holes sort perfectly by the width of the ring left unsupported over the
+counterbore, which is `(SCREW_HEAD_DIA - dia) / 2 - chamfer` and which
+neither the diameter nor the chamfer sets on its own:
+
+| ring | holes | result |
+|---|---|---|
+| 0.525, 0.600 | 3.85 and 3.70 at `C0.60` | clean |
+| 0.675 | 3.55 at `C0.60` | a little sag |
+| 0.750 and up | 3.40 at `C0.60`, all of `C0.00` | filament in the bore |
+
+So **0.60 is this machine's limit for an annular ceiling printed over
+air** — `CLEAR_RING_MAX`, a constant about the printer in the same way
+`SWITCH_HOLE`'s 0.15 shrink is, and it re-measures with it. The plate now
+runs Ø3.70 with a 0.60 chamfer, which lands exactly on that limit. 3.85
+also passes and was not taken: it buys nothing and costs 0.075 more of
+the seat.
+
+That ring is the one dimension in the case squeezed from both ends — it
+is *also* the flat the screw head bears on — so `build.py` checks it
+against a maximum as well as a minimum, the only clearance here that
+gets both.
+
+To re-settle any of it after a filament or nozzle change: print the
+coupon, drive a screw into each post, drop one through each hole, set the
+numbers to the smallest ones that pass, rerun `build.py`, print the real
+thing. The coupon carries the real features at their real sizes — the
+plate is 1.6 mm and the post is whatever that layout's post is, 7.8 mm
+inline and 13.5 mm stacked — so a fit that works here works in the case.
 
 ## Cable, per layout
 
@@ -221,6 +318,31 @@ connectors and not bare receptacles:
 - the NeoKey's support columns growing with the screws, because they were
   sized off `POST_DIA` and are not screws at all. They have their own
   `COLUMN_DIA` now.
+- **two bottom-plate columns standing through a breakout's hot-swap
+  socket** — and this one the checks did *not* find, the assembled part
+  did. The stand-in drew the socket as one box around its body, so it
+  missed the solder wing off each end; and the back face was never
+  mirrored for the fact that the board is turned over to put its switch
+  side up, so the whole of it sat on the wrong side. Both are fixed at
+  the source: `BREAKOUT_BACK_PARTS` is every part on that face as the
+  STEP has them, mirrored once on the way into case space.
+- **the whole board stack sitting 0.16 too low**, the same disease one
+  level up. The deepest thing under a board is not the hot-swap socket at
+  1.85 but the STEMMA receptacle at 2.96, and that was modelled on the
+  other face where nothing had to clear it. `SOCKET_CLEARANCE` had been a
+  hand-written 2.80 reasoned from the socket; it comes from
+  `UNDER_BOARD_MAX` now. The printed case closes on a NeoKey pressed into
+  the bottom plate — too little to feel, enough to strain the boards, and
+  invisible to every check because the model had the part on the far
+  side. The case grows 0.56 to fix it.
+- **a NeoKey support column standing through the middle of the QT Py** in
+  `stacked`, 116 mm³ of it, the moment the key field grew to three
+  boards. The NeoKey stopped starting at the field's left edge, so its
+  first pair of mounting holes landed at case `x = 0` — where the QT Py
+  had always sat. Nothing about the change looked like it was near the
+  QT Py; the boolean is the only reason it was not printed that way. The
+  QT Py now sits at `x = 19.05`, the centre of the widest gap the columns
+  leave, and USB-C is no longer centred on the back wall as a result.
 - **the bottom plate blocking the USB plug** — and this one the checks
   did *not* find, a person looking at the render did. The opening's lower
   edge lands exactly on the seam between the two printed halves, and the
@@ -284,6 +406,66 @@ cheaper thing to spend.
 
 ## How it holds together
 
+**The two halves overlap rather than butting.** The plate's top 1.20 is a
+tongue inset 1.00 a side and the shell's walls carry on down beside it.
+It aligns the halves and puts whatever gap is left **inside** the joint
+instead of on the outside, which is what the complaint was: a butt joint
+158 mm long with screws only at the ends closed 0.2 proud at the centre,
+and slack above the boards took that to 0.1 and no further -- the rest is
+the parts not being flat off the bed.
+
+**There were barbs too, and they are gone.** A snap on the inside of the
+skirt, dropping into a groove round the tongue, swept 0.30 to 0.70 of
+reach on its own coupon. All four printed too weak; 0.70 was the best of
+them and still did not lock. Both complaints -- hard to fit, does not
+hold -- are one fault, and it is arithmetic rather than a number wanting
+another round: **the skirt is not a spring.** At 0.90 thick over a 1.20
+free length, even the shallowest hook asks it for 19% surface strain
+where PLA yields near 2. It never bent; it was forced.
+
+A cantilever that deflects 0.40 within 2% wants about 5 mm of length and
+this plate is 2.40 thick, so no hook in this geometry can work. A third
+screw at mid-span is out for a different reason: the boards fill the case
+wall to wall there, 0.200 between the field and the cavity against the
+5.60 a post needs. **If the centre ever lifts, the next thing to try is
+a magnet pair under the boards, not a plastic spring.**
+
+**The wires have a trench, and the case grew for them.** Five have to
+cross the whole field, and the first wired unit would not lie down: the
+space under the boards was 3.36 mm, of which a hot-swap socket took 1.83
+and a STEMMA receptacle 2.96, leaving one usable lane 5.70 mm wide.
+`UNDER_BOARD_AIR` went from 0.40 to 1.40 on that evidence, so the gap is
+**4.36** and the whole case 13.33 instead of 12.33.
+
+The extra millimetre changed the shape of the problem rather than its
+size. **A wire passes under something only if that thing leaves more
+room than the wire is thick**, so at 0.40 under a receptacle the
+receptacles were walls and the near half of the board was unreachable.
+At 1.40 they are not, and the lane opens from four wires abreast to
+nine. The channel is cut to that whole width — 11.20 mm — because 1.40
+against a 1.30 wire is 0.10 and no harness should be laid on that; sunk
+`WIRE_CHANNEL_D`, a receptacle leaves 2.60 instead. The Qwiic cable
+hangs in that same near half and now has somewhere to sit for the first
+time.
+
+It runs under the boards and stops there, because that is the only place
+the depth buys anything and because past the boards are the screws. A
+trench is invisible to the interference check: over a counterbore it left
+0.20 mm of plate spanning the bore, and beside it 0.45 mm of the shell's
+post stood on air, both with every boolean at zero. What catches it is a
+boolean run the other way — the ring the screw head bears on, built as a
+solid and with the plate subtracted from it, so what is left is plate
+that is not there. Two plan-view margins sit beside it for the distance
+that measurement cannot report.
+
+Where the channel meets something coming the other way it has nowhere
+better to be: both left feet's recesses rise 0.50 under a channel going
+down 1.20, leaving **0.70 mm** of plate over an Ø8 pocket. Ø8 feet at
+y ±5.99 in a 25.99 mm case cannot clear a channel reaching ±5.60, and
+the feet are where they are so the case does not rock. It is a thickness
+rather than a hole, so no boolean sees it and `plate left under the wire
+channel` is what holds it.
+
 **Nothing screws through either PCB.** Four standoffs come down off the
 plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes
 and fixes it in X and Y; the bottom plate's columns push it up against
@@ -308,6 +490,38 @@ In `inline` it sits beside the keys in a shell pocket, **face up**, held
 down by two pinch bars on its clear margins with the plate closing
 underneath. There is nothing above it to hide from, so face up costs
 nothing and puts the USB-C out the right end.
+
+**The rails run full width and give way at three points.** They were
+narrowed once, held 1.80 back off the board's edge so they missed the
+castellated pads — which spent clearance along their whole length to
+solve a problem in three places, and left 1.10 mm and 0.89 mm of ledge to
+carry the board. They are 2.90 and 2.69 now, and `QTPY_PADS_USED` cuts a
+pocket where `SCK`, `MISO` and `MOSI` are soldered, and that pocket runs
+off the near end rather than stopping short of the first pad: stopping
+left a 3.671 mm stub of rail between the pads and the notch the wires
+leave through, and every wire had to bend round it. What carries the
+board is the other rail full length and 8.750 of this one past the pads,
+on the side nothing runs along. Which three pads
+those are is a wiring fact, so it lives in `params.py` next to the wiring
+rather than in the geometry.
+
+And the pocket wall gives way too. The frame runs all the way round the
+board, so a wire soldered to JP3 had the board's edge to leave from and
+nowhere to go — the fourth time this case has fitted a board and then
+made itself impossible to wire, after both Qwiic sockets and the USB
+port. `QTPY_WIRE_NOTCH_W`/`_H` open the wall between the pocket and the
+key field, just above the screw post the wires have to clear anyway and
+stopping short of the plate, so what is left is a bridge rather than a
+missing wall. Measured, not guessed: a bundle laid from the pads to the
+channel shared 10.240 mm³ with that wall and nothing with the plate, and
+shares nothing with either now.
+
+Their inner ends are still trimmed to `QTPY_UNDER_X`. The clear strips
+were read off the board by eye and the second one starts at 14.40 while
+the first real component reaches 14.414 — 0.014 inside it, which only
+matters once a rail is pulled onto that boundary, and which the mock
+could not see at all until the QT Py's underside stopped being one
+hand-drawn box.
 
 Switches go in **from the top, through the plate**, after the case is
 closed — the hot-swap sockets mean they stay removable without opening
@@ -354,7 +568,7 @@ NeoKey covers the case wall to wall and nothing above can reach it.
 | Part | Qty | Note |
 |---|---|---|
 | STEMMA QT / Qwiic cable | 1 | 100 mm for `stacked`; the existing 50 mm for `inline` |
-| M3 × 10 self-tapping, button head | 4 | into Ø2.50 pilots; counterbored 1.00 so the feet still clear the dome |
+| M3 × 10 self-tapping, button head | 4 | into Ø2.95 pilots with a Ø3.40 lead-in, through Ø3.70 clearance chamfered 0.60; counterbored 1.00 so the feet still clear the dome |
 | Ø8 × 2 rubber feet | 4 | 0.5 recess, so they stand 1.5 proud |
 | PLA Basic | ~19 g | shell 10.6 cm³, bottom 7.9 cm³ |
 

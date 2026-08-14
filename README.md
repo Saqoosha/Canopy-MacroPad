@@ -1,8 +1,15 @@
 # Canopy MacroPad
 
-Four keys next to the keyboard. Each key mirrors one Canopy pane: its
+Six keys next to the keyboard. Each key mirrors one Canopy pane: its
 LED shows what that pane's Claude session is doing, and pressing it
 focuses that pane and brings Canopy forward.
+
+The six are not one board. Keys 2-5 are a NeoKey 1x4 on I2C, keys 0-1
+are two single-key breakouts read straight off GPIO, and they butt
+together into one 19.05 mm pitch because the breakout happens to be
+exactly one pitch wide with its switch centred in it. Which board a key
+sits on is invisible to the host: the protocol has one index space and
+the device reports its size.
 
 ![The inline case, closed with keycaps on, and open with the NeoKey and
 the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
@@ -57,12 +64,15 @@ any desk toy is, and a mounted volume disappearing makes macOS say
 *"Disk Not Ejected Properly"* every single time, about a disk nobody was
 using. Ejecting first works and nobody does it.
 
-**Hold a key on the first NeoKey board through a boot and `CIRCUITPY`
-mounts as before.** Any hard reset counts — replug, `RST`, or
-`microcontroller.reset()` — since that is when `boot.py` runs. Only
-`0x30` is probed, so if a second board is ever added its four keys will
-not work as the gate. The drive then stays mounted for the rest of the
-session, so an edit-and-copy loop needs the finger only once.
+**Hold any of the six keys through a boot and `CIRCUITPY` mounts as
+before.** Any hard reset counts — replug, `RST`, or
+`microcontroller.reset()` — since that is when `boot.py` runs. The GPIO
+pair is read first, because two pin reads cost nothing against the
+seesaw's 0.5 s software reset, and a key held there skips the bus
+entirely. On the I2C side only `0x30` is probed, so a second NeoKey's
+keys would not work as the gate. The drive then stays mounted for the
+rest of the session, so an edit-and-copy loop needs the finger only
+once.
 
 Rather than enumerate the ways the read can fail, state the property
 that holds by inspection: **`disable_usb_drive()` is reachable on
@@ -103,20 +113,158 @@ not run again until the board does.
 | Part | SKU | Role |
 |---|---|---|
 | Adafruit QT Py RP2040 | ssci 7211 / ADA-4900 | controller, CircuitPython |
-| Adafruit NeoKey 1x4 QT | ssci 10048 / ADA-4980 | 4 keys + per-key NeoPixel |
+| Adafruit NeoKey 1x4 QT | ssci 10048 / ADA-4980 | keys 2-5, on I2C `0x30` |
+| Adafruit NeoKey Socket Breakout ×2 | ssci 10047 / ADA-4978 | keys 0-1, on GPIO |
 | Qwiic cable 50mm | ssci 6896 / SFE-PRT-17260 | QT Py ↔ NeoKey |
-| Durock Ice King Linear | — | MX compatible, clear housing |
-| Clear ABS keycaps | — | placeholder for printed caps |
+| Durock Ice King Linear ×6 | — | MX compatible, clear housing |
+| Clear ABS keycaps ×6 | — | placeholder for printed caps |
 
-One STEMMA QT / Qwiic cable, no soldering. NeoKey defaults to I2C
-address `0x30`; a second board needs its A0 jumper bridged for `0x31`.
+**Why not a second NeoKey 1x4**: it gives eight keys, not six, and is
+152 mm of board. **Why not the Snap-Apart 5x6 broken to 1x6**: one
+uniform board with guaranteed LED consistency, but it carries no seesaw,
+so I2C disappears, the drive gate is rewritten, and every error path
+proven by injection has to be proven again — for ¥5,088 against ¥858.
+
+The 4978s go to the **left** of the NeoKey, and the cable is what forces
+it: on the right they strand the NeoKey's socket 114 mm from the QT Py
+against a 50 mm cable. This used to give a second reason — that a mated
+Qwiic plug stands 2.50 mm proud of its board edge while a butted
+breakout's switch body starts 2.525 mm from that edge, so the two miss
+by the tolerance — and it was not a reason at all. The plug hangs below
+the board and the switch stands above it, so that pair was never in the
+same space. Booleaned since, and then assembled: a plug in the NeoKey's
+left socket clears the breakouts, the switches and both printed parts,
+and there is a photograph of one sitting in there with both breakouts
+butted on. The socket is not blocked; the built unit simply leaves it
+empty, because power ended up coming off the headers instead.
+
+Five wires and no per-key soldering — the breakouts ship with Kailh
+sockets and their NeoPixels already fitted:
+
+| from | to |
+|---|---|
+| QT Py `MOSI` | breakout 0 `NEO_IN`; its `NEO_OUT` to breakout 1 `NEO_IN` |
+| QT Py `MISO` | breakout 0 `SWITCHA`, pulled up |
+| QT Py `SCK` | breakout 1 `SWITCHA`, pulled up |
+| NeoKey `JP1`/`JP5` `VIN` | both breakouts' `VDD` |
+| NeoKey `JP1`/`JP5` `G` | both breakouts' `GND`, and `SWITCHC` |
+
+![The same wiring drawn on the assembled boards: every pad named, the
+three signal wires on the top row and the two power wires on the bottom
+one](docs/wiring/wiring-six-key.jpg)
+
+The photograph is the shell turned over, so the face in it is the one the
+wires go on. Pad names and positions in it come out of Adafruit's Eagle
+`.brd` files for the 4978 and the 4980, **not** off the silk in the photo
+— the boards sit rotated in the case, so that silk runs the opposite way
+from the table above, and reading left to right off the picture is how
+you get the wiring mirrored.
+
+`docs/wiring/` holds the photograph and the script that draws on it;
+`python3 docs/wiring/annotate.py` redraws the image. Every coordinate in
+it is a pixel position on `boards.jpg` at its native size, so replacing
+that photograph means re-reading all of them — nothing derives a scale.
+
+Power comes off the NeoKey rather than the QT Py, so only three wires
+cross the case. `JP1` and `JP5` are the headers on the NeoKey's long
+edges, `INT D C - 3 VIN`, and that `VIN` is the `VCC` net — the one the
+STEMMA receptacles' `V+` lands on. The pin marked `3` is the `AP2112K`'s
+output and feeds no pixel anywhere.
+
+The NeoKey's spare STEMMA socket carries the same net and sits closer to
+the boards, and it was the plan for a while. The schematic has both
+receptacles fully parallel — `V+`, `GND`, `SDA` and `SCL` all common —
+so the left one is the same node as the right, and a plug goes into it
+with both breakouts butted on, which there is a photograph of. It is a
+real option and it is not the one taken. A header wins on parts: a
+solder joint instead of a connector, and the second cable's other pair
+would have been `SDA`/`SCL`, live and terminated in nothing — 50 mm of
+unterminated stub on a 100 kHz bus, harmless, but better decided on than
+discovered.
+
+Neither tap relaxes the wire channel. Both sit at or beyond the NeoKey's
+left edge and the narrowest point in the case is immediately left of
+that, so all five wires are still abreast where it matters. What the tap
+buys is length, not width.
+
+**Taking power off the NeoKey means the Qwiic cable carries it.** Pull
+that cable and keys 0 and 1 lose their supply and their ground reference
+together: the pixels go dark, `SWITCHA` floats high through its pull-up,
+and they report as never pressed. The device stays up and still says
+`HELLO 3 6`. Every *other* I2C fault — a missing library, a wrong
+address, a seesaw that stops answering — still costs exactly the four
+keys behind it, which is what the firmware's separate guards are for. So
+the promise is narrower than it reads elsewhere: **a dead NeoKey costs
+four keys, a dead cable costs six.** Running `3V` and `GND` from the QT
+Py instead buys the wider promise back, for two more wires through that
+lane.
+
+Each breakout carries a 1N4148 from `SWITCHA` to `SWITCHC`, so grounding
+`SWITCHC` makes a press read low. The forward drop at the ~55 µA an
+internal pull-up supplies is about 0.45 V, under the RP2040's 0.8 V
+V<sub>IL</sub> but not by much: a key stuck reading pressed is the
+symptom of that being wrong, and an external pull-up is the fix.
+
+Both boards carry the same pixel — the schematics name it `_SK6812E`,
+same device on both — and on the NeoKey it runs off `VCC`, the incoming
+Qwiic rail, *ahead* of the `AP2112K-3.3` that feeds the seesaw. A
+`74*1G125` shifts the seesaw's data up to that same rail. So the pixels
+see whatever the cable brings, and the status colours below were tuned at
+whatever that is.
+
+That is the argument for the colours carrying over: identical part, and
+one net. Traced through both schematics rather than assumed — the QT Py's
+`3V` pad, its STEMMA `V+` and its regulator output are all `+3V3`; the
+cable carries that to the NeoKey's `VCC`, which is what its four pixels'
+`VDD` and its `JP1`/`JP5` `VIN` sit on. Wherever the breakouts are
+tapped, they are on the same node as the pixels the colours were tuned
+against.
+
+Which settles the topology and not the question. What the colours
+actually depend on is the **voltage under load**, and six SK6812s at full
+white pull it down through a connector, a cable and however much wire
+this case makes them share. Same net says nothing about the drop across
+it.
+
+The tap point does matter, and not for the reason it first looks. One net
+does not mean one potential: taking the breakouts off the QT Py leaves
+the NeoKey carrying the Qwiic cable's drop alone, so the two halves land
+at different voltages and drift apart in colour. Taking them off the
+NeoKey puts that drop in front of all six at once. It does not make the
+difference vanish — the breakouts still sit behind their own wire — it
+removes the cable's share of it. Whether any of this is visible is a
+different question again, since the rail is already about 200 mV below an
+SK6812's datasheet floor before a single wire is counted.
+
+**The rail has still not been metered, and it no longer needs to be.**
+The voltage was only ever a proxy for a question that can be looked at
+directly: on the assembled unit, all six set to `ffffff` at `B 100` —
+the worst case, three dies lit on every pixel, the breakouts' current
+crossing the cable too — the two halves are the same white. So the
+argument above was right, and the tap point stopped being a colour
+decision. If a number is ever wanted anyway, `tools/mpad.py --load`
+produces that same worst case; probe at an LED's `VDD`, not at the QT
+Py.
+
+**The pixels are not identical to each other, though.** One of the six
+sits slightly purple against the other five under that test, and it does
+not follow the supply — it is on the same node as its neighbours, and
+they agree. It is part-to-part variation in the LED. Worth writing down
+because the alternative explanation is the rail, and the rail is now
+exonerated: a small mismatch found later is a pixel, not a wire.
+
+One consequence worth knowing before anyone "fixes" it. An SK6812's
+datasheet floor is 3.5 V and its green and blue dies drop out first, so a
+3.3 V rail shows up as a warm shift rather than as darkness. If that is
+what this is, all six keys are equally under it and equally warm, which
+is the outcome that makes them match — so **do not feed the breakouts 5 V
+on their own.** That would fix two keys, break the match, and leave the
+breakouts needing a level shifter the NeoKey already has. Both rails or
+neither.
 
 Key count is never hardcoded in Canopy — the device reports it in
-`HELLO`, so a second board is a firmware constant and nothing else on
-that side. Two caveats: a second NeoKey 1x4 gives eight keys, not the six
-the later phases talk about, which needs different hardware; and
-`tools/mpad.py` does assume four, since its demo colours and palette
-pages are written per key.
+`HELLO` — and `tools/mpad.py` now reads it from `PONG` rather than
+assuming.
 
 ## Protocol
 
@@ -266,6 +414,32 @@ desk lighting. Values picked on a screen do not survive that trip.
 Global brightness 60. Every period is 2000 ms; only the floor changes,
 and that is what separates "alive" from "answer me".
 
+**These values are tuned against a supply voltage nobody has written
+down.** The pixels sit on the incoming Qwiic rail rather than behind the
+NeoKey's regulator, so the number that produced this table is whatever
+the QT Py hands the cable, minus whatever 50 mm of thin Qwiic conductor
+drops under load. Until it is measured the whole table rests on a
+variable. Measuring it:
+
+```
+tools/mpad.py --load       # every key full white at brightness 100
+```
+
+Three things about that reading, each of which changes what it means:
+
+- **Probe at an LED's `VDD`, not at the QT Py.** The two differ by
+  exactly the cable drop being looked for.
+- **Under full white, not at idle.** Idle is the flattering case and it
+  is not the case that browns out. `--load` exists to produce the other
+  one; the shipped brightness of 60 is not what the supply has to
+  survive.
+- **Take it at four keys and again at six.** One number cannot separate a
+  cable drop from a regulator giving up; two can, because they fail
+  differently — a regulator at its limit lets go all at once, a cable
+  sags gradually and shifts colour on the way. If six reads much below
+  four, suspect the cable first: it is the cheapest thing in the stack to
+  replace, and a shorter or thicker one needs no redesign.
+
 What the bench actually taught, none of which was predictable on paper:
 
 - **Hue does all the state separation, amplitude does the ranking.** The
@@ -318,9 +492,12 @@ What the bench actually taught, none of which was predictable on paper:
    UF2 for QT Py RP2040](https://circuitpython.org/board/adafruit_qtpy_rp2040/)
    on it; the board reboots as `CIRCUITPY`.
 2. From the [CircuitPython Library
-   Bundle](https://circuitpython.org/libraries), copy `adafruit_neokey/`
-   and `adafruit_seesaw/` into `CIRCUITPY/lib/`. `adafruit_hid` is not
-   needed and must not be used.
+   Bundle](https://circuitpython.org/libraries), copy `adafruit_neokey/`,
+   `adafruit_seesaw/` **and `neopixel.mpy`** into `CIRCUITPY/lib/`.
+   `neopixel` is the one the breakouts need; without it keys 0-1 still
+   report presses and simply never light, and the host is told
+   `ERR gpio pixels ...`. `adafruit_hid` is not needed and must not be
+   used.
 3. Copy `firmware/boot.py` **and** `firmware/code.py` to `CIRCUITPY/`,
    then **hard reset**. `boot.py` only re-runs on a hard reset, and only
    a hard reset re-enumerates USB, which is what actually applies the CDC
@@ -337,8 +514,10 @@ What the bench actually taught, none of which was predictable on paper:
    next hard reset to get it back for the next copy.
 6. `tools/mpad.py --probe` — reports which port is data, plus the VID,
    PID and product string the macOS side matches on.
-7. `tools/mpad.py --demo` — lights all four keys, then turns each key
-   white while it is held. This is the whole loop: LED out, key in.
+7. `tools/mpad.py --demo` — reads the key count off `PONG`, lights that
+   many keys, then turns each one white while it is held. This is the
+   whole loop: LED out, key in. Six keys lit means both halves of the
+   keypad came up; four means the breakouts did not.
 8. **Focus a text editor and press the keys. Nothing must be typed.**
 
 Step 8 is the one that matters. If characters appear, `usb_hid.disable()`
@@ -387,7 +566,7 @@ board, not the QT Py. The firmware catches this and keeps the serial half
 running rather than dying, so the host sees:
 
 ```
-HELLO 3 0
+HELLO 3 6
 ERR i2c setup RuntimeError: No pull up found on SDA or SCL; check your wiring (reset required after fixing)
 ```
 
@@ -397,9 +576,15 @@ the same path and reads `ERR i2c setup ImportError: no module named
 'adafruit_neokey' (reset required after fixing)`. `code.py` builds both
 from one `"setup {}: {}"`.
 
-`HELLO <ver> 0` is a valid state meaning "device present, keypad absent".
-The host should hold the connection and paint nothing, not treat it as a
-failure and reconnect in a loop.
+**The key count does not drop.** It used to: `HELLO <ver> 0` meant
+"device present, keypad absent". It cannot any more, because the GPIO
+half cannot fail to enumerate and key 2 has to stay key 2 whether or not
+the NeoKey answered — the host maps index to pane, and letting the
+boards renumber when a cable is out would quietly focus the wrong
+session. So the count is always 6 and the `ERR` is what says which half
+is missing. The host should hold the connection and paint normally; the
+four keys behind the missing board simply do not light, and writes to
+them are dropped in silence exactly like an out-of-range index.
 
 `CIRCUITPY` comes back in this state, because the same missing keypad
 fails the drive gate open. That is a useful tell rather than a second
@@ -419,15 +604,28 @@ the Mac before suspecting the board.
 
 ## Phase 1 scope
 
-Four keys, USB wired, status out and focus in. The enclosure was a later
+Six keys, USB wired, status out and focus in. The enclosure was a later
 phase and arrived early: `inline` is printed and in use, `stacked` exists
 only as geometry. See [case/](case/).
 
-The rest of the later phases — six keys, low-profile Choc switches,
-wireless on nice!nano with a MagSafe dock — are documented in
+The six-key half of what used to be Phase 2 is built in software and
+geometry and **has never been assembled** — the two 4978 boards are not
+bought yet, so nothing below the protocol has been seen working. The
+`inline` case in the photo above is the four-key one.
+
+The rest of the later phases — low-profile Choc switches, and wireless on
+a MagSafe charger — are sketched in
 [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
 deliberately not built yet. The only requirement now is not to block
 them.
+
+The wireless one has since been costed properly, without anything being
+built:
+[docs/wireless-and-magsafe-findings.md](docs/wireless-and-magsafe-findings.md)
+carries Apple's own magnet-ring dimensions, why the Qi coil rather than
+the magnets is what decides the case depth, why Qi is pointless without
+BLE, and why the board to move to is a XIAO nRF52840 rather than the
+nice!nano the handoff names.
 
 ## License
 

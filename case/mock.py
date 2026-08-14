@@ -58,6 +58,104 @@ def _stadium(across, w, h, axis, a0, a1):
     return extrude(pl * prof, amount=a1 - a0)
 
 
+def _socket(sx, sy):
+    """One Kailh hot-swap socket, hanging below the board.
+
+    Three boxes, not one. The socket is a body with a solder wing off
+    each end, and the wings are what a column runs into -- a box drawn
+    round the body alone cleared the back-left column by 0.586 while the
+    printed plate put it through the left wing. `params.SOCKET_PARTS`
+    carries the shape as measured off ref/neokey-breakout.step.
+
+    Shared by both board kinds because it is the same part fitted the
+    same way up: `KAILH_SOCKET` at `MR0` in both Eagle files, at the same
+    offset from its switch centre. The NeoKey's own STEP does not model
+    its sockets at all, so this is where they come from for that board.
+    """
+    z0 = P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP
+    out = None
+    for dx0, dx1, dy0, dy1 in P.SOCKET_PARTS:
+        b = _block(sx + dx0, sx + dx1, sy + dy0, sy + dy1,
+                   z0, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
+
+
+def _back_parts(ox, oy):
+    """Everything else on a breakout's back face, board-local.
+
+    The sockets are the tall ones and get their own helper, but the
+    reverse-mount NeoPixel and the diode hang down too, and a check that
+    only knows about sockets is a check that has been told half the
+    board.
+    """
+    out = None
+    for x0, x1, y0, y1, proud in P.BREAKOUT_BACK_PARTS:
+        if proud >= P.NEOKEY_SOCKET_DROP - 0.01:
+            continue          # a socket; _socket() places those
+        b = _block(ox + x0, ox + x1, oy + y0, oy + y1,
+                   P.Z_NEOKEY_BOTTOM - proud, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
+
+
+def _neokey_face(ox, oy):
+    """Everything on the NeoKey's component face that nothing else places.
+
+    The sockets and the two receptacles are placed by their own helpers,
+    for the same reasons the breakout's are: the sockets are shared
+    geometry and a receptacle's mated plug is a fact about the cable.
+    What is left is fifty-two parts that had no representation at all --
+    small, none of them deeper than 1.400, and therefore invisible to
+    every clearance the case has in Z.
+
+    They matter in *plan*. A plate column rises the whole way to the
+    board's underside, so it has to dodge whatever is there sideways, and
+    the closest thing in the model to a column is one of these: 0.141 from
+    the back-row seam column. That was measured against the STEP by hand
+    and could not be checked by anything, because the model did not have
+    the part in it.
+    """
+    out = None
+    for x0, x1, y0, y1, proud in P.NEOKEY_BACK_PARTS:
+        if proud >= P.NEOKEY_SOCKET_DROP - 0.01:
+            continue          # a socket or a receptacle; placed elsewhere
+        b = _block(ox + x0, ox + x1, oy + y0, oy + y1,
+                   P.Z_NEOKEY_BOTTOM - proud, P.Z_NEOKEY_BOTTOM)
+        out = b if out is None else out + b
+    return out
+
+
+def breakouts():
+    """The two 4978 boards, their sockets, and their real mounting holes.
+
+    They sit at the same height as the NeoKey and are the same depth, so
+    they share Z_NEOKEY_BOTTOM and the plate above spans all three. That
+    only holds while BREAKOUT_T equals NEOKEY_T, which params says out
+    loud because it is the one board number still unmeasured.
+    """
+    part = None
+    for cx, cy in P.BREAKOUT_CENTERS:
+        slab = _slab(
+            P.BREAKOUT_W, P.BREAKOUT_D, P.BREAKOUT_CORNER_R, cx, cy,
+            P.Z_NEOKEY_BOTTOM, P.Z_NEOKEY_BOTTOM + P.BREAKOUT_T,
+        )
+        part = slab if part is None else part + slab
+    for sx, sy in P.BREAKOUT_SWITCH_XY:
+        part += _socket(sx, sy)
+    for ox, oy in P.BREAKOUT_ORIGINS:
+        part += _back_parts(ox, oy)
+    # Both holes are modelled even though only one is used, so that a peg
+    # moved onto the unused one would still read as a fit rather than as
+    # a collision -- and so that a peg moved off *either* one starts
+    # reading as the collision it would be.
+    for x, y in P.BREAKOUT_HOLE_XY:
+        part -= Pos(x, y, P.Z_NEOKEY_BOTTOM + P.BREAKOUT_T / 2) * Cylinder(
+            radius=P.BREAKOUT_HOLE_DIA / 2, height=P.BREAKOUT_T + 0.2
+        )
+    return part
+
+
 def neokey():
     """Board, plus the hot-swap sockets hanging off its underside."""
     part = _slab(
@@ -67,31 +165,42 @@ def neokey():
     )
     # Socket footprint read off the STEP, relative to its switch centre:
     # 10.9 x 5.9 and offset in both axes, not centred on the switch.
-    for sx, sy in P.SWITCH_XY:
-        part += _block(
-            sx - 4.792, sx + 6.108, sy + 0.858, sy + 6.758,
-            P.Z_NEOKEY_BOTTOM - P.NEOKEY_SOCKET_DROP, P.Z_NEOKEY_BOTTOM,
-        )
+    for sx, sy in P.NEOKEY_SWITCH_XY:
+        part += _socket(sx, sy)
+    part += _neokey_face(*P.NEOKEY_ORIGIN)
     # STEMMA QT receptacles with a mated Qwiic plug standing off each.
     # Stacked, either end may carry the cable, so both are claimed. Inline
     # the QT Py is at the right end and the cable can only come from the
     # right socket -- claiming the left one too would put an imaginary
     # plug through the left screw post, and that layout is handed anyway.
-    ends = (-1, 1) if P.STACKED else (1,)
-    for sign in ends:
-        sx = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 2.54)
-        outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + P.QWIIC_PLUG_L)
+    # Both receptacles. The board has one at each end -- the STEP puts
+    # them at x 0.065..5.015 and 71.185..76.135 -- and only the right one
+    # was modelled for a while, on the grounds that nothing can be
+    # plugged into the left one with a breakout butted against it. Beside
+    # the point either way: the receptacle is there whether a cable is or
+    # not, and the case has to not sit on it.
+    #
+    # The mated plug is a different claim and stays one-ended, because
+    # only the right socket has a cable in it. Not because the left one
+    # is blocked -- it was said to be, and BREAKOUT_ORIGINS_LOCAL now
+    # carries the boolean showing a plug there clears everything. A plug
+    # is a fact about the cable, so modelling one on a socket nothing is
+    # plugged into would be inventing an obstacle.
+    for sign, plug in ((1, P.QWIIC_PLUG_L), (-1, 0.0)):
+        inner = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 - 5.0)
+        outer = P.NEOKEY_CENTER[0] + sign * (P.NEOKEY_W / 2 + plug)
         part += _block(
-            min(sx, outer), max(sx, outer),
-            P.NEOKEY_ORIGIN[1] + 4.62, P.NEOKEY_ORIGIN[1] + 10.62,
-            P.Z_NEOKEY_TOP, P.Z_NEOKEY_TOP + 2.96,
+            min(inner, outer), max(inner, outer),
+            P.NEOKEY_ORIGIN[1] + min(P.neokey_y(4.62), P.neokey_y(10.62)),
+            P.NEOKEY_ORIGIN[1] + max(P.neokey_y(4.62), P.neokey_y(10.62)),
+            P.Z_NEOKEY_BOTTOM - P.UNDER_BOARD_MAX, P.Z_NEOKEY_BOTTOM,
         )
     # The M2.5 holes are real holes. Without them the shell's locating
     # pegs read as a 23 mm3 collision, which is the check crying wolf
     # about the one thing it is supposed to let through.
     for x, y in P.MOUNT_XY:
         part -= Pos(x, y, (P.Z_NEOKEY_BOTTOM + P.Z_NEOKEY_TOP) / 2) * Cylinder(
-            radius=1.25, height=P.NEOKEY_T + 0.2
+            radius=P.NEOKEY_HOLE_DIA / 2, height=P.NEOKEY_T + 0.2
         )
     return part
 
@@ -129,8 +238,17 @@ def qtpy():
         P.Z_QTPY_LOW, P.Z_QTPY_LOW + P.QTPY_T,
     )
     # Underside parts -- up at the NeoKey's sockets when stacked, down at
-    # the bottom plate when not.
-    part += _qt(4.9, 12.7, 3.4, 20.0, P.Z_UNDER_LOW, P.Z_UNDER_HIGH)
+    # the bottom plate when not. Each solid out of the STEP rather than
+    # one box drawn round them: the box was 4.900..12.700 by 3.400..20.000
+    # and 24 of the 40 parts stood outside it, so a rail could land on a
+    # real component and this boolean would still read zero.
+    #
+    # Every one still claims the full QTPY_BOTTOM_DROP in Z rather than
+    # its own height. That is deliberately conservative: what was wrong
+    # here was the footprint, and giving each part its true depth as well
+    # would be a second change riding on an unverified one.
+    for x0, x1, y0, y1, _proud in P.QTPY_UNDER_PARTS:
+        part += _qt(x0, x1, y0, y1, P.Z_UNDER_LOW, P.Z_UNDER_HIGH)
     # USB-C shell, overhanging the board's edge. A stadium, not a box:
     # the real shell has fully rounded ends, and squaring it invented four
     # corners for the opening to have to clear.
@@ -161,6 +279,7 @@ def qtpy():
 def everything():
     return {
         "NeoKey + sockets": neokey(),
+        "breakouts + sockets": breakouts(),
         "switch bodies": switches(),
         "QT Py + parts": qtpy(),
     }
