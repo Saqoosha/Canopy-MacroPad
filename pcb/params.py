@@ -128,3 +128,25 @@ SOCKET_PADS = [
     ((8.1, 3.7), (2.3, 2.6)),
     ((-3.1, 5.9), (2.3, 2.6)),
 ]
+
+# The EasyEDA CPG135001S30 device's own origin sits at the midpoint of its
+# two solder pads, not at the switch centre -- confirmed live: placed with
+# no offset, its pads read back at (+-5.78, +-1.10) mm from where it was
+# asked to go, nowhere near either SOCKET_PADS entry. build.py's checks
+# never caught this because they only verified the component's origin, not
+# its pads. SOCKET_OFFSET_MM is that midpoint, derived from SOCKET_PADS
+# rather than restated: ((8.1 + -3.1) / 2, (3.7 + 5.9) / 2) = (2.5, 4.8).
+#
+# Orientation differs too: crkbd's +x pad is the lower one (y 3.7); the
+# EasyEDA device's +x pad is the upper one. Placing the device on
+# EPCB_LayerId.BOTTOM with rotation 0 mirrors it in y (confirmed live --
+# the only transform pcb_PrimitiveComponent.create() exposes besides a
+# rotation angle is which copper layer it goes on, and a layer swap alone,
+# with no rotation, produces exactly this y-mirror for this footprint).
+# That also happens to match the design spec: everything but the switch
+# pads lives on the board's back face, so BOTTOM is where the socket
+# belongs regardless of the mirror.
+SOCKET_OFFSET_MM = (
+    (SOCKET_PADS[0][0][0] + SOCKET_PADS[1][0][0]) / 2,
+    (SOCKET_PADS[0][0][1] + SOCKET_PADS[1][0][1]) / 2,
+)
