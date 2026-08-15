@@ -46,8 +46,32 @@ def switch_centres_mm():
 # The USB-C receptacle is the one part that does not fit under the plate, so
 # it gets a tab off the right end rather than growing the whole outline.
 USB_TAB_W = 7.30
-BOARD_W = KEY_FIELD_W + USB_TAB_W           # 121.60
-BOARD_D = KEY_FIELD_D                       # 21.59
+
+# And then everything else did not fit either. Under the key field the only
+# free copper is the gaps between adjacent pixels -- 11.8 mm wide, 9.4 deep --
+# plus two lanes 4.3 and 3.0 mm tall along the edges. The RP2040 is 7.48 mm
+# square, so it fits one of those pockets and nothing else does; the flash,
+# the crystal and fourteen decoupling caps then queue up around it with
+# half-millimetre gaps, and the crystal ends up 0.46 from the MCU and 0.55
+# from a pixel. Legal, and not a design -- a board that tight has no room
+# for the routing that has to follow.
+#
+# So the field gets a bay of its own between the last key and the USB tab.
+# Grown along the length rather than the depth deliberately: depth is what
+# the pad occupies on a desk, length is not, and keeping the USB tab on the
+# far side of the bay leaves the connector a few millimetres from the MCU
+# instead of the board's whole length away.
+MCU_BAY_W = 18.00
+BOARD_W = KEY_FIELD_W + MCU_BAY_W + USB_TAB_W   # 139.60
+BOARD_D = KEY_FIELD_D                           # 21.59
+BOARD_CORNER_RADIUS = 2.54       # matches the case pocket's established radius
+
+# Where the bay starts and ends, so nothing has to re-derive it by adding
+# up widths -- that arithmetic is exactly what put an earlier round's
+# targets ten millimetres out.
+BAY_X0 = KEY_FIELD_W                            # 114.30
+BAY_X1 = KEY_FIELD_W + MCU_BAY_W                # 132.30
+USB_CX = BOARD_W - USB_TAB_W / 2                # 135.95
 BOARD_T = 1.60
 BOARD_LAYERS = 4
 

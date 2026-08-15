@@ -69,6 +69,29 @@ naming this exact fix.
   silently: reading a nonexistent `holeDiameter` doesn't throw, it just
   reads `undefined` forever.
 
+- **A pad having a hole does not make it Multi-Layer.** The USB-C
+  `B4A9`/`A4B9` VBUS pads report `layer: 2` and a round `hole`; their copper
+  is still Bottom-only. `route.pad_cells()` used to allow every drilled pad
+  as a start on both outer layers, so both VBUS routes left on Top and never
+  connected to the real pads. `connect.py` repeated the same mistake and
+  called the board complete. Only `layer == 12` spans layers. With that rule,
+  the router adds the two required VBUS vias and the connectivity check sees
+  the same 32 connected nets EasyEDA sees.
+
+- **Physical overlap does not always retire EasyEDA's ratline.** The grid
+  router may legally enter a pad away from its centre; EasyEDA retained seven
+  short airwires on six nets even though the same-net copper overlapped.
+  `center_ties.py` adds seven same-net 0.15 mm stubs from the diagnosed pad
+  centres to copper already touching those pads. The final Net panel must say
+  `Ratlines (0)`; hiding the Ratline layer is not verification.
+
+- **`pcb_Drc.check()` can redraw stale yellow X markers while reporting
+  `All (0)`.** On this board the call also exceeds the bridge's fixed 30 s
+  timeout, but completes in the client. Read the DRC panel after it finishes,
+  then use **Clear Errors** once; that removes the stale overlay without
+  changing the zero-error result. Yellow X objects are UI markers, not stored
+  Multi-Layer primitives.
+
 - **`eda.lib_Symbol.get()` carries no pin data.** Its return's keys are
   `name`, `libraryType`, `uuid`, `libraryUuid`, `classification`, `type`,
   `description`, `subPartNames` — confirmed live, nothing resembling a pin
@@ -79,6 +102,26 @@ naming this exact fix.
   mapping `build.assert_pixel_signal_orientation()` checks against) comes
   from the datasheet (LCSC C5149201) instead, because the library has
   nowhere to get it from.
+
+- **`sch_Document.save()` persists the open schematic.** Returns `true`
+  on success, `false` on upload/save failure -- do not treat false as a
+  no-op. Call it after any mutation; do not ask a person to File → Save.
+
+- **`sch_PrimitiveWire.modify({line})` echoes the request and does not
+  persist.** `toAsync().setState_Line()` throws `modify failed!`. The
+  shape that actually changes a wire is delete-then-create. Same-net
+  stubs that touch merge into one object; that is how D+ shorted to D-
+  when their stars shared a vertex at x=1025, and how the split put each
+  rail back together on its own net without sharing one.
+
+- **`getExportDocumentFile()` leaves a grey loading cover if it times out,
+  and the cover locks every menu.** `showLoading()` is documented as
+  阻止用户进一步操作 -- clicks and menu items go nowhere while it is up.
+  The bridge's default execute timeout is 30s; the PDF export hung past
+  that and the cover stayed. `sys_LoadingAndProgressBar.destroyLoading()`
+  / `destroyProgressBar()` clears it. `schematic_tidy.clear_overlay()` is
+  that call. Restarting EasyEDA also works, but any unsaved annotation is
+  gone until you can reach File → Save.
 
 - **PCB coordinates are 1 mil; schematic coordinates are 0.01 inch.**
   `params.mm_to_mil()` is the PCB-side conversion the whole placement
@@ -91,6 +134,85 @@ naming this exact fix.
   intended distance from origin, silently; nothing errors, the part just
   lands in the wrong place by a factor that isn't obviously wrong at a
   glance.
+
+- **A pad's rotation is RADIANS. A component's is DEGREES.** Same
+  document, same client, same call to `getAll()`. The only sixteen
+  rotated pads on this board are the USB-C receptacle's, all at
+  `1.5707963`, and reading that as degrees turns a quarter turn into 1.6
+  degrees — the shield tabs end up lying flat across the board edge and
+  nothing complains. `geom.pad_polygon()` takes radians for that reason
+  and says so.
+
+- **A POLYGON pad's points are absolute and already rotated.** Every
+  other pad shape is local to the pad and takes its translation and
+  rotation; a POLYGON takes neither. Its list is also a *path*, with `L`
+  and `ARC` tokens between the numbers, so pairing the raw list into
+  points without skipping the keywords produces garbage.
+
+- **A polyline's geometry is wrapped; a pad's is not.** A pad's POLYGON
+  field is a bare list. A polyline's `polygon` field is an *object* with
+  a `polygon` list inside it. A flattener that only descends into lists
+  returns nothing for the second — which reads exactly like "this board
+  has no outline", for a board whose outline is right there.
+  `geom._flatten()` walks dicts because of this.
+
+- **A polygon path must be explicitly closed.** The docs say an open
+  path is closed automatically (`如果首尾不重合将会自动重合`). It is
+  not: `createPolygon` refused a triangle and a square, and accepted the
+  same square with its first point repeated at the end.
+
+- **`regionName` is accepted and then not stored.** Pass one to
+  `pcb_PrimitiveRegion.create()` and read the region back: there is no
+  name field at all. A cleanup keyed on the name therefore matches
+  nothing and every run adds another set of regions on top of the last.
+  `layout.keepouts()` identifies its own by layer and rule set instead.
+
+- **`overwriteCurrentRuleConfiguration` returns `undefined`,** not the
+  documented boolean — and an undefined value disappears from the JSON
+  the bridge returns, so the key is simply absent rather than false.
+  Whether a rule took has to be answered by reading a number back out.
+
+- **The class methods are not all the methods.** `PCB_PrimitivePour` has
+  no rebuild function and it is easy to conclude there is no API for
+  filling copper. There is: `rebuildCopperRegion()` lives on
+  `IPCB_PrimitivePour`, the *instance* interface, reached by
+  `pcb_PrimitivePour.get([id])`. When a class looks like it is missing
+  an obvious verb, grep `references/_quick-reference.md` — it lists both
+  sides.
+
+- **The bridge has its own 30 s request timeout** and the `timeout=`
+  passed to `execute()` does not raise it. `pcb_Drc.check()` and
+  `sch_Netlist.getNetlist()` both outrun it on this board and come back
+  as a bridge timeout while the operation completes fine inside the
+  client. Neither is reachable from a script here; run them in the UI.
+
+- **Four lines forming a closed rectangle are not a board outline.** They
+  are four lines. `zoomToBoardOutline()` returns true, the render looks
+  right, DRC says nothing — and Auto Routing refuses to start with
+  "Please draw a board outline first!". The edge has to be **one closed
+  polyline** (`pcb_PrimitivePolyline`, layer 11). Related: widening the
+  board left the old right-hand edge in place and the client split the
+  new top and bottom edges against it, giving seven segments — one of
+  them a full-height cut line down the middle of the board, which a fab
+  would route. `layout.strip()` checks the edge is a single closed loop
+  for both reasons.
+
+- **EasyEDA's rounded-rectangle `R` path has an inverted Y anchor.** For a
+  board spanning y=0..21.59 mm, `['R', 0, 0, w, h, 0, r]` produces an
+  outline at y=-21.59..0. The source has to start at y=21.59 mm. The
+  documented polygon `discretize()` methods return `Not implemented`, so
+  `board_edge.py` verifies both the raw path and the primitive's measured
+  bounding box after creation. A render that merely looks rounded is not
+  enough; the old inverted outline looked plausible below the components.
+
+- **A copper pour whose boundary no longer matches the board vanishes on
+  rebuild.** The GND and 3V3 planes were drawn for the 121.60 mm board;
+  after widening to 139.60 they were removed by the next copper rebuild,
+  silently. The only symptom was an autorouter that did nothing. And a
+  pour that reaches *nothing* is discarded the same way: 3V3 refused to
+  fill at all until `stitch.py` gave its pads vias, because every 3V3 pad
+  on this board is surface-mount on the bottom. `planes.py` derives both
+  boundaries from `params` so they cannot outlive the board again.
 
 ## Schematic-side API traps (`schematic.py`)
 
@@ -183,6 +305,32 @@ set of traps, all confirmed live:
   that "looks like" the obvious 3-point elbow is not evidence it avoids
   every pin in between; only checking it against the actual pin list is.
 
+## PCB-side MCU import traps (`place_mcu.py`)
+
+- **`create()` never builds EasyEDA's flying wires.** UniqueIds,
+  `pad.modify({net})`, `importChanges()`, and `setNetlist()` can all
+  report success while the canvas still has no ratsnest. The path that
+  actually creates them is PCB **Design → Import Changes from Schematic**
+  (`Alt+I`) against an empty board (or schematic-tab **Design → Schematic
+  to PCB** — that item is not on the PCB Design menu). After convert,
+  move existing parts (`place_mcu.py --relayout`); do not delete and
+  recreate, and do not run `build.py`. Convert dumps SK/LED on TOP at
+  schematic-relative coords (negative Y, off the outline); `--relayout`
+  puts them on BOTTOM at `params` field positions and keeps the 32 nets.
+  Switch holes are not in the schematic; `footprint.place_switch_holes`
+  goes back on after the move. After convert, `pcb/cluster.py` packs the
+  MCU block by net (crystal on XIN/XOUT, ESD/LDO on the USB tab, flash
+  in the next pixel gap) and turns the board into 4 layers. Inner1/Inner2
+  start as NOT_USED (`layerStatus` 0) until
+  `pcb_Layer.setTheNumberOfCopperLayers(4)`. Pour outlines for GND on
+  Inner1 and 3V3 on Inner2 create. `rebuildCopperRegion()` now works on
+  both live pour instances; `planes.py --rebuild` calls it and verifies
+  that two filled copper primitives remain. `sch_Net.getAllNetsName()` stays `[]`
+  even when `getNetlistFile("JLCEDA")` is complete — do not call
+  deprecated `sch_Netlist.getNetlist()` (hangs). The SK6812 symbol's pin
+  *names* (1=GND …) do not match its footprint or `PIXEL_PAD_SIGNALS`
+  (1=VDD …); convert maps by pin *number*, which is why it still ran.
+
 ## The RP2040 reference: GUI-only
 
 Raspberry Pi's Minimal Viable Board reference design needs to come in by
@@ -210,7 +358,30 @@ the reference by hand, then use the script to verify the result — count
 parts, check net names, and so on — rather than trying to build the
 schematic from the API end to end.
 
-## Re-running `build.py`
+## Re-running the finished routed board
+
+```
+cd pcb
+./all.sh
+python3 plot.py
+```
+
+`all.sh` replaces the rounded outline, applies placement and silkscreen,
+routes all signal and power nets, rebuilds both inner planes, checks that
+all 32 nets are single connected islands, and runs the review-specific
+checks in `polish.py`. The reverse-mount LED rectangles are physical board
+openings and are obstacles to both the signal router and power-via stitcher.
+KEY0 uses y=7.9 mm through the repeated opening/centre-hole passage, the
+farthest legal row on the 0.10 mm router grid; KEY3 avoids the narrow
+passage. PIXEL2--PIXEL5 must have no 90-degree copper corners.
+
+There are deliberately no board mounting holes. The printed case already
+locates and clamps the PCB between its shell standoffs and bottom support
+columns; adding holes would consume routing area without adding retention.
+The case imports `BOARD_CORNER_RADIUS` from `pcb/params.py`, so its pocket
+and the R2.54 mm board corners have one source.
+
+## Re-running the original key-cell `build.py`
 
 ```
 python3 pcb/build.py                # place sockets + pixels, DRC, export

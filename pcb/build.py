@@ -11,6 +11,7 @@ failure. A run that has only ever been green is not evidence.
 import os
 import sys
 
+import board_edge
 import params
 import probe
 from bridge import execute
@@ -330,37 +331,8 @@ def clear_board_outline():
 
 
 def draw_board_outline():
-    """Draw the board's physical edge as four lines on BOARD_OUTLINE.
-
-    Nothing drew this before now -- pcb_BoardOutline does not exist, and
-    BOARD_W/BOARD_D were consumed by nothing, so the board in the 3D view
-    was whatever EasyEDA auto-generated around the placed parts.
-
-    Origin: x=0 is the key field's left edge (params.FIRST_SWITCH_X is
-    documented as measured "in from the field's left edge") and y=0 is the
-    top edge -- inferred from params.SWITCH_Y equalling params.KEY_FIELD_D
-    / 2 exactly (10.795 = 21.59 / 2), i.e. the switch row sits vertically
-    centred in the board's depth. Nothing in params.py states an origin
-    outright; this is the reading consistent with every other offset in
-    the file being a small, positive number from *something*, and no
-    outline existed before this function to check it against directly.
-    """
-    clear_board_outline()
-    w = params.mm_to_mil(params.BOARD_W)
-    d = params.mm_to_mil(params.BOARD_D)
-    corners = [(0, 0), (w, 0), (w, d), (0, d)]
-    edges = list(zip(corners, corners[1:] + corners[:1]))
-    for (x1, y1), (x2, y2) in edges:
-        js = (
-            f'const l = await eda.pcb_PrimitiveLine.create('
-            f'"", {BOARD_OUTLINE}, {x1}, {y1}, {x2}, {y2}); '
-            "return l ? l.primitiveId : null;"
-        )
-        if not execute(js):
-            raise AssertionError(
-                f"outline line create returned nothing for ({x1},{y1})-({x2},{y2})"
-            )
-    print(f"  [ok ] board outline: {len(edges)} edges, {params.BOARD_W} x {params.BOARD_D} mm")
+    """Draw the one rounded board edge shared with the case."""
+    board_edge.apply()
 
 
 def assert_within_outline():

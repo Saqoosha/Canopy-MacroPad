@@ -48,8 +48,9 @@ HOLE_SWEEP = (14.00, 14.10, 14.20)
 # clears; the MX spec's 0.3 is a maximum, not a target.
 PLATE_HOLE_R = 0.10
 
-# Board outline corner, same radius the NeoKey and the breakouts used.
-BOARD_CORNER_R = 2.54
+# Board outline corner comes from the PCB. Two sources for the same edge
+# produced two different cases before; the pocket must follow the board.
+BOARD_CORNER_R = pcb.BOARD_CORNER_RADIUS
 
 # --- Fasteners ----------------------------------------------------------
 # M3 button head, self-tapping into printed posts. Settled on the coupon
