@@ -349,17 +349,20 @@ def strip():
 
 # Region rule types, from EPCB_PrimitiveRegionRuleType. Enums are not
 # reachable in the execution context, so these are the documented literals.
-NO_COMPONENTS = 2
+LEGACY_NO_COMPONENTS = 2
 NO_WIRES = 5
 NO_POURS = 7
 NO_INNER_ELECTRICAL_LAYERS = 8
 LAYER_MULTI = 12
 
-KEEPOUT_CLEAR_MM = 0.25
+# Match audit.TRACE_TO_HOLE_MM. The old 0.25 mm contradicted the independent
+# 0.20 mm audit and flagged legal, centred traces whose measured opening
+# clearance is 0.221 mm or more.
+KEEPOUT_CLEAR_MM = audit.TRACE_TO_HOLE_MM
 
 
 def keepouts():
-    """Ring every switch hole with a no-route, no-part, no-copper region.
+    """Ring every switch hole with a no-route, no-copper region.
 
     This is the fix for the thing that made the previous routing garbage.
     A switch hole is a free pad with **no net**, so nothing in a clearance
@@ -427,13 +430,21 @@ def keepouts():
     # region back and it has no name field at all -- so a name-keyed
     # cleanup silently matches nothing and every run adds another
     # thirty-six regions on top of the last.
-    rules = [NO_COMPONENTS, NO_WIRES, NO_POURS, NO_INNER_ELECTRICAL_LAYERS]
+    # Do not add NO_COMPONENTS here.  Each region surrounds a hole that is
+    # physically part of its switch footprint, so the switch must overlap its
+    # own region.  EasyEDA consequently emitted 18 permanent false DRC errors
+    # and yellow markers.  Placement remains fixed by FIXED_PREFIXES and is
+    # geometrically verified; these regions exist to protect copper.
+    rules = [NO_WIRES, NO_POURS, NO_INNER_ELECTRICAL_LAYERS]
+    legacy_rules = [LEGACY_NO_COMPONENTS] + rules
     js = """
     const specs = %s;
     const want = %s;
-    const same = r => r.layer === %d && Array.isArray(r.ruleType)
-      && r.ruleType.length === want.length
-      && want.every(v => r.ruleType.indexOf(v) >= 0);
+    const legacy = %s;
+    const hasExactly = (r, values) => r.layer === %d && Array.isArray(r.ruleType)
+      && r.ruleType.length === values.length
+      && values.every(v => r.ruleType.indexOf(v) >= 0);
+    const same = r => hasExactly(r, want) || hasExactly(r, legacy);
     const olds = await eda.pcb_PrimitiveRegion.getAll();
     const stale = (olds||[]).filter(same).map(r => r.primitiveId);
     if (stale.length) await eda.pcb_PrimitiveRegion.delete(stale);
@@ -448,7 +459,7 @@ def keepouts():
     return {deleted: stale.length, asked: specs.length, made: made,
             total: (now||[]).length};
     """ % (__import__("json").dumps(specs), __import__("json").dumps(rules),
-           LAYER_MULTI, LAYER_MULTI)
+           __import__("json").dumps(legacy_rules), LAYER_MULTI, LAYER_MULTI)
     got = execute(js, timeout=180.0)
     if got["made"] != got["asked"]:
         raise SystemExit(f"only {got['made']} of {got['asked']} keepouts were "

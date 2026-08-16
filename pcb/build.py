@@ -384,11 +384,11 @@ def assert_within_outline():
 def assert_drc():
     """Run EasyEDA's own DRC and raise unless it comes back clean.
 
-    userInterface=true so a failure also leaves the bottom DRC panel open
-    with the actual error list, since the boolean alone does not say what
-    is wrong.
+    Keep userInterface=false. EasyEDA can redraw stale yellow X overlays even
+    when the result is All (0); an interactive check is only useful when a
+    failure must be inspected in its bottom DRC panel.
     """
-    passed = execute("return await eda.pcb_Drc.check(true, true, false);")
+    passed = execute("return await eda.pcb_Drc.check(true, false, false);")
     if not passed:
         raise AssertionError("DRC reported errors; open the PCB and read them")
     print("  [ok ] DRC")

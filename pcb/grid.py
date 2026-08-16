@@ -68,7 +68,7 @@ class Grid:
         self.owner = [[[None] * self.nx for _ in range(self.ny)]
                       for _ in self.layers]
         # A second, more generously inflated map, for deciding where a VIA
-        # may go. A via is 0.61 mm across where a trace is 0.15, so a cell
+        # may go. A via is 0.45 mm across where a trace is 0.15, so a cell
         # that is free for a trace is very often not free for a via -- and
         # routing that did not know the difference put twenty-two vias
         # within 0.047 mm of a QFN pad, against a 0.102 mm rule. The search

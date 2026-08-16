@@ -2,17 +2,16 @@
 
 An earlier round spent an afternoon arguing about 48 DRC errors without
 ever establishing what the rules being violated were. They turn out to
-be a configuration called 自定义配置 whose track-to-track spacing is
-0.102 mm -- and JLCPCB's own published four-layer capability is 0.0889,
-so the board is already held to the stricter of the two. That settles
-the argument in the direction nobody checked: the rules were fine.
+be a configuration called 自定义配置.  This file makes that configuration
+match the geometry the independent audit actually measures: 0.102 mm for
+copper, 0.20 mm from routed openings, and 0.25 mm from the USB-C shell
+holes to the outline.
 
 The client also ships JLCPCB's capability as a preset, and the obvious
 move is to load it. It does not work, silently: the preset and the live
 configuration disagree about the shape of the same table, so the
-overwrite returns undefined and changes nothing. Since the live rules are
-the stricter pair anyway, this file leaves them alone and changes only
-what actually needed changing.
+overwrite returns undefined and changes nothing.  The values are therefore
+written to the live configuration directly and read back after every write.
 
 Two more things the autorouter cannot know unless told:
 
@@ -23,6 +22,7 @@ Two more things the autorouter cannot know unless told:
 
     python3 rules.py            report
     python3 rules.py --apply    set them
+    python3 rules.py --drc      check them
 """
 
 import json
@@ -48,6 +48,36 @@ JLC_PRESET = "JLCPCB Capability(Multiple Layers Board)"
 # at 1 oz, and leaves the 0.127 minimum untouched as the floor. Power does
 # not depend on it -- GND and 3V3 ride the inner planes.
 TRACK_DEFAULT_MM = 0.15
+
+# One copper clearance everywhere. The live table used 0.102 mm only for
+# track-to-track and 0.152 mm for every pad/via combination, while the router
+# and geometric audit both use 0.102 mm. The larger number did not describe
+# the board or the fab capability; it only produced warnings for legal QFN
+# escapes. Keep plane-zone clearance separate and larger below.
+COPPER_CLEARANCE_MM = 0.102
+
+# Routed board openings are held to the same 0.20 mm edge clearance that
+# audit.py measures geometrically. The stock table's 0.30 mm contradicted the
+# keepouts and rejected the deliberately centred KEY0/KEY3 gap routes.
+SLOT_TO_TRACK_MM = 0.20
+
+# The USB-C shell through-holes sit 0.277 mm from the routed board edge.
+# They are mechanically fixed by the connector footprint and still exceed
+# JLCPCB's 0.20 mm routed-edge capability.  Keep a little extra margin without
+# carrying the stock 0.30 mm rule that this connector cannot satisfy.
+BOARD_OUTLINE_TO_TH_MM = 0.25
+
+# RP2040 is USB Full-Speed. The routed pair differs by 1.21 mm (47.8 mil),
+# which is electrically negligible at 12 Mbit/s; 1.5 mm still catches an
+# accidental large detour without pretending this is a high-speed link.
+DIFF_PAIR_SKEW_MAX_MM = 1.5
+
+# Preferred 0.20 mm hole, with the smallest diameter that stays on
+# JLCPCB's standard-cost side. A 0.20 mm hole below 0.45 mm diameter is
+# manufacturable but attracts the small-via surcharge. Keeping these in
+# the live rule configuration makes hand-added vias agree with the router.
+VIA_OUTER_MM = 0.45
+VIA_HOLE_MM = 0.20
 
 DIFF_PAIRS = [
     # name, positive, negative -- the raw side, between the connector and
@@ -85,6 +115,9 @@ def apply():
     const pairs = %s;
     const out = {};
     const width = %f;
+    const viaOuter = %f, viaHole = %f;
+    const copperClearance = %f, slotToTrack = %f, boardToTh = %f;
+    const diffSkewMax = %f;
     const cur = await eda.pcb_Drc.getCurrentRuleConfiguration();
     const spacing = c => {
       try { return c.config.Spacing["Safe Spacing"].copperThickness1oz
@@ -95,16 +128,51 @@ def apply():
                     .defaultValue; } catch (e) { return null; }
     };
     out.spacing = spacing(cur);
+    const safe = cur.config.Spacing["Safe Spacing"].copperThickness1oz
+                    .tables["1"].content;
+    out.copperBefore = safe.slice(0, 7).map((r, i) => r.slice(0, i + 1));
+    for (let r = 0; r <= 6; r++)
+      for (let c = 0; c <= r; c++) safe[r][c] = copperClearance;
+    for (let c = 0; c <= 6; c++) safe[8][c] = slotToTrack;
+    safe[11][2] = boardToTh;
+    const diffForm = cur.config.Physics["Differential Pair"]
+                        .differentialPair.form;
+    out.diffSkewBefore = diffForm.differentailPairLenTolerMax;
+    diffForm.differentailPairLenTolerMax = diffSkewMax;
     out.trackBefore = trackOf(cur);
+    const viaForm = cur.config.Physics["Via Size"].viaSize.form;
+    out.viaBefore = [viaForm.viaOuterdiameterDefault,
+                     viaForm.viaInnerdiameterDefault,
+                     viaForm.viaOuterdiameterMin,
+                     viaForm.viaInnerdiameterMin];
     for (const k of Object.keys(cur.config.Physics.Track)) {
       const f = cur.config.Physics.Track[k].form;
       if (f && f.data) for (const i of Object.keys(f.data))
         f.data[i].defaultValue = width;
     }
+    viaForm.viaOuterdiameterDefault = viaOuter;
+    viaForm.viaInnerdiameterDefault = viaHole;
+    viaForm.viaOuterdiameterMin = viaOuter;
+    viaForm.viaInnerdiameterMin = viaHole;
     out.returned = await eda.pcb_Drc.overwriteCurrentRuleConfiguration(
       cur.config);
     if (out.returned === undefined) out.returned = "undefined";
     out.trackAfter = trackOf(await eda.pcb_Drc.getCurrentRuleConfiguration());
+    const after = await eda.pcb_Drc.getCurrentRuleConfiguration();
+    const afterVia = after.config.Physics["Via Size"].viaSize.form;
+    const afterSafe = after.config.Spacing["Safe Spacing"].copperThickness1oz
+                         .tables["1"].content;
+    out.copperAfter = afterSafe.slice(0, 7)
+                               .map((r, i) => r.slice(0, i + 1));
+    out.slotCopperAfter = afterSafe[8].slice(0, 7);
+    out.boardThAfter = afterSafe[11][2];
+    out.diffSkewAfter = after.config.Physics["Differential Pair"]
+                              .differentialPair.form
+                              .differentailPairLenTolerMax;
+    out.viaAfter = [afterVia.viaOuterdiameterDefault,
+                    afterVia.viaInnerdiameterDefault,
+                    afterVia.viaOuterdiameterMin,
+                    afterVia.viaInnerdiameterMin];
     const known = new Set(await eda.pcb_Net.getAllNetsName() || []);
     out.pairs = []; out.missingNets = [];
     for (const p of pairs) {
@@ -117,7 +185,10 @@ def apply():
     }
     out.now = await eda.pcb_Drc.getCurrentRuleConfigurationName();
     return out;
-    """ % (json.dumps(DIFF_PAIRS), TRACK_DEFAULT_MM)
+    """ % (json.dumps(DIFF_PAIRS), TRACK_DEFAULT_MM,
+             VIA_OUTER_MM, VIA_HOLE_MM, COPPER_CLEARANCE_MM,
+             SLOT_TO_TRACK_MM, BOARD_OUTLINE_TO_TH_MM,
+             DIFF_PAIR_SKEW_MAX_MM)
     got = execute(js, timeout=240.0)
     if got.get("err"):
         raise SystemExit(got["err"])
@@ -127,10 +198,32 @@ def apply():
     # back out, not by believing the return.
     print(f"  track-to-track spacing {got['spacing']} mm "
           f"(JLCPCB four-layer capability is 0.0889, so this is stricter)")
+    flat_copper = [v for row in got["copperAfter"] for v in row]
+    if any(abs(v - COPPER_CLEARANCE_MM) > 1e-5 for v in flat_copper):
+        raise SystemExit("the copper clearance matrix did not take")
+    if any(abs(v - SLOT_TO_TRACK_MM) > 1e-5
+           for v in got["slotCopperAfter"]):
+        raise SystemExit("the slot-to-copper clearance row did not take")
+    if abs(got["boardThAfter"] - BOARD_OUTLINE_TO_TH_MM) > 1e-5:
+        raise SystemExit("the board-outline-to-TH clearance did not take")
+    if abs(got["diffSkewAfter"] - DIFF_PAIR_SKEW_MAX_MM) > 1e-5:
+        raise SystemExit("the differential-pair skew tolerance did not take")
+    print(f"  general copper clearance -> {COPPER_CLEARANCE_MM} mm")
+    print(f"  slot-to-copper clearance -> {SLOT_TO_TRACK_MM} mm")
+    print(f"  board-outline-to-TH clearance -> {BOARD_OUTLINE_TO_TH_MM} mm")
+    print(f"  differential skew {got['diffSkewBefore']} -> "
+          f"{got['diffSkewAfter']} mm")
     print(f"  default track width {got['trackBefore']} -> {got['trackAfter']} "
           f"mm (call returned {got['returned']})")
     if abs((got["trackAfter"] or 0) - TRACK_DEFAULT_MM) > 1e-6:
         raise SystemExit("the track width did not take")
+    print(f"  default via {got['viaBefore']} -> {got['viaAfter']} mm")
+    # EasyEDA stores these in mil and returns the converted decimal; the
+    # round-trip differs by about 0.000002 mm at 0.45 mm.
+    if any(abs(a - b) > 1e-5 for a, b in zip(
+            got["viaAfter"],
+            (VIA_OUTER_MM, VIA_HOLE_MM, VIA_OUTER_MM, VIA_HOLE_MM))):
+        raise SystemExit("the via dimensions did not take")
     for name, ok in got["pairs"]:
         print(f"  differential pair {name}: {'set' if ok else 'REFUSED'}")
     if got["missingNets"]:
@@ -144,21 +237,15 @@ def apply():
 
 
 def drc():
-    """Run DRC. Usually unreachable from here -- see below.
-
-    The bridge enforces its own 30 s request timeout, and the `timeout`
-    passed to execute() does not raise it. A DRC pass over this board runs
-    longer than that, so this call comes back as a bridge timeout while
-    the check is still running inside the client and finishes fine. Run
-    DRC from the client's own UI and read the result there; this function
-    is kept for small boards and to make the limitation findable.
-    """
+    """Run non-interactive DRC and fail the build on any finding."""
     js = """
-    const ok = await eda.pcb_Drc.check(true, true, false);
+    const ok = await eda.pcb_Drc.check(true, false, false);
     return {passed: !!ok};
     """
     got = execute(js, timeout=300.0)
     print(f"  DRC: {'passed' if got['passed'] else 'errors found'}")
+    if not got["passed"]:
+        raise SystemExit("EasyEDA DRC found errors; read the DRC panel")
     return got["passed"]
 
 
@@ -169,17 +256,17 @@ def main():
     print(f"  differential pairs: {s['pairs'] or 'none'}")
     print(f"  nets on the board: {len(s['nets'] or [])}")
 
-    if "--apply" not in sys.argv:
-        print("\n(report only -- pass --apply to set them)")
-        return
-    print("\napply:")
-    apply()
+    changed = "--apply" in sys.argv
+    if changed:
+        print("\napply:")
+        apply()
     if "--drc" in sys.argv:
         print("\ndrc:")
         drc()
+    elif changed:
+        print("\n(DRC not run -- pass --drc after the board is complete.)")
     else:
-        print("\n(DRC not run -- it outlasts the bridge's 30 s request "
-              "timeout on this board. Run it in the client.)")
+        print("\n(report only -- pass --apply to set rules or --drc to check)")
 
 
 if __name__ == "__main__":

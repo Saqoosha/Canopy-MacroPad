@@ -86,6 +86,41 @@ def _nearest_via(pad, data):
     return best
 
 
+def _nearest_trace(pad, data):
+    """Nearest point on same-net trace copper already touching ``pad``."""
+    pad_poly = geom.pad_polygon(pad["x"], pad["y"], pad["r"], pad["pad"])
+    best = None
+    for line in data["lines"]:
+        if line["net"] != pad["net"] or line["layer"] not in (
+                audit.TOP, audit.BOTTOM):
+            continue
+        if not _layers_touch(pad, line["layer"]):
+            continue
+        copper = geom.segment(line["x1"], line["y1"], line["x2"],
+                              line["y2"], line["w"])
+        if geom.distance(pad_poly, copper) > connect.TOUCH_MM / audit.MIL:
+            continue
+        dx, dy = line["x2"] - line["x1"], line["y2"] - line["y1"]
+        length2 = dx * dx + dy * dy
+        t = 0.0 if length2 == 0 else max(0.0, min(1.0, (
+            (pad["x"] - line["x1"]) * dx
+            + (pad["y"] - line["y1"]) * dy
+        ) / length2))
+        x, y = line["x1"] + t * dx, line["y1"] + t * dy
+        distance = math.hypot(x - pad["x"], y - pad["y"])
+        item = (distance, line["layer"], x, y, "trace")
+        if best is None or item[0] < best[0]:
+            best = item
+    return best
+
+
+def _nearest_copper(pad, data):
+    candidates = [candidate for candidate in (
+        _nearest_via(pad, data), _nearest_trace(pad, data)
+    ) if candidate is not None]
+    return min(candidates, default=None, key=lambda candidate: candidate[0])
+
+
 def _named_pads(data):
     owned, _ = audit.component_pads(data)
     by_id = {component["id"]: component for component in data["comps"]}
@@ -116,7 +151,7 @@ def plan(data):
             layer = audit.BOTTOM
             x, y, source = anchor["x"], anchor["y"], anchor_name
         else:
-            candidate = _nearest_via(pad, data)
+            candidate = _nearest_copper(pad, data)
             if candidate is None:
                 unresolved.append(name)
                 continue

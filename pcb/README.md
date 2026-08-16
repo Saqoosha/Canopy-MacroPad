@@ -87,10 +87,51 @@ naming this exact fix.
 
 - **`pcb_Drc.check()` can redraw stale yellow X markers while reporting
   `All (0)`.** On this board the call also exceeds the bridge's fixed 30 s
-  timeout, but completes in the client. Read the DRC panel after it finishes,
-  then use **Clear Errors** once; that removes the stale overlay without
-  changing the zero-error result. Yellow X objects are UI markers, not stored
-  Multi-Layer primitives.
+  timeout, but completes in the client. The scripted DRC calls pass
+  `userInterface=false` so they do not ask EasyEDA to draw that overlay.
+  Read the active PCB tab's `data.drcResult` for the same `All (0)` value the
+  bottom panel displays. If an interactive DRC has already drawn stale Xs,
+  use **Design -> Clear Errors** once. `removeIndicatorMarkers()` is a
+  different marker system and does not remove DRC Xs, and the public
+  `pcb_Drc` API exposes no Clear Errors method. Yellow X objects are UI state,
+  not stored Multi-Layer primitives; hiding Multi-Layer never was the fix.
+
+- **The stock footprint geometry and stock DRC table contradicted each
+  other.** The reverse-mount LED opening left only 0.10 mm to its four pads,
+  and each switch footprint contained two Multi-Layer circular fills exactly
+  on top of two real plated holes. `footprint_fixes.py` moves the LED pads
+  0.11 mm outward (about 0.209 mm opening clearance after EasyEDA's mil
+  rounding) and deletes only those two duplicate fill records. The actual
+  switch holes remain: the final NPTH drill has 6 slots plus 12 x 1.905 mm,
+  12 x 2.9972 mm, and 6 x 5.0038 mm switch openings.
+
+  `rules.py` then makes the live table match the measured geometry: 0.102 mm
+  between copper objects, 0.20 mm from routed openings to copper, 0.25 mm
+  from the USB-C shell holes to the outline, and 1.5 mm maximum USB pair
+  skew. All values are read back after writing. The 36 switch-hole keepouts
+  prohibit tracks, pours, and inner-layer copper, but not components: each
+  switch necessarily overlaps the keepout around its own holes, so adding
+  `NO_COMPONENTS` created 18 permanent false DRC errors. The final live DRC
+  result is `All (0)`.
+
+- **Same-net clearance rules do not prevent accidental via-in-pad.** The
+  router once produced 33 annulus overlaps, 27 with the drilled opening in a
+  solderable pad, so the route grid still treats every SMT pad as a no-via
+  area and dogbones every router-created via. The exception is not a relaxed
+  clearance: U3's stock RP2040 footprint deliberately owns a 3x3 array of
+  0.6096/0.3048 mm thermal vias inside exposed GND pad 57. They must carry
+  GND explicitly in both the local footprint and the placed PCB's `PAD_NET`
+  records. A blank child-via net touches copper on both inner planes without
+  clearance; the enclosing GND pad does not make that safe. `via_in_pad.py`
+  accepts only that exact nine-via, footprint-owned array with explicit GND,
+  while every blank, mismatched, or other annulus overlap remains a build
+  failure.
+  Fabrication is a separate decision: open via-in-pad can wick paste, so use
+  the board house's filled-and-capped via-in-pad process for controlled SMT
+  yield rather than deleting the RP2040 ground-return array.
+  The final via drill contains 99 x 0.20 mm ordinary vias and exactly 9 x
+  0.3048 mm U3 thermal vias; the NPTH file still contains all 36 switch
+  openings and the two 0.60 mm USB-C locating holes.
 
 - **`eda.lib_Symbol.get()` carries no pin data.** Its return's keys are
   `name`, `libraryType`, `uuid`, `libraryUuid`, `classification`, `type`,

@@ -46,9 +46,20 @@ TRACE_W_MM = 0.15
 # above the rule the board is checked against.
 CLEAR_MM = 0.13
 CELL_MM = 0.10
-VIA_OUTER_MM = 0.61
-VIA_HOLE_MM = 0.305
+# JLCPCB's preferred hole is 0.20 mm.  A 0.45 mm finished diameter is the
+# boundary that remains in its standard-cost capability; a 0.20 mm hole
+# with a diameter below 0.45 mm costs extra.  The smaller dogbone via is
+# what lets every QFN/flash transition sit outside its SMT pad.
+VIA_OUTER_MM = 0.45
+VIA_HOLE_MM = 0.20
 HOLE_CLEAR_MM = 0.30
+# Keep the via annulus itself off every SMT pad, even when both carry the
+# same net.  Same-net copper overlap is electrically legal, so the normal
+# obstacle maps deliberately allow it; for assembly it is undesirable
+# because a drill opening in the paste area can wick solder away.  A small
+# positive gap also makes the intent unambiguous to manufacturing checkers
+# that classify annulus overlap, rather than drill overlap, as via-in-pad.
+SMT_PAD_TO_VIA_MM = 0.05
 
 # Long first: a key net has one way out of its socket and one way into the
 # MCU, and everything else has alternatives.
@@ -115,6 +126,14 @@ def build_grid(data):
             poly = geom.pad_polygon(p["x"], p["y"], p["r"], p["pad"])
             layer = None if p["hole"] else p["layer"]
             block(layer, poly, p["net"] or "#nc")
+            if not p["hole"]:
+                # Drill blocking is physical, not net-aware.  Inflate the
+                # SMT pad by the via OUTER radius so the whole annulus, not
+                # merely the hole, remains outside the solderable pad.
+                g.mark_drill(
+                    poly,
+                    (VIA_OUTER_MM / 2 + SMT_PAD_TO_VIA_MM) / MIL,
+                )
             cores.append((layer, geom.bbox(poly), p["net"] or "#nc"))
     for v in data["vias"]:
         block(None, geom.pad_polygon(v["x"], v["y"], 0,
@@ -142,7 +161,8 @@ def build_grid(data):
     # passage.  It remains a soft cost so the pad escapes can leave it.
     lane_x0, lane_y = g.cell_of(24.0 / MIL, 7.9 / MIL)
     lane_x1, _ = g.cell_of(109.4 / MIL, 7.9 / MIL)
-    g.preferred_lanes["KEY0"] = (lane_x0, lane_x1, lane_y, 0.05)
+    for net in ("KEY0", "KEY3"):
+        g.preferred_lanes[net] = (lane_x0, lane_x1, lane_y, 0.05)
     return g
 
 

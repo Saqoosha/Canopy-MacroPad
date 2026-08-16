@@ -37,19 +37,21 @@ MM = 1.0 / MIL
 
 PLANE_NETS = ("GND", "3V3")
 
-# From the board's own rule set: viaOuterdiameterDefault 0.61,
-# viaInnerdiameterDefault 0.305. Read back rather than typed in, so a
+# From the board's own rule set: viaOuterdiameterDefault 0.45,
+# viaInnerdiameterDefault 0.20. Read back rather than typed in, so a
 # change to the rules cannot leave this file describing a different via.
-VIA_OUTER_MM = 0.61
-VIA_HOLE_MM = 0.305
+VIA_OUTER_MM = 0.45
+VIA_HOLE_MM = 0.20
 
 CLEAR_MM = 0.20         # to anything of another net
 HOLE_CLEAR_MM = 0.30    # board rule: drilled edge to drilled edge
 STEP_MM = 0.10
+SMT_PAD_TO_VIA_MM = 0.05
 
 # Two attempts, in order. The first is what a via beside a discrete pad
 # should look like: fat stub, via close by. The second exists for the
-# RP2040 -- a 0.4 mm-pitch QFN has no room beside its pins for a 0.61 mm
+# RP2040 -- a 0.4 mm-pitch QFN has little room beside its pins even for a
+# 0.45 mm
 # via, and a 0.20 mm stub leaving a 0.20 mm pad has exactly 0.20 mm to its
 # neighbours, which is the clearance, which fails. 0.15 mm buys 0.025 mm
 # on each side and lets the stub walk out past the package before it needs
@@ -165,6 +167,15 @@ def plan(data, verbose=True):
     by_id = {c["id"]: c for c in data["comps"]}
     outline = audit.board_outline(data)
     obstacles = _obstacles(data)
+    # Same-net copper is deliberately transparent to _clear(), but a via
+    # must stay off EVERY SMT pad for assembly. Without this second,
+    # net-independent list a via planned for one GND capacitor can land in
+    # the adjacent GND pad of another capacitor.
+    smt_pads = [
+        geom.pad_polygon(p["x"], p["y"], p["r"], p["pad"])
+        for pads in owned.values() for p in pads if not p["hole"]
+    ]
+    via_pad_clear = SMT_PAD_TO_VIA_MM / MIL
     keeps = _keepouts()
     if verbose:
         print(f"  {len(keeps)} no-wire regions to stay out of")
@@ -214,6 +225,8 @@ def plan(data, verbose=True):
         stubs = [geom.segment(p["x"], p["y"], vx, vy, 0.15 / MIL)
                  for p in (p48, p49)]
         if (_clear(via, obstacles, "3V3", clear)
+                and all(geom.distance(via, pad) >= via_pad_clear
+                        for pad in smt_pads)
                 and all(_clear(s, obstacles, "3V3", clear) for s in stubs)):
             for n, p, make_via in (("U3.48", p48, True),
                                    ("U3.49", p49, False)):
@@ -264,6 +277,9 @@ def plan(data, verbose=True):
                            for kp, kb in keeps
                            if not (vb[0] > kb[2] or kb[0] > vb[2]
                                    or vb[1] > kb[3] or kb[1] > vb[3])):
+                        continue
+                    if any(geom.distance(via, other_pad) < via_pad_clear
+                           for other_pad in smt_pads):
                         continue
                     stub = geom.segment(p["x"], p["y"], vx, vy, sw)
                     if not _clear(via, obstacles, p["net"], clear):

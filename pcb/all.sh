@@ -4,7 +4,8 @@
 # The order is the whole content of this file, and every step of it was
 # learned by getting it wrong:
 #
-#   1. Strip the old copper and apply the functional placement. This is a
+#   1. Correct the two project-local footprints, strip the old copper, and
+#      apply the functional placement. This is a
 #      rebuild, not an incremental reroute.
 #   2. Reserve the one constrained shared U3 power exit.
 #   3. Signals. They own every remaining QFN escape corridor.
@@ -20,7 +21,9 @@ set -e
 cd "$(dirname "$0")"
 
 echo "=== 0. rounded board edge ==="
+python3 footprint_fixes.py --apply
 python3 board_edge.py --apply
+python3 rules.py --apply
 
 echo "=== 1. clean placement and silk ==="
 python3 layout.py --apply
@@ -32,7 +35,7 @@ echo "=== 2. U3 power exits ==="
 # and they share one via outside the QFN.
 # C8.1 also needs a plane via before the signal fanout encloses it; the
 # following local trace then brings U3.22 onto that same connected island.
-MPAD_STITCH_ONLY_PADS=U3.48,U3.49,C8.1 python3 stitch.py --apply
+MPAD_STITCH_ONLY_PADS=U3.48,U3.49,C8.1,C9.1 python3 stitch.py --apply
 python3 power_local.py --apply
 
 echo "=== 3. signals ==="
@@ -54,6 +57,8 @@ echo "=== verify ==="
 python3 planes.py --rebuild
 python3 audit.py --control
 python3 audit.py
+python3 via_in_pad.py
 python3 connect.py
 python3 polish.py
+python3 rules.py --drc
 python3 -c 'from bridge import execute; ok=execute("return await eda.pcb_Document.save();"); assert ok is True, ok; print("saved")'
