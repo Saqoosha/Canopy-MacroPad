@@ -57,6 +57,7 @@ def main():
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
+        "coupon-hook": parts.hook_coupon(),
     }
 
     print("exported")
@@ -256,6 +257,24 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} anything above the "
           f"hook's top plane {step:9.3f} mm3")
+
+    # A sweep whose entries come out identical tests nothing, and looks
+    # exactly like one that works. Only the shell reads END_HOOK_FIT, so
+    # its four fragments must differ and the plate's four must not --
+    # except by the ink in their labels, which is why the plate side is
+    # asserted as a bound rather than as equality.
+    hook_solids = built["coupon-hook"].solids()
+    xs = sorted(so.center().X for so in hook_solids)
+    split = (xs[0] + xs[-1]) / 2
+    plate_v = sorted(so.volume for so in hook_solids if so.center().X < split)
+    shell_v = sorted(so.volume for so in hook_solids if so.center().X >= split)
+    want = len(P.END_HOOK_FIT_SWEEP)
+    steps = [round(shell_v[i + 1] - shell_v[i], 4) for i in range(len(shell_v) - 1)]
+    good = (len(plate_v) == want and len(shell_v) == want
+            and min(steps) > 0.01 and (plate_v[-1] - plate_v[0]) < 1.0)
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} hook fits differ "
+          f"{len(shell_v)}/{want}, steps {steps}")
 
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed

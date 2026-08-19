@@ -421,6 +421,84 @@ def coupon():
     return part
 
 
+def hook_coupon_layout():
+    """Where each swept pair sits, and how big a bite is taken."""
+    n = len(P.END_HOOK_FIT_SWEEP)
+    y0, y1 = P.END_HOOK_Y0, P.END_HOOK_Y0 + P.END_HOOK_L
+    return {
+        "n": n,
+        "band": (y0, y1),
+        "cy": (y0 + y1) / 2,
+        "grip": 6.0,          # flat inboard of the wall, to hold and to label
+        "depth": P.END_HOOK_L + 5.0,
+        "pitch": P.END_HOOK_L + 5.0 + 4.0,
+        "gap": 8.0,           # between the plate half and the shell half
+    }
+
+
+def hook_coupon():
+    """One plate fragment and one shell fragment per END_HOOK_FIT_SWEEP.
+
+    **Cut out of the real parts, not modelled again.** A coupon drawn by
+    hand answers a question about the coupon; this one is the geometry
+    `shell()` and `bottom()` build, sliced around one hook band, so a
+    number settled here is settled about the case.
+
+    Only the shell reads END_HOOK_FIT -- it is the slot's clearance and
+    the boss does not know about it -- so the plate is built once and its
+    fragment repeated, and the shell is rebuilt per swept value.
+
+    Both halves are laid out in the orientation each is printed in: the
+    plate on its underside, the shell turned over onto its plate face.
+    That is not decoration. The fit being swept is between two printed
+    faces, and each takes its tolerance from the direction it was grown.
+    """
+    L = hook_coupon_layout()
+    by0, by1 = L["band"]
+    x_in = P.CASE_W / 2 - P.WALL
+
+    plate_box = _block(
+        x_in - L["grip"], P.CASE_W / 2 + 0.5,
+        by0 - L["depth"] / 2 + P.END_HOOK_L / 2,
+        by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
+        -0.1, P.END_HOOK_SEAM_Z + 0.1,
+    )
+    shell_box = _block(
+        x_in - L["grip"], P.CASE_W / 2 + 0.5,
+        by0 - L["depth"] / 2 + P.END_HOOK_L / 2,
+        by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
+        P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z + 3.0,
+    )
+    plate_piece = bottom() & plate_box
+
+    was = P.END_HOOK_FIT
+    part = None
+    try:
+        for i, fit in enumerate(P.END_HOOK_FIT_SWEEP):
+            P.END_HOOK_FIT = fit
+            shell_piece = shell() & shell_box
+
+            dy = (i - (L["n"] - 1) / 2) * L["pitch"] - L["cy"]
+
+            one = Pos(0, dy, 0) * plate_piece
+            # Turned over onto the face it prints on, and set down in its
+            # own row across the plate. Offsetting along y instead put it
+            # where the next pair's plate goes and the two fused: four
+            # solids where there should be eight.
+            flipped = Rotation(180, 0, 0) * shell_piece
+            flipped = Pos(0, 0, -flipped.bounding_box().min.Z) * flipped
+            one += Pos(L["grip"] + P.WALL + L["gap"], dy, 0) * flipped
+
+            # Engraved on the flat inboard of the wall, where a finger
+            # holding the fragment does not cover it.
+            one -= Pos(x_in - L["grip"] / 2, dy + L["cy"], P.BOTTOM_T - 0.4) * extrude(
+                _label("%.2f" % fit), amount=0.5)
+            part = one if part is None else part + one
+    finally:
+        P.END_HOOK_FIT = was
+    return part
+
+
 def clear_coupon_layout():
     L = coupon_layout()
     n = len(P.CLEAR_SWEEP)
