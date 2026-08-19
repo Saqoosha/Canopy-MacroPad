@@ -108,7 +108,7 @@ def _board_pocket(z0, z1):
 
 
 # --- shell --------------------------------------------------------------
-def _hook_wall(x0, x1, y0, y1, z0, z1, c_in, c_out):
+def _hook_wall(x0, x1, y0, y1, z0, z1, c_in):
     """The raised wall with a lead-in chamfered off each top edge.
 
     Chamfered as an isolated box, before it is fused into the plate.
@@ -129,20 +129,23 @@ def _hook_wall(x0, x1, y0, y1, z0, z1, c_in, c_out):
     # that box with only its own chamfer and the first one is gone. The
     # volume said 0.120 where 0.390 was wanted, which is the outer
     # chamfer alone; nothing raised.
-    for pick, size in ((0, c_in), (-1, c_out)):
-        edge = w.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[pick]
-        w = chamfer(edge, length=size)
-    return w
+    edge = w.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[0]
+    return chamfer(edge, length=c_in)
 
 
 def _hook_boss(x0, x1, y0, y1, z0, z1, nose):
-    """The boss, with a lead-in off its leading bottom edge.
+    """The boss, with a lead-in off its leading **top** edge.
 
-    All of the slot's play sits under the boss -- both tops are flush --
-    so nose-first it is the bottom edge that has to find the opening.
+    This was on the bottom edge first, reasoned from where the slack is:
+    the slot is taller than the boss and all of that play sits underneath,
+    so nose-first along x the bottom edge is the one with somewhere to go.
+    That reasoning is about a purely horizontal insertion and the case is
+    not assembled that way -- the shell comes **down** over the plate, so
+    the corner that meets the shell's slot roof is the top one. Saqoosha
+    read it off the section and said so.
     """
     b = _block(x0, x1, y0, y1, z0, z1)
-    lead = b.edges().filter_by(Axis.Y).group_by(Axis.Z)[0].sort_by(Axis.X)[-1]
+    lead = b.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[-1]
     return chamfer(lead, length=nose)
 
 
@@ -196,11 +199,10 @@ def shell():
         # use the whole wall, and it is the only way to see from outside
         # whether the hook actually went in.
         f = P.END_HOOK_FIT
-        slot_z1 = P.END_HOOK_SEAM_Z - P.END_HOOK_TOP_GAP
         part -= _block(
             x_seam - 0.1, P.CASE_W / 2 + 0.1,
             lo - f / 2, hi + f / 2,
-            slot_z1 - P.END_HOOK_H - f, slot_z1,
+            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f, P.END_HOOK_SEAM_Z,
         )
 
     # Standoffs that set the board height. No pegs -- the switch locates.
@@ -255,12 +257,12 @@ def bottom():
     x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
     for y0, y1 in _end_hook_bands():
         lo, hi = sorted((y0, y1))
-        part += _hook_wall(x_in, x_seam, lo, hi, P.BOTTOM_T, P.END_HOOK_SEAM_Z,
-                           P.END_HOOK_CHAMFER_IN, P.END_HOOK_CHAMFER_OUT)
-        boss_z1 = P.END_HOOK_SEAM_Z - P.END_HOOK_TOP_GAP
+        part += _hook_wall(x_in, x_seam, lo, hi, P.BOTTOM_T,
+                           P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
         part += _hook_boss(
             x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
-            boss_z1 - P.END_HOOK_H, boss_z1, P.END_HOOK_NOSE,
+            P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
+            P.END_HOOK_NOSE,
         )
 
     # Columns under the press points, so the clamp is a sandwich.

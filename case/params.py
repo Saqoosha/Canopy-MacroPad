@@ -144,17 +144,14 @@ END_HOOK_Y0 = USB_PLUG_W / 2 + 0.50      # clear of the plug opening
 END_HOOK_L = 3.00                        # along the wall, inside the 3.99
 END_HOOK_H = 1.60                        # the boss's own height
 
-# How far the boss's top sits **below** the wall's top. Flush was wrong
-# and the section says why: the outer chamfer cuts the wall's top corner
-# down to 4.800 and the boss then returns to 5.000 right beside it, so
-# the top reads as a V notch rather than a chamfered ridge. Dropping the
-# boss leaves the wall's top a clean lead-in across its whole width, puts
-# solid wall above the boss instead of a groove, and makes the outer
-# chamfer do the job it looked like it was doing all along -- leading the
-# wall into the shell's slot, which it could not do while the boss stood
-# proud of that same face at the same height.
-END_HOOK_TOP_GAP = 0.60
-END_HOOK_SEAM_Z = 5.00                   # how high the seam climbs here
+# The wall's top is the boss's top. Nothing is bought by going higher:
+# the hook's grip is the shell material above the *slot*, whose roof is
+# the boss, so 4.40, 5.00 and 5.50 all leave the same 5.10 of it. What a
+# taller wall costs is the shell's own wall -- 5.10 left at 4.40, 4.00 at
+# 5.50 -- and what it buys is only more tongue before the boss engages.
+# 5.50 would also come within 0.20 of the board's underside, which is the
+# same number this design already calls too tight everywhere else.
+END_HOOK_SEAM_Z = 4.40                   # how high the seam climbs here
 
 # **The pocket goes right through the shell's wall**, which is Saqoosha's
 # call and it buys two things. The skirt is only 1.00 thick, so a blind
@@ -193,20 +190,22 @@ END_HOOK_FIT = 0.20
 # large chamfers would meet: at 0.50 each the top is a knife edge, which
 # prints as a wobble and locates nothing. The flat left between them is
 # checked, not assumed.
+# One chamfer on the wall, inboard, for the board. There is no outboard
+# one any more: the wall's top and the boss's top are the same plane now,
+# so an outer chamfer would cut down and the boss would return beside it
+# -- the V notch this design has already been through once. The boss's
+# nose is the lead-in on that side.
 END_HOOK_CHAMFER_IN = 0.30
-END_HOOK_CHAMFER_OUT = 0.20
 
-# And a third, on the boss, which is the one that actually earns the
-# phrase "easy to insert". The wall's outer chamfer looked like the
-# insertion lead-in and is not: the boss stands proud of that face, so it
-# is the boss that meets the shell first and the wall's edge never
-# touches anything. The chamfer there lands on the boss's root instead --
-# harmless, a small relief, but it leads nothing in.
+# And a third, on the boss's leading **top** edge.
 #
-# The slot is END_HOOK_H + END_HOOK_FIT tall against a boss of
-# END_HOOK_H, and both tops are flush, so every bit of the play sits
-# **under** the boss. Nose-first, the edge that has to find its way is
-# the leading bottom one.
+# It was on the bottom edge first, and the reasoning was about the wrong
+# motion. The slot is taller than the boss with both tops flush, so all
+# the play is underneath, and along a purely horizontal insertion the
+# bottom edge is the one with room to move -- true, and not how this case
+# goes together. The shell comes **down** over the plate, so the corner
+# that meets the slot's roof is the top one. Saqoosha read it off the
+# section drawing.
 END_HOOK_NOSE = 0.35
 
 FOOT_DIA = 8.00
