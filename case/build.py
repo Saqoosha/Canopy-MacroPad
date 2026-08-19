@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from build123d import Cylinder, Pos, Rotation, export_step, export_stl
+from build123d import Box, Cylinder, Pos, Rotation, export_step, export_stl
 
 import mock
 import params as P
@@ -44,6 +44,29 @@ def _head_seat_probe():
     return part
 
 
+def _rib_probes():
+    """One small box per rib the coupon is supposed to have.
+
+    The first version of this counted lumps in one wide slab, and a rib
+    moved 60 mm off its pair still gave 4 of 4 -- it could see a rib that
+    was *missing* and not one that was in the wrong place, which is most
+    of what can actually go wrong. Asking each expected position for
+    material separately catches both. A check nobody has watched fail
+    proves nothing, and this one had to be watched twice.
+    """
+    L = rib_coupon_layout_cached()
+    z = P.BOTTOM_T + P.SEAM_RIB_H - 0.20
+    y = L["gap"] / 2 + P.SEAM_RIB_INSET
+    return [
+        Pos(x, y, z + 0.05) * Box(P.SEAM_RIB_L * 0.5, P.SEAM_RIB_W * 0.5, 0.10)
+        for x in L["xs"]
+    ]
+
+
+def rib_coupon_layout_cached():
+    return parts.rib_coupon_layout()
+
+
 def check(label, got, want, tol=0.01):
     ok = abs(got - want) <= tol
     print(f"  [{'ok ' if ok else 'BAD'}] {label:<38} {got:8.3f}  (want {want:.3f})")
@@ -57,6 +80,7 @@ def main():
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
+        "coupon-rib": parts.rib_coupon(),
     }
 
     print("exported")
@@ -93,6 +117,11 @@ def main():
         check("shell height", built["shell"].bounding_box().size.Z,
               P.CASE_H - P.Z_FLOOR + P.SEAM_STEP_H),
         check("USB-C centred in the cavity depth", P.USB_CY, 0.0),
+        # The rib sits hard against the skirt line by construction. Stated
+        # as an equality because that is what it is -- as a margin it
+        # would read its own threshold forever and never go red.
+        check("rib's outboard edge on the skirt line",
+              P.SEAM_RIB_INSET - P.SEAM_RIB_W / 2, P.SEAM_STEP_W),
         check("key field mid-x",
               (P.SWITCH_XY[0][0] + P.SWITCH_XY[-1][0]) / 2,
               P.BOARD_ORIGIN[0] + P.KEY_FIELD_W / 2),
@@ -121,6 +150,20 @@ def main():
             P.CASE_W / 2 - (P.USB_CX + P.USB_OVERHANG)
         ),
         "plate web between switches": P.SWITCH_PITCH - P.SWITCH_HOLE,
+        "shell wall above the deepest rib pocket": (
+            parts.rib_coupon_layout()["wall_h"]
+            - P.SEAM_RIB_H - P.SEAM_RIB_ROOF
+        ),
+        # The one that went red first, at -0.125: the pocket cut clean
+        # through the wall into the cavity at the top of the old sweep.
+        "wall inboard of the widest rib pocket": (
+            P.WALL - P.SEAM_RIB_INSET
+            - (P.SEAM_RIB_W + max(P.SEAM_RIB_FIT_SWEEP)) / 2
+        ),
+        "wall outboard of the widest rib pocket": (
+            P.SEAM_RIB_INSET
+            - (P.SEAM_RIB_W + max(P.SEAM_RIB_FIT_SWEEP)) / 2
+        ),
         "screw post bite depth": (
             P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
         ),
@@ -182,6 +225,15 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
           f"head {missing:9.3f} mm3")
+
+    # The ribs, measured where each one is supposed to be rather than
+    # believed from the source that draws them.
+    probes = _rib_probes()
+    found = sum(1 for pr in probes if (pr & built["coupon-rib"]).volume > 1e-6)
+    good = found == len(probes)
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} ribs at their swept "
+          f"positions {found:5d} / {len(probes)}")
 
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1

@@ -328,6 +328,77 @@ def coupon():
     return part
 
 
+def rib_coupon_layout():
+    n = len(P.SEAM_RIB_FIT_SWEEP)
+    span = 20.0
+    gap = 4.0
+    pitch = span + 6.0
+    w = n * pitch
+    return {
+        "n": n, "span": span, "gap": gap, "pitch": pitch, "w": w,
+        "xs": [(-w / 2) + pitch / 2 + i * pitch for i in range(n)],
+        "wall_h": 6.0,
+    }
+
+
+def rib_coupon():
+    """One shell fragment and one plate fragment per SEAM_RIB_FIT_SWEEP entry.
+
+    Both are printed in the orientation the real part is printed in -- the
+    shell plate-face-down so its seam points up, the plate bottom-face-down
+    so its tongue points up. That matters here more than usual: the fit
+    being swept is between a printed boss and a printed pocket, and both
+    take their tolerance from the layer they were printed against.
+
+    Push a pair together by hand. The answer is the one that goes on with
+    a deliberate push and needs a deliberate pull to come off. If every
+    one is loose the sweep runs down from 0.00; if none will start, the
+    rib is the wrong feature here and the next thing to try is a magnet
+    pair, not a tighter rib.
+    """
+    L = rib_coupon_layout()
+    part = None
+    for fit, x in zip(P.SEAM_RIB_FIT_SWEEP, L["xs"]):
+        x0, x1 = x - L["span"] / 2, x + L["span"] / 2
+
+        # --- the shell fragment, printed upside down like the real shell.
+        # Its outer face is at y0; the skirt is the band against it, and
+        # the pocket is cut into the wall the tongue meets.
+        y0 = -L["gap"] / 2
+        skirt_t = P.SEAM_STEP_W - P.SEAM_FIT / 2
+        wall = _block(x0, x1, y0 - P.WALL, y0, 0.0, L["wall_h"])
+        wall += _block(x0, x1, y0 - skirt_t, y0,
+                       L["wall_h"], L["wall_h"] + P.SEAM_STEP_H)
+        pocket_c = y0 - P.SEAM_RIB_INSET
+        pw, pl = P.SEAM_RIB_W + fit, P.SEAM_RIB_L + fit
+        wall -= _block(
+            x - pl / 2, x + pl / 2,
+            pocket_c - pw / 2, pocket_c + pw / 2,
+            L["wall_h"] - P.SEAM_RIB_H - P.SEAM_RIB_ROOF, L["wall_h"] + 0.1,
+        )
+        part = wall if part is None else part + wall
+
+        # --- the plate fragment, tongue up, rib on it.
+        y1 = L["gap"] / 2
+        plate = _block(x0, x1, y1, y1 + P.WALL + 2.0,
+                       0.0, P.BOTTOM_T - P.SEAM_STEP_H)
+        plate += _block(x0, x1, y1 + P.SEAM_STEP_W, y1 + P.WALL + 2.0,
+                        P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
+        rib_c = y1 + P.SEAM_RIB_INSET
+        plate += _block(
+            x - P.SEAM_RIB_L / 2, x + P.SEAM_RIB_L / 2,
+            rib_c - P.SEAM_RIB_W / 2, rib_c + P.SEAM_RIB_W / 2,
+            P.BOTTOM_T, P.BOTTOM_T + P.SEAM_RIB_H,
+        )
+        part += plate
+
+        # Engraved on the plate's own top, past the tongue, where a finger
+        # holding the fragment does not cover it.
+        part -= Pos(x, y1 + P.WALL + 1.2, P.BOTTOM_T - P.SEAM_STEP_H - 0.3) * extrude(
+            _label("%.2f" % fit), amount=0.4)
+    return part
+
+
 def clear_coupon_layout():
     L = coupon_layout()
     n = len(P.CLEAR_SWEEP)
