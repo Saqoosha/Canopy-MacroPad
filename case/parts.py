@@ -456,6 +456,7 @@ def hook_coupon():
     L = hook_coupon_layout()
     by0, by1 = L["band"]
     x_in = P.CASE_W / 2 - P.WALL
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
 
     plate_box = _block(
         x_in - L["grip"], P.CASE_W / 2 + 0.5,
@@ -469,14 +470,40 @@ def hook_coupon():
         by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
         P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z + 3.0,
     )
+    # **Coupon only.** The wall runs the fragment's whole width here; in
+    # the case it is END_HOOK_L long like the boss. Saqoosha printed this
+    # and it broke in the hand -- a 1.00 x 2.00 wall three long with a
+    # 0.90 boss on the far side is a cantilever loaded at the tip, and
+    # the coupon has none of the case around it to hold it. A test piece
+    # that snaps before it is pushed together answers nothing.
+    #
+    # It stays faithful about what is being asked. The boss and the slot
+    # keep their real 3.00, and the fit is a clearance between those two
+    # -- the wall's length has no part in it.
+    cy0 = by0 - L["depth"] / 2 + P.END_HOOK_L / 2
+    cy1 = by1 + L["depth"] / 2 - P.END_HOOK_L / 2
+    fy0, fy1 = cy0 + 0.6, cy1 - 0.6
     plate_piece = bottom() & plate_box
+    plate_piece += _hook_wall(x_in, x_seam, fy0, fy1, P.BOTTOM_T,
+                              P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
 
     was = P.END_HOOK_FIT
     part = None
     try:
         for i, fit in enumerate(P.END_HOOK_FIT_SWEEP):
             P.END_HOOK_FIT = fit
+            # And the shell's relief widened to match, or the two would
+            # foul along the wall the coupon just lengthened.
             shell_piece = shell() & shell_box
+            # Across the fragment's whole width, not just the wall's.
+            # Stopping at the wall left a 0.059 mm3 crumb of the shell's
+            # cavity corner floating free inside the STL -- a speck the
+            # slicer would try to print.
+            shell_piece -= _block(
+                x_in - 0.1, x_seam + P.SEAM_FIT / 2,
+                cy0 - 0.1, cy1 + 0.1,
+                P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z,
+            )
 
             dy = (i - (L["n"] - 1) / 2) * L["pitch"] - L["cy"]
 
