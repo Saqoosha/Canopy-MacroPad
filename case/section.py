@@ -33,9 +33,17 @@ STYLE = {
     "switch bodies": ("#b06a1f", 0.55),
 }
 
+# The third cut exists because the first two miss the end hook entirely:
+# one runs along the key row at y = 0 and the other across the middle of
+# the case, and the hook lives in a 3.00 band at |y| 6.50..9.50 beside
+# the USB port. A feature nothing draws is a feature nobody checks.
+_HOOK_Y = P.END_HOOK_Y0 + P.END_HOOK_L / 2
+
 CUTS = [
     ("through the key row  (looking back)", (0, P.SWITCH_XY[0][1], 0), (0, 1, 0), 0, 2),
     ("through the centreline  (looking right)", (0, 0, 0), (1, 0, 0), 1, 2),
+    (f"through the end hook at y = {_HOOK_Y:.2f}  (looking back)",
+     (0, _HOOK_Y, 0), (0, 1, 0), 0, 2),
 ]
 
 
@@ -53,7 +61,7 @@ def meshes():
 
 def main():
     loaded = meshes()
-    fig, axes = plt.subplots(len(CUTS), 1, figsize=(15, 9), dpi=140)
+    fig, axes = plt.subplots(len(CUTS), 1, figsize=(15, 12), dpi=140)
 
     for ax, (title, origin, normal, ha, va) in zip(axes, CUTS):
         for name, mesh in loaded.items():

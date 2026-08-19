@@ -107,6 +107,20 @@ def _board_pocket(z0, z1):
 
 
 # --- shell --------------------------------------------------------------
+def _end_hook_bands():
+    """(y0, y1) for each hook, at the right wall, both sides of the port.
+
+    Derived once and used by the boss, the pocket and the raised seam, so
+    the three cannot drift apart. The band is bounded by the USB plug's
+    opening on the inboard side and the case's corner radius outboard;
+    everything is measured from those two rather than placed by eye.
+    """
+    return [
+        (sign * P.END_HOOK_Y0, sign * (P.END_HOOK_Y0 + P.END_HOOK_L))
+        for sign in (-1, 1)
+    ]
+
+
 def shell():
     """Top shell: the switch plate, its walls, and the board clamp."""
     outer = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R, P.Z_FLOOR, P.CASE_H)
@@ -127,6 +141,28 @@ def shell():
                 max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                 skirt_z0 - 0.1, P.Z_FLOOR + 0.1)
     )
+
+    # The seam climbs at the right end. In the two bands beside the USB
+    # port the shell gives up its inner SEAM_STEP_W all the way to
+    # END_HOOK_SEAM_Z, so the plate's wall can carry on up inside it, and
+    # takes a pocket in what is left for the boss to drop into.
+    x_in = P.CASE_W / 2 - P.WALL
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    for y0, y1 in _end_hook_bands():
+        lo, hi = sorted((y0, y1))
+        part -= _block(x_in - 0.1, x_seam + P.SEAM_FIT / 2,
+                       lo - P.SEAM_FIT / 2, hi + P.SEAM_FIT / 2,
+                       P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z)
+        # Through the outer face, deliberately: it is what lets the reach
+        # use the whole wall, and it is the only way to see from outside
+        # whether the hook actually went in.
+        f = P.END_HOOK_FIT
+        part -= _block(
+            x_seam - 0.1, P.CASE_W / 2 + 0.1,
+            lo - f / 2, hi + f / 2,
+            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f,
+            P.END_HOOK_SEAM_Z,
+        )
 
     # Standoffs that set the board height. No pegs -- the switch locates.
     for x, y in P.PRESS_XY:
@@ -171,6 +207,20 @@ def bottom():
     part += _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
                   max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                   P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
+
+    # The other half of the raised seam: the plate's wall carries on up
+    # inside the shell in the same two bands, and the boss stands off its
+    # outer face. The boss is what stops this end lifting -- it is
+    # captured by the shell's material above the pocket, not gripped.
+    x_in = P.CASE_W / 2 - P.WALL
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    for y0, y1 in _end_hook_bands():
+        lo, hi = sorted((y0, y1))
+        part += _block(x_in, x_seam, lo, hi, P.BOTTOM_T, P.END_HOOK_SEAM_Z)
+        part += _block(
+            x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
+            P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
+        )
 
     # Columns under the press points, so the clamp is a sandwich.
     for x, y in P.PRESS_XY:
@@ -325,77 +375,6 @@ def coupon():
     so_h = P.Z_PLATE_BOTTOM - P.Z_BOARD_TOP
     sy = L["standoff_y"]
     part += _tube(post_x[0], sy, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
-    return part
-
-
-def rib_coupon_layout():
-    n = len(P.SEAM_RIB_FIT_SWEEP)
-    span = 20.0
-    gap = 4.0
-    pitch = span + 6.0
-    w = n * pitch
-    return {
-        "n": n, "span": span, "gap": gap, "pitch": pitch, "w": w,
-        "xs": [(-w / 2) + pitch / 2 + i * pitch for i in range(n)],
-        "wall_h": 6.0,
-    }
-
-
-def rib_coupon():
-    """One shell fragment and one plate fragment per SEAM_RIB_FIT_SWEEP entry.
-
-    Both are printed in the orientation the real part is printed in -- the
-    shell plate-face-down so its seam points up, the plate bottom-face-down
-    so its tongue points up. That matters here more than usual: the fit
-    being swept is between a printed boss and a printed pocket, and both
-    take their tolerance from the layer they were printed against.
-
-    Push a pair together by hand. The answer is the one that goes on with
-    a deliberate push and needs a deliberate pull to come off. If every
-    one is loose the sweep runs down from 0.00; if none will start, the
-    rib is the wrong feature here and the next thing to try is a magnet
-    pair, not a tighter rib.
-    """
-    L = rib_coupon_layout()
-    part = None
-    for fit, x in zip(P.SEAM_RIB_FIT_SWEEP, L["xs"]):
-        x0, x1 = x - L["span"] / 2, x + L["span"] / 2
-
-        # --- the shell fragment, printed upside down like the real shell.
-        # Its outer face is at y0; the skirt is the band against it, and
-        # the pocket is cut into the wall the tongue meets.
-        y0 = -L["gap"] / 2
-        skirt_t = P.SEAM_STEP_W - P.SEAM_FIT / 2
-        wall = _block(x0, x1, y0 - P.WALL, y0, 0.0, L["wall_h"])
-        wall += _block(x0, x1, y0 - skirt_t, y0,
-                       L["wall_h"], L["wall_h"] + P.SEAM_STEP_H)
-        pocket_c = y0 - P.SEAM_RIB_INSET
-        pw, pl = P.SEAM_RIB_W + fit, P.SEAM_RIB_L + fit
-        wall -= _block(
-            x - pl / 2, x + pl / 2,
-            pocket_c - pw / 2, pocket_c + pw / 2,
-            L["wall_h"] - P.SEAM_RIB_H - P.SEAM_RIB_ROOF, L["wall_h"] + 0.1,
-        )
-        part = wall if part is None else part + wall
-
-        # --- the plate fragment, tongue up, rib on it.
-        y1 = L["gap"] / 2
-        plate = _block(x0, x1, y1, y1 + P.WALL + 2.0,
-                       0.0, P.BOTTOM_T - P.SEAM_STEP_H)
-        plate += _block(x0, x1, y1 + P.SEAM_STEP_W, y1 + P.WALL + 2.0,
-                        P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
-        rib_c = y1 + P.SEAM_RIB_INSET
-        plate += _block(
-            x - P.SEAM_RIB_L / 2, x + P.SEAM_RIB_L / 2,
-            rib_c - P.SEAM_RIB_W / 2, rib_c + P.SEAM_RIB_W / 2,
-            P.BOTTOM_T, P.BOTTOM_T + P.SEAM_RIB_H,
-        )
-        part += plate
-
-        # Engraved on the plate's own top, past the tongue, where a finger
-        # holding the fragment does not cover it.
-        part -= Pos(x, y1 + P.WALL + 1.2, P.BOTTOM_T - P.SEAM_STEP_H - 0.3) * extrude(
-            _label("%.2f" % fit), amount=0.4)
     return part
 
 

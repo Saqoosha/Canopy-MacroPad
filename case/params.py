@@ -103,79 +103,6 @@ SEAM_STEP_H = 1.20
 
 SEAM_FIT = 0.20        # total clearance between skirt and tongue
 
-# --- the seam's ribs -----------------------------------------------------
-# A rib on the tongue standing up into a pocket in the shell's wall, at the
-# **ends only**. Saqoosha's constraint and it is about assembly, not
-# strength: the shell seats on the left screws and swings down, so a rib
-# part-way along a long side is entered on a slant and binds. At an end it
-# goes in straight.
-#
-# This is not the snap coming back. The snap needed the skirt to *flex*
-# and the skirt is not a spring -- 0.90 thick over 1.20 free length, 19%
-# surface strain where PLA yields near 2. A rib in a pocket does not bend
-# at all; it holds by interference along its flanks, the way a dowel does.
-# Different mechanism, so the arithmetic that killed the snap says nothing
-# about this. What it does share is that **it is a press fit, and the
-# snap's coupon behaved like one** -- hard to get on, nothing once there.
-# So this number is not guessed into the case: `coupon-rib` prints it.
-# The band where both halves have material is only SEAM_STEP_W wide: the
-# rib has to stand on the tongue, which starts 1.00 in from the outer
-# face, and its pocket has to leave shell wall before the cavity at 2.00.
-# Written out, those two demands are one inequality:
-#
-#     rib on the tongue    INSET - W/2 >= SEAM_STEP_W
-#     wall past the pocket WALL - INSET - (W + fit)/2 >= 0.25
-#     together             W + fit/2 <= 0.75
-#
-# So 0.80 does not fit, which `build.py` said before anything was printed
-# -- "pocket wall at the widest swept fit" went to -0.125, the pocket
-# through the wall and into the cavity. 0.60 leaves the sweep 0.30 to
-# spend and that is what sets the numbers below, rather than taste.
-SEAM_RIB_W = 0.60      # across the tongue
-SEAM_RIB_L = 5.00      # along the wall
-SEAM_RIB_H = 2.50      # how far it stands above the tongue
-SEAM_RIB_ROOF = 0.20   # pocket cut deeper than the rib is tall
-
-# Modelled pocket minus rib, on both flanks -- not the printed fit. This
-# machine pulls a hole in by about 0.15 (the constant `SWITCH_HOLE`
-# measures), so these four land near -0.15, -0.07, +0.01 and +0.10 of real
-# clearance: interference at one end, a slip fit at the other, which is
-# the bracket a press fit wants. The top of the sweep is 0.25 because the
-# inequality above allows no more, not because 0.25 felt right.
-SEAM_RIB_FIT_SWEEP = (0.00, 0.08, 0.16, 0.25)
-SEAM_RIB_FIT = 0.16    # placeholder. The coupon replaces it; nothing in
-                       # shell() or bottom() reads it yet.
-
-# One derivation of where the rib sits across the seam, used by both
-# halves. Two places deriving the same edge is how a 0.196 sliver got into
-# the QT Py rail -- the rib and its pocket must come from one number. The
-# rib sits hard against the skirt line, as far outboard as standing on the
-# tongue allows, because every millimetre it moves inboard is taken off
-# the wall its pocket has to leave.
-SEAM_RIB_INSET = SEAM_STEP_W + SEAM_RIB_W / 2
-
-# **The step is the whole joint. There was a snap and it is gone**, and
-# the reason is arithmetic rather than a number that wanted tuning.
-#
-# Barbs on the inside of the skirt dropped into a groove round the
-# tongue, swept 0.30 to 0.70 of reach on a coupon. All four came back too
-# weak, 0.70 the best of them and still no lock, and both complaints --
-# hard to fit, does not hold -- are the same fault: **the skirt is not a
-# spring.** It is 0.90 thick over a 1.20 free length, so even the
-# shallowest hook asks it for 19% surface strain where PLA yields near 2.
-# It never bent. It was forced.
-#
-# A cantilever that deflects 0.40 at 2% wants roughly 5 mm of length and
-# the plate is 2.40 thick, so no hook in this geometry can work and a
-# sweep upward would only have found a stiffer press fit. A third screw
-# at mid-span is out too: the boards fill the case wall to wall there,
-# 0.200 between the field and the cavity, against the 5.60 a post needs.
-#
-# So the step does what the step already did -- align the halves and put
-# the residual gap inside the joint instead of on the outside. If the
-# centre ever lifts, the next thing to try is a magnet pair under the
-# boards, not a plastic spring.
-
 # --- USB-C --------------------------------------------------------------
 # Receptacle class figure from the design spec (3.16). Overhang and plug
 # overmold are the numbers the wired pad already settled with a real
@@ -190,6 +117,54 @@ USB_PLUG_W = 12.00
 USB_PLUG_H = 6.60
 USB_PLUG_L = 8.00
 USB_R = USB_H / 2
+
+# --- the end hook -------------------------------------------------------
+# Two screws hold this case and both sit in the left bay, so 145.50 mm of
+# a 151.00 mm case has nothing on it. The step aligns the halves and hides
+# the gap; since the snap went, nothing pulls them together.
+#
+# Saqoosha's answer, and it is a better one than a rib: at the right end
+# the seam climbs, the plate's wall carries on up inside the shell's, and
+# a **horizontal** boss off that wall drops into a pocket in the shell.
+# It is not friction. The boss is captured, so the halves cannot lift
+# there at all.
+#
+# **Ends only, and the reason is the assembly motion.** The boss points
+# outward, so it is engaged by moving the plate along x -- put the right
+# end in, swing the left end down, then the screws. On a long side the
+# same boss would need the plate to move in y at the same time, which the
+# other end's boss forbids. That is Saqoosha's constraint, felt before it
+# was drawn: an end goes in, the middle of a long side does not.
+#
+# The band it lives in is cut from both sides: the USB plug's opening ends
+# at y 6.00 and the outer corner radius starts at 9.99, leaving 3.99 mm of
+# straight wall each side of the port. Everything below is sized inside
+# that, not chosen.
+END_HOOK_Y0 = USB_PLUG_W / 2 + 0.50      # clear of the plug opening
+END_HOOK_L = 3.00                        # along the wall, inside the 3.99
+END_HOOK_H = 1.60                        # the boss's own height
+END_HOOK_SEAM_Z = 5.00                   # how high the seam climbs here
+
+# **The pocket goes right through the shell's wall**, which is Saqoosha's
+# call and it buys two things. The skirt is only 1.00 thick, so a blind
+# pocket had to share that with the skin left outside it -- 0.70 of reach
+# plus the fit read -0.100 and burst through anyway, which is how this
+# ended up being asked rather than assumed. Through, the reach is bounded
+# by the wall instead of by the wall minus a skin. And the second thing
+# matters more on the bench: **you can see whether the hook engaged.**
+# There is no other way to know, since the joint is buried once shut.
+#
+# The boss stops 0.10 short of the outer face so it sits recessed rather
+# than proud -- a bump would be felt, a shadow line will not.
+END_HOOK_REACH = SEAM_STEP_W - 0.10
+
+# Clearance in y and z, so the boss can drop into the slot. This is the
+# unknown now that the reach is settled by the wall: too tight and the
+# end will not go together, too loose and the end lifts by exactly this
+# before the boss catches. Not a press fit -- the boss is held by the
+# shell's material above it, not gripped by its flanks.
+END_HOOK_FIT_SWEEP = (0.10, 0.20, 0.30, 0.40)
+END_HOOK_FIT = 0.20
 
 FOOT_DIA = 8.00
 FOOT_H = 2.00
