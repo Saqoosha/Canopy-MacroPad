@@ -85,16 +85,17 @@ naming this exact fix.
   centres to copper already touching those pads. The final Net panel must say
   `Ratlines (0)`; hiding the Ratline layer is not verification.
 
-- **`pcb_Drc.check()` can redraw stale yellow X markers while reporting
-  `All (0)`.** On this board the call also exceeds the bridge's fixed 30 s
-  timeout, but completes in the client. The scripted DRC calls pass
-  `userInterface=false` so they do not ask EasyEDA to draw that overlay.
-  Read the active PCB tab's `data.drcResult` for the same `All (0)` value the
-  bottom panel displays. If an interactive DRC has already drawn stale Xs,
-  use **Design -> Clear Errors** once. `removeIndicatorMarkers()` is a
-  different marker system and does not remove DRC Xs, and the public
-  `pcb_Drc` API exposes no Clear Errors method. Yellow X objects are UI state,
-  not stored Multi-Layer primitives; hiding Multi-Layer never was the fix.
+- **`pcb_Drc.check()` can redraw stale yellow X markers even when it finds no
+  current violation.** On this board the call exceeds the bridge's fixed 30 s
+  timeout, and this EasyEDA release has also rejected the asynchronous result
+  with an internal `Error: undefined`. Do not scrape the editor's private tab
+  state and call that a DRC result. Run **Design -> Check DRC** in the client
+  and read the bottom DRC panel; the required result is `All (0)`. If an
+  interactive DRC has left old Xs behind, use **Design -> Clear Errors** once.
+  `removeIndicatorMarkers()` is a different marker system and does not remove
+  DRC Xs, and the public `pcb_Drc` API exposes no Clear Errors method. Yellow X
+  objects are UI state, not stored Multi-Layer primitives; hiding Multi-Layer
+  never was the fix.
 
 - **The stock footprint geometry and stock DRC table contradicted each
   other.** The reverse-mount LED opening left only 0.10 mm to its four pads,
@@ -111,27 +112,21 @@ naming this exact fix.
   skew. All values are read back after writing. The 36 switch-hole keepouts
   prohibit tracks, pours, and inner-layer copper, but not components: each
   switch necessarily overlaps the keepout around its own holes, so adding
-  `NO_COMPONENTS` created 18 permanent false DRC errors. The final live DRC
-  result is `All (0)`.
+  `NO_COMPONENTS` created 18 permanent false DRC errors. `all.sh` verifies the
+  stored rule values and prints a reminder to run the client-side DRC; it does
+  not claim `All (0)` on behalf of an API call that timed out.
 
 - **Same-net clearance rules do not prevent accidental via-in-pad.** The
   router once produced 33 annulus overlaps, 27 with the drilled opening in a
-  solderable pad, so the route grid still treats every SMT pad as a no-via
-  area and dogbones every router-created via. The exception is not a relaxed
-  clearance: U3's stock RP2040 footprint deliberately owns a 3x3 array of
-  0.6096/0.3048 mm thermal vias inside exposed GND pad 57. They must carry
-  GND explicitly in both the local footprint and the placed PCB's `PAD_NET`
-  records. A blank child-via net touches copper on both inner planes without
-  clearance; the enclosing GND pad does not make that safe. `via_in_pad.py`
-  accepts only that exact nine-via, footprint-owned array with explicit GND,
-  while every blank, mismatched, or other annulus overlap remains a build
-  failure.
-  Fabrication is a separate decision: open via-in-pad can wick paste, so use
-  the board house's filled-and-capped via-in-pad process for controlled SMT
-  yield rather than deleting the RP2040 ground-return array.
-  The final via drill contains 99 x 0.20 mm ordinary vias and exactly 9 x
-  0.3048 mm U3 thermal vias; the NPTH file still contains all 36 switch
-  openings and the two 0.60 mm USB-C locating holes.
+  solderable pad, so the route grid treats every SMT pad as a no-via area and
+  dogbones every router-created via. U3's stock 3x3 exposed-pad via array is
+  removed too: `thermal_fanout.py` replaces it with four short bottom-layer
+  GND spokes and 0.45/0.30 mm vias outside pad 57's paste area. This retains
+  short thermal and ground paths without requiring filled-and-capped
+  via-in-pad processing. `via_in_pad.py` rejects every annular SMT-pad
+  overlap, without exceptions. Every board via uses the ordinary-cost
+  0.45/0.30 mm geometry; the NPTH file still contains all 36 switch openings
+  and the two 0.60 mm USB-C locating holes.
 
 - **`eda.lib_Symbol.get()` carries no pin data.** Its return's keys are
   `name`, `libraryType`, `uuid`, `libraryUuid`, `classification`, `type`,
@@ -361,12 +356,11 @@ set of traps, all confirmed live:
   Switch holes are not in the schematic; `footprint.place_switch_holes`
   goes back on after the move. After convert, `pcb/cluster.py` packs the
   MCU block by net (crystal on XIN/XOUT, ESD/LDO on the USB tab, flash
-  in the next pixel gap) and turns the board into 4 layers. Inner1/Inner2
-  start as NOT_USED (`layerStatus` 0) until
-  `pcb_Layer.setTheNumberOfCopperLayers(4)`. Pour outlines for GND on
-  Inner1 and 3V3 on Inner2 create. `rebuildCopperRegion()` now works on
-  both live pour instances; `planes.py --rebuild` calls it and verifies
-  that two filled copper primitives remain. `sch_Net.getAllNetsName()` stays `[]`
+  in the next pixel gap). `cluster.py` records the superseded four-layer
+  experiment; the finished board uses `stack.py` to require exactly two
+  copper layers. `planes.py` creates Bottom GND and Top 3V3 pours, and
+  `rebuildCopperRegion()` verifies that both filled copper primitives remain.
+  `sch_Net.getAllNetsName()` stays `[]`
   even when `getNetlistFile("JLCEDA")` is complete — do not call
   deprecated `sch_Netlist.getNetlist()` (hangs). The SK6812 symbol's pin
   *names* (1=GND …) do not match its footprint or `PIXEL_PAD_SIGNALS`
@@ -407,10 +401,11 @@ cd pcb
 python3 plot.py
 ```
 
-`all.sh` replaces the rounded outline, applies placement and silkscreen,
-routes all signal and power nets, rebuilds both inner planes, checks that
-all 32 nets are single connected islands, and runs the review-specific
-checks in `polish.py`. The reverse-mount LED rectangles are physical board
+`all.sh` replaces the rounded outline, requires a two-layer stack, applies
+placement and silkscreen, routes all signal and power nets, rebuilds Bottom
+GND and Top 3V3 pours, requires the EasyEDA Net panel to read `Ratlines (0)`,
+checks that all 32 nets are single connected islands, and runs the
+review-specific checks in `polish.py`. The reverse-mount LED rectangles are physical board
 openings and are obstacles to both the signal router and power-via stitcher.
 KEY0 uses y=7.9 mm through the repeated opening/centre-hole passage, the
 farthest legal row on the 0.10 mm router grid; KEY3 avoids the narrow
@@ -421,6 +416,40 @@ locates and clamps the PCB between its shell standoffs and bottom support
 columns; adding holes would consume routing area without adding retention.
 The case imports `BOARD_CORNER_RADIUS` from `pcb/params.py`, so its pocket
 and the R2.54 mm board corners have one source.
+
+## Manufacturing export and JLCPCB quote
+
+Export the exact open PCB revision, then verify the three files before an
+upload:
+
+```
+cd pcb
+python3 export_manufacturing.py
+```
+
+This writes `out/manufacturing/canopy_macropad-gerber.zip`,
+`canopy_macropad-bom.xlsx`, and `canopy_macropad-cpl.xlsx`. The exporter checks
+that the archive contains both outer copper layers and drill data, and no
+inner copper layers; that the BOM contains U1 as W25Q64JVSSIQ / C179171; that the old
+unavailable C2940195 XSON part is absent; and that U1 is present in the CPL.
+Passing export checks prove file completeness, not DRC cleanliness, so run the
+EasyEDA DRC panel immediately before upload.
+
+The board is now a dedicated two-layer redesign: Bottom carries the GND pour,
+Top carries the 3V3 pour and backbone, and every signal and power net has an
+explicit ordinary-copper path. Do not reuse an older four-layer Gerber archive.
+
+For the intended cheapest partial assembly, start with 5 green FR-4 boards,
+2 layers, 1.6 mm, 1 oz copper and the cheapest available HASL finish. Enable
+Economic PCBA on the bottom side for 2 boards and
+use customer/self-service parts selection. U3 (RP2040) and U1 (C179171 flash)
+must be assembled; the reverse-mount LEDs, hot-swap sockets, and SW1 may be
+marked DNP for hand soldering. The checked cheaper flash candidates were
+Standard-only in Economic assembly, so retain C179171 unless the live parts
+filter shows a compatible in-stock Economic option. Recheck live stock and the displayed total before
+saving the quote because JLCPCB availability and fees can change after these
+files were exported. Never advance from the reviewed quote to payment without
+an explicit order instruction.
 
 ## Re-running the original key-cell `build.py`
 
@@ -441,9 +470,10 @@ check fail on its own — not inferred from the other's failure. Neither
 flag touches DRC or export; those are checked on whatever's actually on
 the board regardless of which (if any) injection flag was passed.
 
-`assert_drc()` calls DRC with `userInterface=true`, so a failure also
-pops EasyEDA's own DRC panel open with the real error list — the raised
-`AssertionError` message alone doesn't say what's wrong, the panel does.
+`assert_drc()` calls DRC with `userInterface=false`; the call may still exceed
+the bridge timeout or fail inside this EasyEDA release. Use the client-side DRC
+panel for the manufacturing decision rather than treating this legacy helper
+as final evidence.
 `export_fabrication()` does not depend on DRC passing; Gerber, BOM, and
 pick-and-place all export successfully even with DRC errors present, which
 is realistic (a fabricator's tooling doesn't refuse a design with DRC

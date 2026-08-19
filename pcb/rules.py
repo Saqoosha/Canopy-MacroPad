@@ -3,7 +3,7 @@
 An earlier round spent an afternoon arguing about 48 DRC errors without
 ever establishing what the rules being violated were. They turn out to
 be a configuration called 自定义配置.  This file makes that configuration
-match the geometry the independent audit actually measures: 0.102 mm for
+match the geometry the independent audit actually measures: 0.13 mm for
 copper, 0.20 mm from routed openings, and 0.25 mm from the USB-C shell
 holes to the outline.
 
@@ -37,24 +37,19 @@ JLC_PRESET = "JLCPCB Capability(Multiple Layers Board)"
 # board's own configuration use different shapes for the same table --
 # `table` in the preset against `tables` keyed by status in the live one --
 # so overwriting with it does nothing, silently, returning undefined. And
-# it would buy nothing anyway: the board's track-to-track spacing is
-# 0.102 mm where JLCPCB's published four-layer capability is 0.0889, so
-# the rules already in force are the stricter pair. Being stricter than
-# the fab is the safe direction to be wrong in.
+# it would buy nothing anyway: this board deliberately uses 0.13 mm,
+# slightly more than the ordinary two-layer 5 mil process limit.
 #
 # What DID need changing is the default track width. 0.254 mm cannot pass
 # between the pads of a 0.4 mm-pitch QFN-56, which is the hardest escape
 # on this board; 0.15 mm can, carries far more than any signal here needs
 # at 1 oz, and leaves the 0.127 minimum untouched as the floor. Power does
-# not depend on it -- GND and 3V3 ride the inner planes.
+# not depend on it -- GND and 3V3 use the two outer-layer pours.
 TRACK_DEFAULT_MM = 0.15
 
-# One copper clearance everywhere. The live table used 0.102 mm only for
-# track-to-track and 0.152 mm for every pad/via combination, while the router
-# and geometric audit both use 0.102 mm. The larger number did not describe
-# the board or the fab capability; it only produced warnings for legal QFN
-# escapes. Keep plane-zone clearance separate and larger below.
-COPPER_CLEARANCE_MM = 0.102
+# One copper clearance everywhere, just over the cheap two-layer 5 mil
+# process limit and identical to the router and geometric audit.
+COPPER_CLEARANCE_MM = 0.13
 
 # Routed board openings are held to the same 0.20 mm edge clearance that
 # audit.py measures geometrically. The stock table's 0.30 mm contradicted the
@@ -72,12 +67,11 @@ BOARD_OUTLINE_TO_TH_MM = 0.25
 # accidental large detour without pretending this is a high-speed link.
 DIFF_PAIR_SKEW_MAX_MM = 1.5
 
-# Preferred 0.20 mm hole, with the smallest diameter that stays on
-# JLCPCB's standard-cost side. A 0.20 mm hole below 0.45 mm diameter is
-# manufacturable but attracts the small-via surcharge. Keeping these in
-# the live rule configuration makes hand-added vias agree with the router.
+# Ordinary-cost 0.30/0.45 mm via.  Keeping these in the live rule
+# configuration makes hand-added vias agree with the router and avoids the
+# advanced small-via process option in the fabrication quote.
 VIA_OUTER_MM = 0.45
-VIA_HOLE_MM = 0.20
+VIA_HOLE_MM = 0.30
 
 DIFF_PAIRS = [
     # name, positive, negative -- the raw side, between the connector and
@@ -93,8 +87,7 @@ DIFF_PAIRS = [
 # falsy return as "the class already existed" and printed a reassuring
 # line about a class that did not exist. A feature that cannot work and
 # reports success is worse than no feature. They are not needed anyway:
-# GND and 3V3 ride the inner planes, so nothing here wants a wider track
-# than the 0.15 mm default.
+# GND and 3V3 use outer-layer pours, so signals retain the 0.15 mm default.
 
 
 def state():
@@ -197,7 +190,7 @@ def apply():
     # entirely -- so "did it work" has to be answered by reading a number
     # back out, not by believing the return.
     print(f"  track-to-track spacing {got['spacing']} mm "
-          f"(JLCPCB four-layer capability is 0.0889, so this is stricter)")
+          f"(two-layer target {COPPER_CLEARANCE_MM} mm)")
     flat_copper = [v for row in got["copperAfter"] for v in row]
     if any(abs(v - COPPER_CLEARANCE_MM) > 1e-5 for v in flat_copper):
         raise SystemExit("the copper clearance matrix did not take")
@@ -237,7 +230,7 @@ def apply():
 
 
 def drc():
-    """Run non-interactive DRC and fail the build on any finding."""
+    """Run non-interactive DRC when the bridge request can remain open."""
     js = """
     const ok = await eda.pcb_Drc.check(true, false, false);
     return {passed: !!ok};

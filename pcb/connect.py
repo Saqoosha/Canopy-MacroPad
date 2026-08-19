@@ -2,18 +2,17 @@
 
 audit.py finds copper that should not be there. This finds copper that
 should be there and is not -- a net whose pads the router left in two or
-more islands. Nothing reports that on its own: the ratlines disappear from
-the view as soon as a trace is drawn near them, DRC is a rule checker and
-an unrouted net breaks no rule, and a board with one net split in half
-looks exactly like a finished one.
+more islands. EasyEDA's Net panel is checked separately, but this independent
+geometry graph catches same-net copper that only looks joined. DRC is a rule
+checker, and a board with one net split in half looks exactly like a finished
+one.
 
 The method is a graph. Pads, vias and trace endpoints are nodes; a trace
-joins its two ends; a via joins every layer; and a pad or via on a net
-that owns an inner plane is joined to every other pad on that net, because
-the plane is the wire. Then each net has to come out as a single connected
-component.
+joins its two ends; a via joins every layer; and a pad or via on a net that
+owns a pour is joined when it actually touches that pour's layer. Then each
+net has to come out as a single connected component.
 
-Two things it also asks, because a four-layer board can be ruined quietly:
+Two things it also asks, because a copper stack can be ruined quietly:
 
   - traces on the plane layers, which cut the plane they cross
   - traces inside a keepout, which the keepouts exist to prevent
@@ -27,10 +26,9 @@ from bridge import execute
 
 MIL = 0.0254
 
-# Layers 15 and 16 carry the GND and 3V3 pours. A signal routed there is
-# not a signal on a spare layer -- it is a slot cut through a plane, and
-# the plane's job is to be uninterrupted.
-PLANE_LAYERS = {15: None, 16: None}   # filled from the live pours
+# Inner-layer traces would cut a dedicated plane. Outer-layer traces simply
+# coexist with pours and must not be reported as plane cuts.
+PLANE_LAYERS = {15: None, 16: None}
 
 # How close two pieces of copper must be to count as joined. This is a
 # measurement tolerance, not a design allowance: route.py works on a
@@ -157,7 +155,7 @@ def analyse(data):
         # centre point, so a trace ending just outside a 0.25 mm pad still
         # lands copper on it -- which is connected, and reads as broken if
         # only the centre is tested. Every remaining failure was at a small
-        # pad (the XSON-8 flash, the pixels) for exactly this reason.
+        # pad (the SOIC-8 flash, the pixels) for exactly this reason.
         half = l["w"] / 2.0
         for end, (ex, ey) in ((a, (l["x1"], l["y1"])), (b, (l["x2"], l["y2"]))):
             for t in near(ex, ey, l["net"], l["layer"], half):
@@ -196,14 +194,13 @@ def analyse(data):
             if geom.distance(pa, pb) <= 0:
                 u.join((ka, na), (kb, nb))
 
-    # A plane is a wire: everything on that net is joined by it, provided
-    # it can reach the plane at all -- which means a via or a Multi-Layer
-    # pad. A Bottom pad may contain a drill and still carry no inner-layer
-    # copper; the USB VBUS pads prove that distinction.
+    # A plane is a wire: everything on that net is joined by it when it is
+    # on the plane layer or genuinely spans layers. On this two-layer board
+    # Bottom GND pads connect directly; Bottom 3V3 pads require a via to Top.
     for net, layer in plane_nets.items():
         anchor = ("plane", net)
         for kind, name, n, x, y, pl, through, poly in nodes:
-            if n == net and through:
+            if n == net and (through or pl == layer):
                 u.join((kind, name), anchor)
 
     # Now: one component per net?
@@ -223,7 +220,7 @@ def analyse(data):
 
 def plane_cuts(data):
     """Traces sitting on a layer that carries a plane."""
-    planes = {p["layer"] for p in data["pours"]}
+    planes = {p["layer"] for p in data["pours"] if p["layer"] in PLANE_LAYERS}
     return [l for l in data["lines"] if l["layer"] in planes]
 
 

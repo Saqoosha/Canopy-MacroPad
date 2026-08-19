@@ -36,22 +36,23 @@ MM = 1.0 / MIL
 
 TOP, BOTTOM = 1, 2
 
-TRACE_W_MM = 0.15
-# The board's own rule is 0.102 mm track-to-track, itself stricter than
-# JLCPCB's 0.0889 four-layer capability. 0.18 was a guess and it was
-# expensive: 18 nets have to escape a 0.4 mm-pitch QFN whose pads leave a
-# 0.2 mm gap, so nothing passes BETWEEN pins at any clearance and every
-# escape is radial -- which makes the room just outside the pad row the
-# scarce thing, and 0.06 mm per side of it is worth having. Still 27%
-# above the rule the board is checked against.
+# 0.13 mm is just over the economical two-layer process's 5 mil minimum.
+# A 0.15 mm trace leaving the RP2040's 0.4 mm-pitch pads left only
+# 0.120-0.125 mm to an adjacent pad, so it could not satisfy the matching
+# 0.13 mm copper-clearance rule even on a perfectly orthogonal escape.
+TRACE_W_MM = 0.13
 CLEAR_MM = 0.13
 CELL_MM = 0.10
-# JLCPCB's preferred hole is 0.20 mm.  A 0.45 mm finished diameter is the
-# boundary that remains in its standard-cost capability; a 0.20 mm hole
-# with a diameter below 0.45 mm costs extra.  The smaller dogbone via is
-# what lets every QFN/flash transition sit outside its SMT pad.
+# A via centre is quantised to this grid, so an exact geometric 0.13 mm
+# clearance can round a few microns under the rule (C4.1 measured 0.129 mm
+# in the first two-layer GND-tree pass).  Keep a small routing-only guard;
+# it does not change the fabrication rule or copper dimensions.
+VIA_GRID_GUARD_MM = 0.02
+# Keep every drilled via in JLCPCB's ordinary-cost 0.30/0.45 mm class.  The
+# 0.45 mm annulus still lets every QFN/flash transition sit outside its SMT
+# pad, while the 0.30 mm drill avoids the advanced-process surcharge.
 VIA_OUTER_MM = 0.45
-VIA_HOLE_MM = 0.20
+VIA_HOLE_MM = 0.30
 HOLE_CLEAR_MM = 0.30
 # Keep the via annulus itself off every SMT pad, even when both carry the
 # same net.  Same-net copper overlap is electrically legal, so the normal
@@ -74,8 +75,9 @@ PRIORITY = [
     # only difficulty is leaving U3 go first, and the ones with a whole
     # empty channel to play with go last.
     # The flash now sits directly below this row. Route the whole local bus
-    # before USB or DVDD consumes its escape space. The right-hand flash
-    # column is the constrained half, hence SD0/SCLK/SD3 first.
+    # before USB or DVDD consumes its escape space. Its 90-degree SOIC
+    # orientation presents two signal columns to this row; route the right
+    # column first because it also borders the USB escape corridor.
     "QSPI_SD0", "QSPI_SCLK", "QSPI_SD3",
     "QSPI_SS", "QSPI_SD1", "QSPI_SD2",
     "USB_DP", "USB_DM", "DVDD",
@@ -89,7 +91,7 @@ def build_grid(data):
     x0, y0, x1, y1 = audit.board_outline(data)
     g = grid.Grid(x0, y0, x1, y1, CELL_MM)
     inflate = (TRACE_W_MM / 2 + CLEAR_MM) / MIL
-    via_inflate = (VIA_OUTER_MM / 2 + CLEAR_MM) / MIL
+    via_inflate = (VIA_OUTER_MM / 2 + CLEAR_MM + VIA_GRID_GUARD_MM) / MIL
     opening_inflate = (TRACE_W_MM / 2 + audit.TRACE_TO_HOLE_MM) / MIL
     opening_via_inflate = (VIA_OUTER_MM / 2 + audit.TRACE_TO_HOLE_MM) / MIL
 
@@ -223,7 +225,7 @@ def route_net(g, name, pads, out):
         # Everything the path touched now belongs to this net, and its
         # neighbours are blocked to others.
         inflate = (TRACE_W_MM / 2 + CLEAR_MM) / MIL
-        via_inflate = (VIA_OUTER_MM / 2 + CLEAR_MM) / MIL
+        via_inflate = (VIA_OUTER_MM / 2 + CLEAR_MM + VIA_GRID_GUARD_MM) / MIL
         for l, i, j in path:
             x, y = g.xy_of(i, j)
             tree.add((l, i, j))

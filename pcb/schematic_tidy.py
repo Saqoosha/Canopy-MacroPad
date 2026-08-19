@@ -50,7 +50,7 @@ REGIONS = {
 # is not the uuid that was passed to create()).
 GROUP_BY_LCSC = {
     "C2961140": "rp2040",       # RP2040
-    "C2904572": "flash",        # W25Q64
+    "C179171": "flash",         # W25Q64JVSSIQ, SOIC-8-208mil
     "C9900091606": "crystal",   # ABM8-272-T3
     "C5446": "ldo",             # XC6206
     "C323793": "usb",           # USBLC6-2SC6

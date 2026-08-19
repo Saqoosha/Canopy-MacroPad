@@ -108,11 +108,11 @@ PLAN = [
     ("USBC1", (P.USB_CX, 10.795), 270, "fixed by the case, mouth outward"),
     ("U3",    (120.50, 11.00),       0, "RP2040; keys left/right, QSPI and USB down"),
 
-    # QSPI belongs directly below U3.  At zero degrees the flash's left
-    # column is SS/SD1/SD2 and its right column is SD0/SCLK/SD3 -- the same
-    # two groups as U3's bottom row.  Rotating it put one group toward the
-    # board edge and turned SCLK/SD0 into 20 mm detours.
-    ("U1",    (119.10, 4.20),        0, "flash directly under the QSPI pins"),
+    # QSPI belongs directly below U3. C179171's SOIC pads form two long rows;
+    # rotating 90 degrees presents the three left-side and three right-side
+    # signals as columns beside U3's bottom QSPI row. At zero degrees half of
+    # the bus faces the board edge and needs a long loop back.
+    ("U1",    (119.10, 4.20),       90, "SOIC flash directly under QSPI pins"),
 
     # Oscillator block, immediately above XIN/XOUT.
     ("U2",    (121.00, 18.20),       0, "crystal directly above XIN/XOUT"),

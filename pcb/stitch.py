@@ -29,6 +29,7 @@ import os
 import sys
 
 import audit
+import connect
 import geom
 from bridge import execute
 
@@ -38,10 +39,10 @@ MM = 1.0 / MIL
 PLANE_NETS = ("GND", "3V3")
 
 # From the board's own rule set: viaOuterdiameterDefault 0.45,
-# viaInnerdiameterDefault 0.20. Read back rather than typed in, so a
+# viaInnerdiameterDefault 0.30. Read back rather than typed in, so a
 # change to the rules cannot leave this file describing a different via.
 VIA_OUTER_MM = 0.45
-VIA_HOLE_MM = 0.20
+VIA_HOLE_MM = 0.30
 
 CLEAR_MM = 0.20         # to anything of another net
 HOLE_CLEAR_MM = 0.30    # board rule: drilled edge to drilled edge
@@ -180,10 +181,17 @@ def plan(data, verbose=True):
     if verbose:
         print(f"  {len(keeps)} no-wire regions to stay out of")
 
+    _, plane_nets, _ = connect.analyse(connect._fetch())
     targets = []
     for cid, pads in owned.items():
         for p in pads:
-            if p["net"] in PLANE_NETS and not p["hole"]:
+            plane_layer = plane_nets.get(p["net"])
+            touches_plane = (
+                plane_layer is not None
+                and p["layer"] in (audit.MULTI, plane_layer)
+            )
+            if (p["net"] in PLANE_NETS and plane_layer is not None
+                    and not p["hole"] and not touches_plane):
                 targets.append((f"{by_id[cid]['des']}.{p['num']}", p))
     # ONLY= narrows this to one component. The RP2040's power pins are the
     # most constrained pads on the board -- a 0.4 mm-pitch QFN has less

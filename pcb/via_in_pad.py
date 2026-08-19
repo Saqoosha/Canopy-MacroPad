@@ -10,12 +10,9 @@ of calling every copper overlap "via-in-pad":
 * drill-in-pad  -- the actual drilled opening intersects the pad;
 * annulus-only  -- only the via's outer copper overlaps the pad.
 
-The RP2040 footprint deliberately contains a 3x3 thermal-via array inside
-its exposed GND pad.  Those nine vias are footprint children, but they must
-still carry GND explicitly: a blank child-via net can touch both inner planes
-without clearance.  Accept only that exact, measured array when every via is
-GND.  Every blank, mismatched, router-created, or otherwise unexpected
-overlap remains a failure.
+The board uses no via-in-pad process.  U3's exposed GND pad is fanned out to
+ordinary vias outside its paste area by ``thermal_fanout.py``.  Therefore
+every annular overlap found here is unexpected and remains a build failure.
 
 Read-only.  Nothing here writes to the EasyEDA document.
 """
@@ -24,15 +21,6 @@ import audit
 import geom
 
 MIL = 0.0254
-
-EXPECTED_THERMAL_ARRAYS = {
-    ("U3", "57", "GND"): {
-        "count": 9,
-        "hole_mm": 0.3048,
-        "diameter_mm": 0.6096,
-    },
-}
-
 
 def classify(data):
     owned, _ = audit.component_pads(data)
@@ -79,19 +67,7 @@ def classify(data):
 def main():
     data = audit._fetch()
     results = classify(data)
-    intentional = []
-    unexpected = []
-    for result in results:
-        key = (result["component"], result["pad"], result["pad_net"])
-        inherited = (
-            key in EXPECTED_THERMAL_ARRAYS
-            and result["footprint_owned"]
-            and result["centre"]
-            and result["drill"]
-            and result["via_net"] == result["pad_net"]
-        )
-        (intentional if inherited else unexpected).append(result)
-
+    unexpected = results
     risky = [r for r in unexpected if r["drill"]]
     centred = [r for r in results if r["centre"]]
     annulus_only = [r for r in unexpected if not r["drill"]]
@@ -100,41 +76,8 @@ def main():
     print(f"SMT-pad annulus overlaps: {len(results)}")
     print(f"unexpected drill opening intersections: {len(risky)}")
     print(f"via centre inside SMT pad: {len(centred)}")
-    print(f"intentional footprint thermal vias: {len(intentional)}")
     print(f"unexpected SMT-pad overlaps: {len(unexpected)}")
     print(f"annulus-only same-net fanout: {len(annulus_only)}")
-
-    grouped = {}
-    for result in intentional:
-        key = (result["component"], result["pad"], result["pad_net"])
-        grouped.setdefault(key, []).append(result)
-    thermal_problems = []
-    for key, spec in EXPECTED_THERMAL_ARRAYS.items():
-        found = grouped.get(key, [])
-        if len(found) != spec["count"]:
-            thermal_problems.append(
-                f"{key[0]}.{key[1]} has {len(found)} thermal vias, "
-                f"wanted {spec['count']}"
-            )
-            continue
-        for result in found:
-            hole_mm = result["via_hole"] * MIL
-            diameter_mm = result["via_dia"] * MIL
-            if abs(hole_mm - spec["hole_mm"]) > 0.001 or abs(
-                diameter_mm - spec["diameter_mm"]
-            ) > 0.001:
-                thermal_problems.append(
-                    f"{key[0]}.{key[1]} thermal via at "
-                    f"({result['x_mm']:.3f},{result['y_mm']:.3f}) mm is "
-                    f"{diameter_mm:.4f}/{hole_mm:.4f} mm"
-                )
-    for key, found in grouped.items():
-        spec = EXPECTED_THERMAL_ARRAYS[key]
-        print(
-            f"  [ok ] {key[0]}.{key[1]} {key[2]}: {len(found)} explicit-"
-            f"net thermal vias, {spec['diameter_mm']:.4f}/"
-            f"{spec['hole_mm']:.4f} mm"
-        )
 
     for result in unexpected:
         net_mark = "same net" if result["pad_net"] == result["via_net"] else "NET MISMATCH"
@@ -165,8 +108,6 @@ def main():
         else:
             print("      no same-net top/bottom trace crosses via centre")
 
-    if thermal_problems:
-        raise SystemExit("; ".join(thermal_problems))
     if unexpected:
         raise SystemExit(
             f"{len(unexpected)} unexpected vias overlap SMT pads; "

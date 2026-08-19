@@ -27,7 +27,7 @@ PARK_Y = -800
 # same-package Basic Part in params (15 pF / 100 nF / 1 µF).
 DEV_BY_SID = {
     "C2961140": params.DEV_RP2040,
-    "C2904572": params.DEV_FLASH,
+    "C179171": params.DEV_FLASH,
     "C9900091606": params.DEV_CRYSTAL,
     "C5446": params.DEV_LDO,
     "C165948": params.DEV_USB_C,

@@ -73,7 +73,7 @@ BAY_X0 = KEY_FIELD_W                            # 114.30
 BAY_X1 = KEY_FIELD_W + MCU_BAY_W                # 132.30
 USB_CX = BOARD_W - USB_TAB_W / 2                # 135.95
 BOARD_T = 1.60
-BOARD_LAYERS = 4
+BOARD_LAYERS = 2
 
 # --- parts -----------------------------------------------------------------
 # EasyEDA library identifiers, found with lib_Device.search() and confirmed by
@@ -264,9 +264,10 @@ DEV_RP2040 = "a550c651585f4e7a9cc06e26cce54f4f"   # QFN-56, confirmed by the
 # brief's uuid is the one actually placed; LCSC_RP2040 is a pre-existing
 # constant this task did not write and did not resolve -- flagged in the
 # task report, not silently fixed here.
-DEV_FLASH = "e300585d7e454be69ca119a810fc9014"    # W25Q64JVSSIQ_C2904572,
-# SOIC-8, matches LCSC_PIXEL-style sourcing: found with getByLcscIds("C2904572"),
-# the exact LCSC number the design spec names for the 8 MB QSPI flash.
+DEV_FLASH = "8dc2219f4e1a4d1597513c6c28c126c4"    # W25Q64JVSSIQ_C179171,
+# SOIC-8-208mil, found with getByLcscIds("C179171") and test-placed in both
+# schematic and PCB editors. This is the stocked JLCPCB Extended Part chosen
+# after the XSON alternative proved unavailable at quote time.
 DEV_CRYSTAL = "1a1f6ba3e1b445e4a784383e06e56b40"  # ABM8-272-T3, 12 MHz,
 # LCSC C9900091606 (read off the placed part's own netlist "Supplier Part",
 # same reasoning as the netlist-matching note on DEV_RP2040 below).
@@ -331,7 +332,7 @@ DEV_C_1U = "115c3169541a48b3ba9c88523dfbcdee"    # 1 uF, LCSC C52923, Basic
 # survives the clone unchanged and is what actually matches.
 LCSC_OF = {
     DEV_RP2040: "C2961140",
-    DEV_FLASH: "C2904572",
+    DEV_FLASH: "C179171",
     DEV_CRYSTAL: "C9900091606",
     DEV_LDO: "C5446",
     DEV_USB_C: "C165948",

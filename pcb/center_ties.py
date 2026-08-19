@@ -36,6 +36,7 @@ TARGETS = {
     "U1.6": ("via", None),             # QSPI_SCLK: bottom pad -> route via
     "U1.5": ("via", None),             # QSPI_SD0
     "U1.3": ("via", None),             # QSPI_SD2
+    "U1.2": ("trace", None),           # QSPI_SD1: pad centre -> touching trace
     "U1.1": ("via", None),             # QSPI_SS
     "USBC1.A4B9": ("via", None),       # VBUS: pad centre -> route's safe via
     "USBC1.B4A9": ("via", None),

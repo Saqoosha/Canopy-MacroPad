@@ -29,15 +29,11 @@ BOTTOM = 2
 OUTLINE = 11
 MULTI = 12
 
-# Copper-to-copper is the board's OWN rule, 0.102 mm track-to-track (which
-# is itself stricter than JLCPCB's 0.0889 four-layer capability). It used
-# to be a rounder, larger guess, and that guess was the wrong kind of
-# wrong: routing legally at 0.13 mm produced a dozen "findings" of +0.017
-# to +0.047 mm -- gaps that are fine by the rule the board is checked
-# against and fine by the fab, reported as faults. An instrument stricter
-# than the thing it measures does not fail safe; it fails noisy, and noise
-# is what a real finding hides in.
-BOARD_CLEARANCE_MM = 0.102
+# The cheap two-layer process is a 5/5 mil process. 0.13 mm is just over
+# 5 mil, matches the router's physical obstacle inflation, and prevents a
+# route that was legal on the old four-layer stack from silently relying on
+# that stack's finer capability.
+BOARD_CLEARANCE_MM = 0.13
 TRACE_TO_PAD_MM = BOARD_CLEARANCE_MM
 PAD_TO_PAD_MM = BOARD_CLEARANCE_MM
 # Holes keep the larger margin. They are drilled, not etched, and their

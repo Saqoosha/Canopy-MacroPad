@@ -1,4 +1,4 @@
-"""The two inner-layer planes, rebuilt from the board outline.
+"""The two outer-layer pours, rebuilt from the board outline.
 
 They existed once and vanished. They had been drawn for the 121.60 mm
 board; widening it to 139.60 and redrawing the edge as a closed polyline
@@ -10,9 +10,9 @@ autorouter that did nothing and logged nothing.
 So they are derived here from params, like everything else, instead of
 being drawn once by hand and then quietly outliving the board.
 
-Layer 15 is Inner1 and layer 16 is Inner2 in this stack; the client's own
-layer list is what says so, and `assert_stack()` re-reads it rather than
-trusting these two numbers.
+The two-layer version keeps Bottom as the continuous GND return and Top as
+3V3. Signals mostly run on Top over the Bottom reference plane; the Top 3V3
+pour reinforces an explicit rail and the vias from Bottom-side supply pads.
 
     python3 planes.py            report
     python3 planes.py --apply    (re)create and rebuild them
@@ -29,9 +29,9 @@ from bridge import execute
 
 MIL = 0.0254
 
-# net -> layer. GND goes on the layer nearer the components (all parts are
-# on the bottom), so the return path under the RP2040 is one via away.
-PLANES = [("GND", 16), ("3V3", 15)]
+# net -> layer. All parts are on Bottom, so their GND pads connect directly
+# to the reference plane. 3V3 pads fan out through ordinary vias to Top.
+PLANES = [("GND", 2), ("3V3", 1)]
 
 # How far the copper stops short of the board edge. JLCPCB wants copper
 # 0.3 mm inside the outline; 0.5 is comfortable and costs nothing here.
@@ -39,12 +39,12 @@ EDGE_PULLBACK_MM = 0.50
 
 
 def assert_stack():
-    """The plane layers must be inner signal layers, and there must be 4."""
+    """The board must have exactly the two copper layers in params."""
     js = """
     const n = await eda.pcb_Layer.getTheNumberOfCopperLayers();
     const all = await eda.pcb_Layer.getAllLayers();
     return {copper: n, layers: (all||[])
-      .filter(l => [1, 2, 15, 16].indexOf(l.id) >= 0)
+      .filter(l => [1, 2].indexOf(l.id) >= 0)
       .map(l => [l.id, l.name, l.type])};
     """
     got = execute(js)
@@ -55,8 +55,6 @@ def assert_stack():
     for net, layer in PLANES:
         if layer not in named:
             raise SystemExit(f"layer {layer} is not in the stack")
-        if named[layer][1] != "SIGNAL":
-            raise SystemExit(f"layer {layer} is {named[layer][1]}, not SIGNAL")
     print("  stack: " + ", ".join(f"{i}={named[i][0]}" for i in sorted(named)))
     return named
 
@@ -73,8 +71,7 @@ def apply(path):
     const planes = %s;
     const out = {removed: 0, made: []};
     const olds = await eda.pcb_PrimitivePour.getAll();
-    const kill = (olds||[]).filter(p => planes.some(q => q[1] === p.layer))
-                           .map(p => p.primitiveId);
+    const kill = (olds||[]).map(p => p.primitiveId);
     if (kill.length) { await eda.pcb_PrimitivePour.delete(kill);
                        out.removed = kill.length; }
     for (const [net, layer] of planes) {
@@ -113,9 +110,8 @@ def state():
 def rebuild():
     """Turn the two pour boundaries into current copper.
 
-    This used to throw while the board had no useful through connection to
-    3V3.  With the power vias present, the documented instance method works
-    and must be read back as a real poured primitive for both planes.
+    Rebuild only after every signal and power escape exists. The documented
+    instance method must succeed for both outer-layer pours.
     """
     js = """
     const ps = await eda.pcb_PrimitivePour.getAll();
@@ -166,6 +162,9 @@ def main():
           f"R{path[6]*MIL:.2f} ({EDGE_PULLBACK_MM} mm inside the edge)")
     print("\napply:")
     apply(path)
+    if "--defer-rebuild" in sys.argv:
+        print("\nrebuild deferred until routing is complete")
+        return
     print("\nrebuild:")
     rebuild()
 
