@@ -422,27 +422,55 @@ def coupon():
 
 
 def hook_coupon_layout():
-    """Where each swept pair sits, and how big a bite is taken."""
-    n = len(P.END_HOOK_FIT_SWEEP)
-    y0, y1 = P.END_HOOK_Y0, P.END_HOOK_Y0 + P.END_HOOK_L
+    """Where each swept pair sits, and how big a bite is taken.
+
+    The bite is the case's **whole end**: the USB opening in the middle
+    and a hook on each side of it. One hook on its own answers whether a
+    boss fits a slot; two, 24 mm apart with the port between them, answer
+    whether the end actually goes together -- which is the question, and
+    not one a single fragment can be asked.
+    """
     return {
-        "n": n,
-        "band": (y0, y1),
-        "cy": (y0 + y1) / 2,
-        "grip": 6.0,          # flat inboard of the wall, to hold and to label
-        "depth": P.END_HOOK_L + 5.0,
-        "pitch": P.END_HOOK_L + 5.0 + 4.0,
-        "gap": 8.0,           # between the plate half and the shell half
+        "n": len(P.END_HOOK_FIT_SWEEP),
+        "y0": -P.CASE_D / 2 - 0.1,
+        "y1": P.CASE_D / 2 + 0.1,
+        # How far inboard of the wall each fragment reaches. 6.0 gave a
+        # piece you pinch; this gives one you hold with two fingers while
+        # pushing the other half on, which is the motion being felt.
+        # Inboard of the wall both halves are flat and empty -- the
+        # plate's floor on one, the switch plate over the cavity on the
+        # other -- so it costs nothing but bed.
+        "grip": 16.0,
+        "pitch": P.CASE_D + 5.0,
+        "gap": 8.0,
     }
 
 
+def _coupon_wall_runs():
+    """The two straight runs of end wall, one each side of the port.
+
+    The case gives the wall END_HOOK_L, the same 3.00 as the boss. The
+    coupon gives it the whole side, plug opening to corner, because
+    Saqoosha printed the first one and it broke in the hand: a 1.00 x
+    2.00 wall three long with a 0.90 boss on the far side is a cantilever
+    loaded at the tip, and a coupon has none of the case around it.
+
+    The boss and the slot keep their real length. They are what is being
+    measured and the fit is a clearance between those two; the wall's
+    length has no part in it.
+    """
+    plug = P.USB_PLUG_W / 2 + 0.30
+    corner = P.CASE_D / 2 - P.OUTER_CORNER_R - 0.10
+    return [(-corner, -plug), (plug, corner)]
+
+
 def hook_coupon():
-    """One plate fragment and one shell fragment per END_HOOK_FIT_SWEEP.
+    """One plate end and one shell end per END_HOOK_FIT_SWEEP entry.
 
     **Cut out of the real parts, not modelled again.** A coupon drawn by
     hand answers a question about the coupon; this one is the geometry
-    `shell()` and `bottom()` build, sliced around one hook band, so a
-    number settled here is settled about the case.
+    `shell()` and `bottom()` build, so a number settled here is settled
+    about the case.
 
     Only the shell reads END_HOOK_FIT -- it is the slot's clearance and
     the boss does not know about it -- so the plate is built once and its
@@ -454,78 +482,43 @@ def hook_coupon():
     faces, and each takes its tolerance from the direction it was grown.
     """
     L = hook_coupon_layout()
-    by0, by1 = L["band"]
     x_in = P.CASE_W / 2 - P.WALL
     x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
 
-    plate_box = _block(
-        x_in - L["grip"], P.CASE_W / 2 + 0.5,
-        by0 - L["depth"] / 2 + P.END_HOOK_L / 2,
-        by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
-        -0.1, P.END_HOOK_SEAM_Z + 0.1,
-    )
-    shell_box = _block(
-        x_in - L["grip"], P.CASE_W / 2 + 0.5,
-        by0 - L["depth"] / 2 + P.END_HOOK_L / 2,
-        by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
-        # All the way to the top, so the switch plate comes with it. The
-        # box stopped at END_HOOK_SEAM_Z + 3.0 and cut the fragment off
-        # mid-wall: a thin strip with nothing to hold, and nothing to
-        # print flat on. The plate spans inward from Z_PLATE_BOTTOM and is
-        # +98.95 mm3 of exactly the flange a thumb needs -- it is also
-        # the face this half is printed on, so the fragment now sits down
-        # the way the real shell does.
-        P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.CASE_H + 0.1,
-    )
-    # **Coupon only.** The wall runs the fragment's whole width here; in
-    # the case it is END_HOOK_L long like the boss. Saqoosha printed this
-    # and it broke in the hand -- a 1.00 x 2.00 wall three long with a
-    # 0.90 boss on the far side is a cantilever loaded at the tip, and
-    # the coupon has none of the case around it to hold it. A test piece
-    # that snaps before it is pushed together answers nothing.
-    #
-    # It stays faithful about what is being asked. The boss and the slot
-    # keep their real 3.00, and the fit is a clearance between those two
-    # -- the wall's length has no part in it.
-    cy0 = by0 - L["depth"] / 2 + P.END_HOOK_L / 2
-    cy1 = by1 + L["depth"] / 2 - P.END_HOOK_L / 2
-    fy0, fy1 = cy0 + 0.6, cy1 - 0.6
+    plate_box = _block(x_in - L["grip"], P.CASE_W / 2 + 0.5,
+                       L["y0"], L["y1"], -0.1, P.END_HOOK_SEAM_Z + 0.1)
+    shell_box = _block(x_in - L["grip"], P.CASE_W / 2 + 0.5,
+                       L["y0"], L["y1"],
+                       P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.CASE_H + 0.1)
+
     plate_piece = bottom() & plate_box
-    plate_piece += _hook_wall(x_in, x_seam, fy0, fy1, P.BOTTOM_T,
-                              P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
+    for wy0, wy1 in _coupon_wall_runs():
+        plate_piece += _hook_wall(x_in, x_seam, wy0, wy1, P.BOTTOM_T,
+                                  P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
 
     was = P.END_HOOK_FIT
     part = None
     try:
         for i, fit in enumerate(P.END_HOOK_FIT_SWEEP):
             P.END_HOOK_FIT = fit
-            # And the shell's relief widened to match, or the two would
-            # foul along the wall the coupon just lengthened.
             shell_piece = shell() & shell_box
-            # Across the fragment's whole width, not just the wall's.
-            # Stopping at the wall left a 0.059 mm3 crumb of the shell's
-            # cavity corner floating free inside the STL -- a speck the
-            # slicer would try to print.
-            shell_piece -= _block(
-                x_in - 0.1, x_seam + P.SEAM_FIT / 2,
-                cy0 - 0.1, cy1 + 0.1,
-                P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z,
-            )
+            # The shell's relief widened to match, or the two foul along
+            # the wall the coupon just lengthened.
+            for wy0, wy1 in _coupon_wall_runs():
+                shell_piece -= _block(
+                    x_in - 0.1, x_seam + P.SEAM_FIT / 2,
+                    wy0 - P.SEAM_FIT / 2, wy1 + P.SEAM_FIT / 2,
+                    P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z,
+                )
 
-            dy = (i - (L["n"] - 1) / 2) * L["pitch"] - L["cy"]
-
+            dy = (i - (L["n"] - 1) / 2) * L["pitch"]
             one = Pos(0, dy, 0) * plate_piece
-            # Turned over onto the face it prints on, and set down in its
-            # own row across the plate. Offsetting along y instead put it
-            # where the next pair's plate goes and the two fused: four
-            # solids where there should be eight.
             flipped = Rotation(180, 0, 0) * shell_piece
             flipped = Pos(0, 0, -flipped.bounding_box().min.Z) * flipped
             one += Pos(L["grip"] + P.WALL + L["gap"], dy, 0) * flipped
 
-            # Engraved on the flat inboard of the wall, where a finger
-            # holding the fragment does not cover it.
-            one -= Pos(x_in - L["grip"] / 2, dy + L["cy"], P.BOTTOM_T - 0.4) * extrude(
+            # Engraved on the flat inboard of the wall, clear of the port.
+            one -= Pos(x_in - L["grip"] / 2, dy, P.BOTTOM_T - 0.4) * extrude(
                 _label("%.2f" % fit), amount=0.5)
             part = one if part is None else part + one
     finally:
