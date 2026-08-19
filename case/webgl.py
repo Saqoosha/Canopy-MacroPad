@@ -24,6 +24,7 @@ import numpy as np
 
 import mock
 import params as P
+import pcb3d
 import product
 
 # Keep-out volumes read as a check, not as a part of the object.
@@ -73,6 +74,11 @@ def dump():
         for k, v in envelopes().items()
     ]
     for name, solid, color, alpha, lift in scene:
+        # The bare slab is replaced below by the board EasyEDA exports.
+        # Drawing both is not an option: they are the same outline at the
+        # same Z, so every face is coplanar with its twin and tears.
+        if name == "board":
+            continue
         mesh = product.mesh_of(name, solid)
         tris = mesh.vertices[mesh.faces].reshape(-1, 3)
         parts.append({
@@ -83,6 +89,28 @@ def dump():
             "count": len(tris),
         })
         blobs.append(tris.astype(np.float64))
+
+    # The real board, with every component's actual package on it. It rides
+    # at the slab's lift so it explodes with the rest of the stack, and it
+    # is checked for orientation before it is drawn -- a mirrored board is
+    # still a convincing-looking board.
+    pcb_parts = pcb3d.solid_parts(pcb3d.load())
+    as_is, flipped, probes = pcb3d.assert_orientation(pcb_parts)
+    print(f"  PCB mesh: {len(pcb_parts)} materials, orientation confirmed "
+          f"({as_is} vs {flipped} over {probes} off-centre components)")
+    for name, tris, color in pcb_parts:
+        flat = tris.reshape(-1, 3)
+        parts.append({
+            # group() keys the legend off a "board" prefix; anything it
+            # does not match lands in the legend as its raw mesh name, so
+            # all 24 materials deliberately share the one entry.
+            "name": f"board-{name}",
+            "color": color,
+            "alpha": 1.0,
+            "lift": 20.0,
+            "count": len(flat),
+        })
+        blobs.append(flat.astype(np.float64))
 
     allv = np.concatenate(blobs)
     lo, hi = allv.min(axis=0), allv.max(axis=0)
@@ -113,7 +141,7 @@ def dump():
 LABELS = {
     "shell": ("Shell", "printed"),
     "bottom": ("Bottom plate", "printed"),
-    "board": ("PCB", "custom, 6\u00d7 Choc v2"),
+    "board": ("PCB", "as fabricated, RP2040 + 6\u00d7 Choc v2"),
     "sw": ("Switches", "Kailh Choc v2"),
     "cap": ("Keycaps", "1U clear ABS"),
     "led": ("NeoPixels", "under each key"),
