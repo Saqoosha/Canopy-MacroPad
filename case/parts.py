@@ -468,7 +468,14 @@ def hook_coupon():
         x_in - L["grip"], P.CASE_W / 2 + 0.5,
         by0 - L["depth"] / 2 + P.END_HOOK_L / 2,
         by1 + L["depth"] / 2 - P.END_HOOK_L / 2,
-        P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z + 3.0,
+        # All the way to the top, so the switch plate comes with it. The
+        # box stopped at END_HOOK_SEAM_Z + 3.0 and cut the fragment off
+        # mid-wall: a thin strip with nothing to hold, and nothing to
+        # print flat on. The plate spans inward from Z_PLATE_BOTTOM and is
+        # +98.95 mm3 of exactly the flange a thumb needs -- it is also
+        # the face this half is printed on, so the fragment now sits down
+        # the way the real shell does.
+        P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.CASE_H + 0.1,
     )
     # **Coupon only.** The wall runs the fragment's whole width here; in
     # the case it is END_HOOK_L long like the boss. Saqoosha printed this
