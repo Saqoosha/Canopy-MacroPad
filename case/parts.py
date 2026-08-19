@@ -128,16 +128,6 @@ def shell():
                 skirt_z0 - 0.1, P.Z_FLOOR + 0.1)
     )
 
-    for sx in P.SEAM_SNAP_X:
-        for sign in (-1, 1):
-            y_in = sign * (P.CASE_D / 2 - P.SEAM_STEP_W + P.SEAM_FIT / 2)
-            part += _block(
-                sx - P.SEAM_SNAP_W / 2, sx + P.SEAM_SNAP_W / 2,
-                min(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
-                max(y_in, y_in - sign * P.SEAM_SNAP_HOOK),
-                skirt_z0, skirt_z0 + P.SEAM_SNAP_H,
-            )
-
     # Standoffs that set the board height. No pegs -- the switch locates.
     for x, y in P.PRESS_XY:
         part += _tube(x, y, P.Z_BOARD_TOP + P.BOARD_CLAMP_SLACK,
@@ -181,17 +171,6 @@ def bottom():
     part += _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
                   max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                   P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
-
-    gz = P.BOTTOM_T - P.SEAM_STEP_H
-    part -= (
-        _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
-              max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
-              gz, gz + P.SEAM_SNAP_H)
-        - _slab(P.CASE_W - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
-                P.CASE_D - 2 * (P.SEAM_STEP_W + P.SEAM_SNAP_HOOK),
-                max(P.OUTER_CORNER_R - P.SEAM_STEP_W - P.SEAM_SNAP_HOOK, 0.5),
-                gz - 0.1, gz + P.SEAM_SNAP_H + 0.1)
-    )
 
     # Columns under the press points, so the clamp is a sandwich.
     for x, y in P.PRESS_XY:
@@ -346,54 +325,6 @@ def coupon():
     so_h = P.Z_PLATE_BOTTOM - P.Z_BOARD_TOP
     sy = L["standoff_y"]
     part += _tube(post_x[0], sy, P.PLATE_T, P.PLATE_T + so_h, P.STANDOFF_DIA)
-    return part
-
-
-def seam_coupon_layout():
-    n = len(P.SEAM_SNAP_SWEEP)
-    span = 20.0
-    gap = 4.0
-    pitch = span + 6.0
-    w = n * pitch
-    return {
-        "n": n, "span": span, "gap": gap, "pitch": pitch, "w": w,
-        "xs": [(-w / 2) + pitch / 2 + i * pitch for i in range(n)],
-        "wall_h": 6.0,
-    }
-
-
-def seam_coupon():
-    """One shell fragment and one plate fragment per SEAM_SNAP_SWEEP entry."""
-    L = seam_coupon_layout()
-    part = None
-    for hook, x in zip(P.SEAM_SNAP_SWEEP, L["xs"]):
-        y0 = -L["gap"] / 2
-        wall = _block(x - L["span"] / 2, x + L["span"] / 2,
-                      y0 - P.WALL, y0, 0.0, L["wall_h"])
-        skirt_t = P.SEAM_STEP_W - P.SEAM_FIT / 2
-        wall += _block(x - L["span"] / 2, x + L["span"] / 2,
-                       y0 - skirt_t, y0,
-                       L["wall_h"], L["wall_h"] + P.SEAM_STEP_H)
-        wall += _block(x - P.SEAM_SNAP_W / 2, x + P.SEAM_SNAP_W / 2,
-                       y0 - skirt_t - hook, y0 - skirt_t,
-                       L["wall_h"] + P.SEAM_STEP_H - P.SEAM_SNAP_H,
-                       L["wall_h"] + P.SEAM_STEP_H)
-        part = wall if part is None else part + wall
-
-        y1 = L["gap"] / 2
-        plate = _block(x - L["span"] / 2, x + L["span"] / 2,
-                       y1, y1 + P.WALL + 2.0,
-                       0.0, P.BOTTOM_T - P.SEAM_STEP_H)
-        plate += _block(x - L["span"] / 2, x + L["span"] / 2,
-                        y1 + P.SEAM_STEP_W, y1 + P.WALL + 2.0,
-                        P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
-        plate -= _block(x - L["span"] / 2, x + L["span"] / 2,
-                        y1 + P.SEAM_STEP_W, y1 + P.SEAM_STEP_W + hook,
-                        P.BOTTOM_T - P.SEAM_STEP_H,
-                        P.BOTTOM_T - P.SEAM_STEP_H + P.SEAM_SNAP_H)
-        part += plate
-        part -= Pos(x, y1 + P.WALL + 0.5, P.BOTTOM_T - 0.3) * extrude(
-            _label("%.2f" % hook), amount=0.4)
     return part
 
 

@@ -57,7 +57,6 @@ def main():
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
-        "coupon-seam": parts.seam_coupon(),
     }
 
     print("exported")

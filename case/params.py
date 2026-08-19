@@ -100,11 +100,25 @@ SOCKET_CLEARANCE = SOCKET_DROP + UNDER_BOARD_AIR
 # --- how the two printed halves close on each other --------------------
 SEAM_STEP_W = 1.00
 SEAM_STEP_H = 1.20
-SEAM_SNAP_W = 4.00
-SEAM_SNAP_HOOK = 0.40
-SEAM_SNAP_H = 0.60
-SEAM_FIT = 0.20
-SEAM_SNAP_SWEEP = (0.30, 0.40, 0.55, 0.70)
+
+SEAM_FIT = 0.20        # total clearance between skirt and tongue
+
+# **The step is the whole joint. There was a snap and it is gone**, and
+# the reason is arithmetic rather than a number that wanted tuning.
+#
+# Barbs on the inside of the skirt dropped into a groove round the
+# tongue, swept 0.30 to 0.70 of reach on a coupon. All four came back too
+# weak, 0.70 the best of them and still no lock, and both complaints --
+# hard to fit, does not hold -- are the same fault: **the skirt is not a
+# spring.** It is 0.90 thick over a 1.20 free length, so even the
+# shallowest hook asks it for 19% surface strain where PLA yields near 2.
+# It never bent. It was forced.
+#
+# A cantilever that deflects 0.40 at 2% wants roughly 5 mm of length and
+# the plate is 2.40 thick, so no hook in this geometry can work and a
+# sweep upward would only have found a stiffer press fit. So the step
+# does what the step already did -- align the halves and put the residual
+# gap inside the joint instead of on the outside.
 
 # --- USB-C --------------------------------------------------------------
 # Receptacle class figure from the design spec (3.16). Overhang and plug
@@ -166,12 +180,6 @@ SWITCH_XY = [board_xy((x, SWITCH_Y)) for x in SWITCH_X]
 # USB-C faces out the right wall off the tab.
 USB_CX, USB_CY = board_xy((BOARD_W, BOARD_D / 2))
 USB_AXIS = "x"
-
-# Snap barbs where the posts leave room -- either side of mid-span.
-SEAM_SNAP_X = (
-    BOARD_ORIGIN[0] + SWITCH_X[1],
-    BOARD_ORIGIN[0] + SWITCH_X[4],
-)
 
 # Shell presses the board down, bottom plate pushes it up, at the same
 # points. The Choc socket sits on the back half of each switch
