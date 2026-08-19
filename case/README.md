@@ -428,6 +428,44 @@ this plate is 2.40 thick, so no hook in this geometry can work. **If the
 centre ever lifts, the next thing to try is a magnet pair under the
 boards, not a plastic spring.**
 
+**And the far end is hooked.** Both screws sit in the left bay, so 145.50
+of a 151.00 case had nothing on it. At the right end the seam climbs to
+`END_HOOK_SEAM_Z`, the plate's wall carries on up inside the shell's, and
+a horizontal boss off that wall drops into a slot cut right through. It
+is not friction: the boss is captured, so that end cannot lift. **Ends
+only, and the reason is the assembly motion rather than strength** -- the
+boss is engaged by moving the plate along x, right end in and left end
+swung down, and on a long side the same boss would need the plate to move
+in y at the same time, which the other end forbids.
+
+The slot goes through the outer face on purpose. A blind pocket had to
+share the skirt's 1.00 with the skin outside it and burst through anyway,
+and through you can see from outside whether the hook engaged -- which is
+otherwise unknowable once the case is shut.
+
+`END_HOOK_FIT` is the one number in it not settled on a part.
+`out/<layout>/coupon-hook.stl` asks it: four pairs of whole case ends, so
+that both hooks have to find both slots at once. One hook answers whether
+a boss fits a slot; two, 24 mm apart with the port between them, answer
+whether the end goes together.
+
+**Open: a fillet where that wall meets the plate.** The first coupon
+printed and broke in the hand -- 1.00 thick, 2.00 tall, with a 0.90 boss
+on the far side, a cantilever loaded at the tip, and nothing in the model
+had an opinion about that. The coupon's wall was widened to survive
+handling; the case's is still `END_HOOK_L` long. A fillet can only go
+inboard: outboard the shell's skirt fills the root to 2.40 and its own
+material carries on to the slot at 2.60, so there is 0.20 there and the
+shell is in it. Inboard is empty cavity, with the board's edge stopping
+at 73.30 and its underside at 5.70. Ø1.00 takes the root section from
+1.00 to 3.00 mm2.
+
+**Deliberately after the fit, not before.** The fillet is inboard of the
+wall and the fit is a clearance between boss and slot, so the two do not
+touch -- but changing the case mid-sweep would mean the coupon and the
+part had stopped being the same thing, which is the one property that
+makes this coupon worth more than a drawn one.
+
 **The wires have a trench, and the case grew for them.** Five have to
 cross the whole field, and the first wired unit would not lie down: the
 space under the boards was 3.36 mm, of which a hot-swap socket took 1.83
