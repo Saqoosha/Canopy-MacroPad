@@ -139,6 +139,15 @@ def main():
         "hook band clear of the plug opening": (
             P.END_HOOK_Y0 - P.USB_PLUG_W / 2
         ),
+        # Two chamfers meeting on a SEAM_STEP_W wall leave a knife edge,
+        # which prints as a wobble and locates nothing.
+        "flat left on the hook wall's top": (
+            P.WALL - P.SEAM_STEP_W
+            - P.END_HOOK_CHAMFER_IN - P.END_HOOK_CHAMFER_OUT
+        ),
+        # And the nose cannot eat the whole boss.
+        "boss left above its nose": (P.END_HOOK_H - P.END_HOOK_NOSE),
+        "boss left behind its nose": (P.END_HOOK_REACH - P.END_HOOK_NOSE),
         "hook band clear of the corner radius": (
             P.CASE_D / 2 - P.OUTER_CORNER_R - P.END_HOOK_Y0 - P.END_HOOK_L
         ),
@@ -203,6 +212,29 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
           f"head {missing:9.3f} mm3")
+
+    # The lead-ins, measured as volume rather than believed from the
+    # source. Three separate constructions of these cut nothing at all
+    # while every other check passed, so the arithmetic they are supposed
+    # to match is asserted here rather than trusted.
+    L = P.END_HOOK_L
+    prism = lambda c: 2 * L * c ** 2 / 2   # noqa: E731
+    real_w, real_b = parts._hook_wall, parts._hook_boss
+    parts._hook_wall = lambda *a: real_w(*a[:-2], 0.001, 0.001)
+    flat_wall = parts.bottom().volume
+    parts._hook_wall = real_w
+    parts._hook_boss = lambda *a: real_b(*a[:-1], 0.001)
+    flat_boss = parts.bottom().volume
+    parts._hook_boss = real_b
+    for label, got, want in (
+        ("wall lead-ins", flat_wall - built["bottom"].volume,
+         prism(P.END_HOOK_CHAMFER_IN) + prism(P.END_HOOK_CHAMFER_OUT)),
+        ("boss nose", flat_boss - built["bottom"].volume, prism(P.END_HOOK_NOSE)),
+    ):
+        good = abs(got - want) < 0.02
+        ok.append(good)
+        print(f"  [{'ok ' if good else 'BAD'}] {'lead-in':<7} {label:<22}"
+              f" {got:9.3f} mm3  (want {want:.3f})")
 
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed

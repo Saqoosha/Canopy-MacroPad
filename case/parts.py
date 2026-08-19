@@ -22,6 +22,7 @@ from build123d import (
     Pos,
     Rectangle,
     RectangleRounded,
+    Rotation,
     Text,
     chamfer,
     extrude,
@@ -107,6 +108,44 @@ def _board_pocket(z0, z1):
 
 
 # --- shell --------------------------------------------------------------
+def _hook_wall(x0, x1, y0, y1, z0, z1, c_in, c_out):
+    """The raised wall with a lead-in chamfered off each top edge.
+
+    Chamfered as an isolated box, before it is fused into the plate.
+    Three attempts at doing it with a subtracted wedge each failed in a
+    different silent way -- the face placed on the corner removed nothing
+    (0.000 against an expected 0.270), the half-space unclamped ate the
+    plate below it (27.833 against 0.367), and the clamp put on the
+    normal's side removed nothing again. None of them raised, and
+    `build.py` was green through all three.
+
+    On a lone box there is exactly one top face and exactly two edges on
+    it running along y, so selecting them cannot pick the wrong thing.
+    """
+    w = _block(x0, x1, y0, y1, z0, z1)
+    # Re-select between the two cuts. `chamfer(edge, ...)` works on the
+    # solid that edge belongs to, so an edge picked before the first cut
+    # still points at the original box -- the second call then returns
+    # that box with only its own chamfer and the first one is gone. The
+    # volume said 0.120 where 0.390 was wanted, which is the outer
+    # chamfer alone; nothing raised.
+    for pick, size in ((0, c_in), (-1, c_out)):
+        edge = w.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[pick]
+        w = chamfer(edge, length=size)
+    return w
+
+
+def _hook_boss(x0, x1, y0, y1, z0, z1, nose):
+    """The boss, with a lead-in off its leading bottom edge.
+
+    All of the slot's play sits under the boss -- both tops are flush --
+    so nose-first it is the bottom edge that has to find the opening.
+    """
+    b = _block(x0, x1, y0, y1, z0, z1)
+    lead = b.edges().filter_by(Axis.Y).group_by(Axis.Z)[0].sort_by(Axis.X)[-1]
+    return chamfer(lead, length=nose)
+
+
 def _end_hook_bands():
     """(y0, y1) for each hook, at the right wall, both sides of the port.
 
@@ -216,10 +255,12 @@ def bottom():
     x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
     for y0, y1 in _end_hook_bands():
         lo, hi = sorted((y0, y1))
-        part += _block(x_in, x_seam, lo, hi, P.BOTTOM_T, P.END_HOOK_SEAM_Z)
-        part += _block(
+        part += _hook_wall(x_in, x_seam, lo, hi, P.BOTTOM_T, P.END_HOOK_SEAM_Z,
+                           P.END_HOOK_CHAMFER_IN, P.END_HOOK_CHAMFER_OUT)
+        part += _hook_boss(
             x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
             P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
+            P.END_HOOK_NOSE,
         )
 
     # Columns under the press points, so the clamp is a sandwich.

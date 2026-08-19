@@ -166,6 +166,38 @@ END_HOOK_REACH = SEAM_STEP_W - 0.10
 END_HOOK_FIT_SWEEP = (0.10, 0.20, 0.30, 0.40)
 END_HOOK_FIT = 0.20
 
+# Both top edges of that raised wall are chamfered, and each one is a
+# lead-in for a different thing going past it.
+#
+# **Inboard, for the board.** Its right edge sits 0.200 from the wall's
+# inner face and the wall stands 3.30 above the plate at that point, so
+# closing the case asks a 139.60 mm board to find a 0.200 slot blind. A
+# chamfer turns that into a funnel; it does not add clearance further
+# down and does not need to.
+#
+# **Outboard, for the shell.** The wall enters the shell's slot with
+# SEAM_FIT/2 = 0.100 a side, same problem one layer out.
+#
+# They are not equal because the wall is only SEAM_STEP_W wide and two
+# large chamfers would meet: at 0.50 each the top is a knife edge, which
+# prints as a wobble and locates nothing. The flat left between them is
+# checked, not assumed.
+END_HOOK_CHAMFER_IN = 0.30
+END_HOOK_CHAMFER_OUT = 0.20
+
+# And a third, on the boss, which is the one that actually earns the
+# phrase "easy to insert". The wall's outer chamfer looked like the
+# insertion lead-in and is not: the boss stands proud of that face, so it
+# is the boss that meets the shell first and the wall's edge never
+# touches anything. The chamfer there lands on the boss's root instead --
+# harmless, a small relief, but it leads nothing in.
+#
+# The slot is END_HOOK_H + END_HOOK_FIT tall against a boss of
+# END_HOOK_H, and both tops are flush, so every bit of the play sits
+# **under** the boss. Nose-first, the edge that has to find its way is
+# the leading bottom one.
+END_HOOK_NOSE = 0.35
+
 FOOT_DIA = 8.00
 FOOT_H = 2.00
 FOOT_RECESS = 0.50
