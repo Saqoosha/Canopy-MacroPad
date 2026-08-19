@@ -145,6 +145,13 @@ def main():
             P.WALL - P.SEAM_STEP_W
             - P.END_HOOK_CHAMFER_IN - P.END_HOOK_CHAMFER_OUT
         ),
+        # The boss must stay clear of the wall's top band, or the outer
+        # chamfer cuts down and the boss returns beside it and the top
+        # reads as a V notch instead of a ridge. That was the shape until
+        # Saqoosha drew what it should be.
+        "boss below the wall's outer chamfer": (
+            P.END_HOOK_TOP_GAP - P.END_HOOK_CHAMFER_OUT
+        ),
         # And the nose cannot eat the whole boss.
         "boss left above its nose": (P.END_HOOK_H - P.END_HOOK_NOSE),
         "boss left behind its nose": (P.END_HOOK_REACH - P.END_HOOK_NOSE),
@@ -236,13 +243,39 @@ def main():
         print(f"  [{'ok ' if good else 'BAD'}] {'lead-in':<7} {label:<22}"
               f" {got:9.3f} mm3  (want {want:.3f})")
 
+    # The wall's top band has to be empty of boss, measured rather than
+    # inferred from the gap above: an arithmetic margin says the numbers
+    # allow a ridge, this says the solid has one.
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    intrude = 0.0
+    for y0, y1 in parts._end_hook_bands():
+        lo, hi = sorted((y0, y1))
+        # Sized from the chamfer, not from END_HOOK_TOP_GAP. Taking the
+        # band's height from the very number under test shrank the probe
+        # with the fault: at TOP_GAP 0.05 the box was 0.05 tall and the
+        # boss's top face landed exactly on its floor, so it reported
+        # 0.000 while the notch was back. Same disease as a label margin
+        # measured from the label.
+        band = Pos(x_seam + P.END_HOOK_REACH / 2, (lo + hi) / 2,
+                   P.END_HOOK_SEAM_Z - P.END_HOOK_CHAMFER_OUT / 2) * Box(
+            P.END_HOOK_REACH, hi - lo, P.END_HOOK_CHAMFER_OUT)
+        intrude += (band & built["bottom"]).volume
+    good = intrude < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} boss inside the wall's "
+          f"top band {intrude:9.3f} mm3")
+
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed
     # off by a closing intersection -- and every other check still passes.
     # So ask each band separately for a boss on the plate and a void in
     # the shell, at the height the two are supposed to meet.
     x_probe = P.CASE_W / 2 - P.SEAM_STEP_W + P.END_HOOK_REACH / 2
-    z_probe = P.END_HOOK_SEAM_Z - P.END_HOOK_H / 2
+    # Follows the boss down. A probe left at the old height reported
+    # 0/2 pockets the moment the boss moved, which is the check working
+    # -- but a probe that had happened to still land in material would
+    # have gone on reporting 2/2 about geometry that had changed.
+    z_probe = P.END_HOOK_SEAM_Z - P.END_HOOK_TOP_GAP - P.END_HOOK_H / 2
     bosses = voids = 0
     for y0, y1 in parts._end_hook_bands():
         cy = (y0 + y1) / 2

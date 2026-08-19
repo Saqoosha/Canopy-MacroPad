@@ -143,6 +143,17 @@ USB_R = USB_H / 2
 END_HOOK_Y0 = USB_PLUG_W / 2 + 0.50      # clear of the plug opening
 END_HOOK_L = 3.00                        # along the wall, inside the 3.99
 END_HOOK_H = 1.60                        # the boss's own height
+
+# How far the boss's top sits **below** the wall's top. Flush was wrong
+# and the section says why: the outer chamfer cuts the wall's top corner
+# down to 4.800 and the boss then returns to 5.000 right beside it, so
+# the top reads as a V notch rather than a chamfered ridge. Dropping the
+# boss leaves the wall's top a clean lead-in across its whole width, puts
+# solid wall above the boss instead of a groove, and makes the outer
+# chamfer do the job it looked like it was doing all along -- leading the
+# wall into the shell's slot, which it could not do while the boss stood
+# proud of that same face at the same height.
+END_HOOK_TOP_GAP = 0.60
 END_HOOK_SEAM_Z = 5.00                   # how high the seam climbs here
 
 # **The pocket goes right through the shell's wall**, which is Saqoosha's

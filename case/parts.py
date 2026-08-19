@@ -196,11 +196,11 @@ def shell():
         # use the whole wall, and it is the only way to see from outside
         # whether the hook actually went in.
         f = P.END_HOOK_FIT
+        slot_z1 = P.END_HOOK_SEAM_Z - P.END_HOOK_TOP_GAP
         part -= _block(
             x_seam - 0.1, P.CASE_W / 2 + 0.1,
             lo - f / 2, hi + f / 2,
-            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f,
-            P.END_HOOK_SEAM_Z,
+            slot_z1 - P.END_HOOK_H - f, slot_z1,
         )
 
     # Standoffs that set the board height. No pegs -- the switch locates.
@@ -257,10 +257,10 @@ def bottom():
         lo, hi = sorted((y0, y1))
         part += _hook_wall(x_in, x_seam, lo, hi, P.BOTTOM_T, P.END_HOOK_SEAM_Z,
                            P.END_HOOK_CHAMFER_IN, P.END_HOOK_CHAMFER_OUT)
+        boss_z1 = P.END_HOOK_SEAM_Z - P.END_HOOK_TOP_GAP
         part += _hook_boss(
             x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
-            P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
-            P.END_HOOK_NOSE,
+            boss_z1 - P.END_HOOK_H, boss_z1, P.END_HOOK_NOSE,
         )
 
     # Columns under the press points, so the clamp is a sandwich.
