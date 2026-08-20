@@ -171,6 +171,17 @@ def main():
              - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
             - (P.BOTTOM_T - P.SEAM_STEP_H) + 0.05
         ),
+        # The fillet can only grow inboard, and what it must not reach is
+        # the receptacle's clearance cut, which is the nearest thing to
+        # the band in y.
+        "hook fillet clear of the receptacle cut": (
+            P.END_HOOK_Y0
+            - (P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2
+        ),
+        # And it must stay under the board rather than reaching its plane.
+        "hook fillet below the board": (
+            P.Z_BOARD_BOTTOM - (P.BOTTOM_T + P.END_HOOK_ROOT_R)
+        ),
         "hook band clear of the plug opening": (
             P.END_HOOK_Y0 - P.USB_PLUG_W / 2
         ),
@@ -259,15 +270,23 @@ def main():
     L = P.END_HOOK_L
     prism = lambda c: 2 * L * c ** 2 / 2   # noqa: E731
     real_w, real_b = parts._hook_wall, parts._hook_boss
-    parts._hook_wall = lambda *a: real_w(*a[:-1], 0.001)
+    parts._hook_wall = lambda *a: real_w(*a[:-2], 0.001, a[-1])
     flat_wall = parts.bottom().volume
     parts._hook_wall = real_w
     parts._hook_boss = lambda *a: real_b(*a[:-1], 0.001)
     flat_boss = parts.bottom().volume
     parts._hook_boss = real_b
+    import math
+    parts._hook_wall = lambda *a: real_w(*a[:-1], 0.001)
+    flat_root = parts.bottom().volume
+    parts._hook_wall = real_w
     for label, got, want in (
         ("wall lead-in", flat_wall - built["bottom"].volume,
          prism(P.END_HOOK_CHAMFER_IN)),
+        # The fillet adds rather than removes, so the sign is the other
+        # way and the shape is a quarter round, not a prism.
+        ("root fillet", built["bottom"].volume - flat_root,
+         2 * L * P.END_HOOK_ROOT_R ** 2 * (1 - math.pi / 4)),
         ("boss nose", flat_boss - built["bottom"].volume, prism(P.END_HOOK_NOSE)),
     ):
         good = abs(got - want) < 0.02

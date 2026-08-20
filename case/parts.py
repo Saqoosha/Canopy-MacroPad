@@ -113,7 +113,7 @@ def _board_pocket(z0, z1):
 
 
 # --- shell --------------------------------------------------------------
-def _hook_wall(x0, x1, y0, y1, z0, z1, c_in):
+def _hook_wall(x0, x1, y0, y1, z0, z1, c_in, root_r):
     """The raised wall with a lead-in chamfered off each top edge.
 
     Chamfered as an isolated box, before it is fused into the plate.
@@ -135,7 +135,19 @@ def _hook_wall(x0, x1, y0, y1, z0, z1, c_in):
     # volume said 0.120 where 0.390 was wanted, which is the outer
     # chamfer alone; nothing raised.
     edge = w.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[0]
-    return chamfer(edge, length=c_in)
+    w = chamfer(edge, length=c_in)
+
+    # A quarter round in the inboard root, built as a box less a cylinder
+    # rather than with fillet(): the wall is fused into the plate right
+    # after this, so the concave corner the fillet belongs in does not
+    # exist yet on this solid and there is no edge to select.
+    r = root_r
+    cy = (y0 + y1) / 2
+    span = abs(y1 - y0)
+    fil = _block(x0 - r, x0, y0, y1, z0, z0 + r)
+    fil -= (Pos(x0 - r, cy, z0 + r) * Rotation(90, 0, 0)
+            * Cylinder(radius=r, height=span + 0.4))
+    return w + fil
 
 
 def _hook_boss(x0, x1, y0, y1, z0, z1, nose):
@@ -263,7 +275,8 @@ def bottom():
     for y0, y1 in _end_hook_bands():
         lo, hi = sorted((y0, y1))
         part += _hook_wall(x_in, x_seam, lo, hi, P.BOTTOM_T,
-                           P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
+                           P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN,
+                           P.END_HOOK_ROOT_R)
         part += _hook_boss(
             x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
             P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
@@ -541,7 +554,8 @@ def hook_coupon():
     plate_piece = bottom() & plate_box
     for wy0, wy1 in _coupon_wall_runs():
         plate_piece += _hook_wall(x_in, x_seam, wy0, wy1, P.BOTTOM_T,
-                                  P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
+                                  P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN,
+                           P.END_HOOK_ROOT_R)
 
     was = P.END_HOOK_FIT
     part = None

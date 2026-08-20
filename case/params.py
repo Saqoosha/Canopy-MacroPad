@@ -232,6 +232,26 @@ END_HOOK_FIT = 0.40
 # nose is the lead-in on that side.
 END_HOOK_CHAMFER_IN = 0.30
 
+# A fillet where that wall meets the plate. Saqoosha printed the first
+# coupon, picked it up and said it was tiny and fragile -- which it is:
+# 1.00 thick and 2.00 tall with a 0.90 boss hanging off the far side, a
+# cantilever loaded at the tip. Nothing in the model had an opinion about
+# that. A boolean asks what two solids share and a margin asks how much
+# room is left; neither is a question about surviving being handled.
+#
+# It can only go **inboard**. Outboard the shell's skirt fills the root
+# to Z_FLOOR and its own material carries on to the slot, so there is
+# SEAM_STEP_H of band there and the shell is in it. Inboard is the case
+# cavity, empty from Z_FLOOR to Z_PLATE_BOTTOM, with the board's
+# underside 2.30 higher again and the receptacle's clearance cut 1.00
+# clear of the band in y.
+#
+# It waited for END_HOOK_FIT deliberately: changing the case mid-sweep
+# would have stopped the coupon and the part being the same thing, which
+# is the one property that makes that coupon worth more than a drawing.
+# The fit is settled at 0.40 now, so it can come in.
+END_HOOK_ROOT_R = 1.00
+
 # And a third, on the boss's leading **top** edge.
 #
 # It was on the bottom edge first, and the reasoning was about the wrong
