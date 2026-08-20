@@ -421,6 +421,41 @@ def coupon():
     return part
 
 
+END_TEST_REACH = 25.0     # how far inboard of the end wall to cut
+
+
+def end_test():
+    """The case's right end, both halves, cut and not otherwise touched.
+
+    The coupon this follows is **not** the case end and Saqoosha said so:
+    its wall runs the whole side beside the port where the case gives it
+    END_HOOK_L, because the first coupon broke in the hand. That widening
+    is the one place the coupon and the part disagree, and it is on the
+    wall -- which is what you push on.
+
+    So this is the other kind of test piece. Nothing is added, nothing is
+    widened; `shell()` and `bottom()` are sliced END_TEST_REACH inboard of
+    the end wall and laid out in the orientation each is printed in. If
+    the hook seats here it seats in the case, and if the wall breaks here
+    it will break in the case.
+
+    There are no screws at this end -- both are in the left bay -- so the
+    hook is the whole joint in this piece, which is exactly the thing
+    being asked about.
+    """
+    x0 = P.CASE_W / 2 - END_TEST_REACH
+    x1 = P.CASE_W / 2 + 0.5
+    y0, y1 = -P.CASE_D / 2 - 0.1, P.CASE_D / 2 + 0.1
+
+    plate = bottom() & _block(x0, x1, y0, y1, -0.1, P.CASE_H + 0.1)
+    shell_piece = shell() & _block(x0, x1, y0, y1,
+                                   P.Z_FLOOR - P.SEAM_STEP_H - 0.1,
+                                   P.CASE_H + 0.1)
+    flipped = Rotation(180, 0, 0) * shell_piece
+    flipped = Pos(0, 0, -flipped.bounding_box().min.Z) * flipped
+    return plate + Pos(END_TEST_REACH + 6.0, 0, 0) * flipped
+
+
 def hook_coupon_layout():
     """Where each swept pair sits, and how big a bite is taken.
 

@@ -172,7 +172,19 @@ END_HOOK_REACH = SEAM_STEP_W - 0.10
 # before the boss catches. Not a press fit -- the boss is held by the
 # shell's material above it, not gripped by its flanks.
 END_HOOK_FIT_SWEEP = (0.10, 0.20, 0.30, 0.40)
-END_HOOK_FIT = 0.20
+# Settled on the coupon: 0.10, 0.20 and 0.30 would not go on and 0.40
+# did. That is the top of the sweep, so where it stops being tight was
+# never found -- but the direction of better here is *tighter*, and
+# tighter is what did not fit, so 0.40 is the best value available rather
+# than merely the surviving one.
+#
+# The reason three of four failed is this machine's hole shrink, the same
+# ~0.15 the constant SWITCH_HOLE measures. The slot is a hole and arrives
+# 0.15 small; the boss is an outside feature and arrives a little over.
+# So the printed clearance is roughly the modelled figure minus 0.20, and
+# **the lift is the printed one**: 0.40 modelled is about 0.20 of lift at
+# that end, not 0.40.
+END_HOOK_FIT = 0.40
 
 # Both top edges of that raised wall are chamfered, and each one is a
 # lead-in for a different thing going past it.

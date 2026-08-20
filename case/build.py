@@ -58,6 +58,7 @@ def main():
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
         "coupon-hook": parts.hook_coupon(),
+        "end-test": parts.end_test(),
     }
 
     print("exported")
@@ -275,6 +276,27 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} hook fits differ "
           f"{len(shell_v)}/{want}, steps {steps}")
+
+    # The end test has to be the case and nothing else. The coupon is
+    # deliberately not -- its wall is widened so the piece survives being
+    # pushed on -- and that is the one place the two disagree, so it is
+    # the one thing worth asserting about this piece: its wall is the
+    # case's END_HOOK_L, not the coupon's whole side.
+    x_in = P.CASE_W / 2 - P.WALL
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    z_wall = (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2
+    plate_half = min(parts.end_test().solids(), key=lambda so: so.center().X)
+    wall_len = 0.0
+    for y in [i * 0.1 for i in range(-130, 131)]:
+        pr = Pos((x_in + x_seam) / 2, y, z_wall) * Box(
+            P.SEAM_STEP_W * 0.5, 0.08, 0.5)
+        if (pr & plate_half).volume > 1e-9:
+            wall_len += 0.1
+    want = 2 * P.END_HOOK_L
+    good = abs(wall_len - want) < 0.35
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'end':<7} test wall is the case's "
+          f"{wall_len:5.2f} / {want:.2f} mm")
 
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed
