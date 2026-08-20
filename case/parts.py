@@ -86,10 +86,15 @@ def _usb_opening():
     wall = P.CASE_W / 2
     across = (P.USB_CY, zc)
     edge = P.USB_CX
-    cut = _stadium(across, P.USB_W + P.USB_CLEAR_W, P.USB_H + P.USB_CLEAR_H,
+    # One shape, twice. The relief is the plug's envelope and the throat
+    # is that same outline inset by USB_LEDGE, so the border between them
+    # is USB_LEDGE the whole way round rather than something that has to
+    # be measured afterwards and turns out to pinch.
+    rw = P.USB_PLUG_W + P.USB_PLUG_CLEAR
+    rh = P.USB_PLUG_H + P.USB_PLUG_CLEAR
+    cut = _stadium(across, rw - 2 * P.USB_LEDGE, rh - 2 * P.USB_LEDGE,
                    P.USB_AXIS, wall - P.WALL - 1.0, wall + 0.1)
-    cut += _stadium(across, P.USB_PLUG_W + P.USB_PLUG_CLEAR,
-                    P.USB_PLUG_H + P.USB_PLUG_CLEAR, P.USB_AXIS,
+    cut += _stadium(across, rw, rh, P.USB_AXIS,
                     edge + P.USB_OVERHANG - 0.05, wall + 0.1)
     return cut
 
@@ -269,9 +274,20 @@ def bottom():
     for x, y in P.PRESS_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.COLUMN_DIA)
 
-    # Local pocket for the USB-C receptacle. Spec: the bottom plate is
-    # 2.40 and can give up 1.00 without argument.
-    pocket_d = 1.00
+    # Local pocket for the USB-C receptacle. Its floor is the port's own
+    # lower edge, not a round number: at 1.00 deep it reached z 1.40 and
+    # took away the tongue that backs the plug relief, so the relief --
+    # which already cuts through the shell's 1.00 skirt -- came out the
+    # other side. Two unrelated cuts lining up, and the port had a second
+    # thin opening under the throat because of it.
+    #
+    # The receptacle needed none of that depth. It hangs to z 2.54 over a
+    # plate top of 2.40, so 0.14 was the gap being widened; taking the
+    # floor to the throat's lower edge instead leaves 0.42 and puts the
+    # tongue back.
+    _zc = (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
+    _throat_h = P.USB_PLUG_H + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE
+    pocket_d = P.BOTTOM_T - (_zc - _throat_h / 2)
     ox, oy = P.BOARD_ORIGIN
     part -= _block(
         ox + P.BOARD_W - P.USB_TAB_W - 1.0, ox + P.BOARD_W + 2.0,

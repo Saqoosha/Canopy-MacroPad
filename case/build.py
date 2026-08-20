@@ -143,6 +143,15 @@ def main():
         # what the printed part looked like, and neither the interference
         # check nor any margin had an opinion about it. Both floors are
         # measured from the relief because that is the shape that moves.
+        # The throat is derived from the relief now, so what used to be
+        # set by hand -- whether it clears the receptacle -- has to be
+        # checked instead of assumed.
+        "throat clears the receptacle across": (
+            ((P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) - P.USB_W) / 2
+        ),
+        "throat clears the receptacle in height": (
+            ((P.USB_PLUG_H + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) - P.USB_H) / 2
+        ),
         "relief floor above the shell's lowest face": (
             ((P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
              - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
@@ -312,6 +321,34 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'end':<7} test wall is the case's "
           f"{wall_len:5.2f} / {want:.2f} mm")
+
+    # The port must have exactly one opening. Below the throat there was
+    # a second, thin one: the relief cuts through the shell's 1.00 skirt
+    # and the plate's receptacle pocket had removed the tongue behind it,
+    # two unrelated cuts lining up. Neither an interference check nor any
+    # margin can see that -- it is a hole, and a hole is what both of
+    # them are blind to. So walk in from the outer face and require the
+    # wall to stop you.
+    zc = (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
+    rh = P.USB_PLUG_H + P.USB_PLUG_CLEAR
+    th = rh - 2 * P.USB_LEDGE
+    band = [zc - rh / 2 + 0.10, zc - (rh / 2 + th / 2) / 2, zc - th / 2 - 0.10]
+    leaks = 0
+    for z in band:
+        for y in (0.0, 2.0, 4.0, 5.0):
+            through = True
+            for i in range(22):
+                x = P.CASE_W / 2 - i * 0.1
+                pr = Pos(x, y, z) * Box(0.09, 0.09, 0.09)
+                if ((pr & built["shell"]).volume > 1e-12
+                        or (pr & built["bottom"]).volume > 1e-12):
+                    through = False
+                    break
+            leaks += through
+    good = leaks == 0
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening under the "
+          f"throat {leaks:5d} leaks / {len(band) * 4} probed")
 
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed

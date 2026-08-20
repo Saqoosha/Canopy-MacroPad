@@ -110,8 +110,20 @@ SEAM_FIT = 0.20        # total clearance between skirt and tongue
 USB_W = 8.94
 USB_H = 3.16
 USB_OVERHANG = 0.969
-USB_CLEAR_W = 1.10
-USB_CLEAR_H = 0.80
+# **One shape makes both openings.** They used to be two, each sized from
+# its own pair of numbers -- 10.04 x 3.96 for the throat and 12.40 x 5.40
+# for the plug's relief -- and two stadiums of different proportions do
+# not have parallel outlines: the ledge between them ran 1.180 to 1.520
+# and pinched at the ends, which is what read as a corner. Saqoosha said
+# it should just be the same shape twice, and he is right; it is the same
+# fault this file already names, two places deriving one edge.
+#
+# So the relief is the plug's envelope, the throat is that inset by one
+# number, and the ledge is that number everywhere by construction. What
+# used to be USB_CLEAR_W/H is now a consequence rather than an input, and
+# `build.py` checks the throat still clears the receptacle instead of
+# taking it on trust.
+USB_LEDGE = 0.70
 USB_PLUG_CLEAR = 0.40
 USB_PLUG_W = 12.00
 # 6.60 was chosen generously and never measured, and it is what made the
