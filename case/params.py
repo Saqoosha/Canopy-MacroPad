@@ -114,7 +114,18 @@ USB_CLEAR_W = 1.10
 USB_CLEAR_H = 0.80
 USB_PLUG_CLEAR = 0.40
 USB_PLUG_W = 12.00
-USB_PLUG_H = 6.60
+# 6.60 was chosen generously and never measured, and it is what made the
+# port's shape wrong: the relief it sizes reached z 0.62, below the
+# shell's own lowest material at 1.20, so the opening's outline ran off
+# the bottom edge instead of closing, and it cut the bottom plate's lip
+# down to a 0.62 shelf spanning the port.
+#
+# 5.00 is Saqoosha's, off the assembled part -- the plug does not touch
+# the shell, so the envelope had room to come down. **The boolean cannot
+# check this one**: mock.py draws the mated plug from this same constant,
+# so shrinking it shrinks the stand-in too and the interference check
+# agrees with itself no matter what. The evidence is the handled part.
+USB_PLUG_H = 5.00
 USB_PLUG_L = 8.00
 USB_R = USB_H / 2
 

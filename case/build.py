@@ -138,6 +138,21 @@ def main():
         ),
         # The hook band has to clear the plug's opening on one side and
         # the case's corner radius on the other.
+        # The port's relief has to stay inside each half's own material,
+        # or its outline runs off an edge instead of closing -- which is
+        # what the printed part looked like, and neither the interference
+        # check nor any margin had an opinion about it. Both floors are
+        # measured from the relief because that is the shape that moves.
+        "relief floor above the shell's lowest face": (
+            ((P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
+             - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
+            - (P.Z_FLOOR - P.SEAM_STEP_H) + 0.05
+        ),
+        "relief floor above the plate's outer lip": (
+            ((P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
+             - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
+            - (P.BOTTOM_T - P.SEAM_STEP_H) + 0.05
+        ),
         "hook band clear of the plug opening": (
             P.END_HOOK_Y0 - P.USB_PLUG_W / 2
         ),
