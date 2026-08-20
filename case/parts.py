@@ -274,27 +274,23 @@ def bottom():
     for x, y in P.PRESS_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.COLUMN_DIA)
 
-    # Local pocket for the USB-C receptacle. Its floor is the port's own
-    # lower edge, not a round number: at 1.00 deep it reached z 1.40 and
-    # took away the tongue that backs the plug relief, so the relief --
-    # which already cuts through the shell's 1.00 skirt -- came out the
-    # other side. Two unrelated cuts lining up, and the port had a second
-    # thin opening under the throat because of it.
+    # Clearance under the receptacle, cut with the **port's own profile**
+    # rather than a box. It was a rectangle, and a rectangle is what you
+    # saw from outside: the port's lower edge was that pocket's flat floor
+    # running out to y +-5.47, not the throat's curve. The shape that
+    # opens the wall and the shape that clears the receptacle are one
+    # shape now, so the outline is a single continuous stadium.
     #
-    # The receptacle needed none of that depth. It hangs to z 2.54 over a
-    # plate top of 2.40, so 0.14 was the gap being widened; taking the
-    # floor to the throat's lower edge instead leaves 0.42 and puts the
-    # tongue back.
+    # The depth is not free either. With no pocket at all the plate's top
+    # at BOTTOM_T leaves the receptacle 0.14 -- under one printed layer --
+    # so this is the throat carried inward, and it gives 0.42 for the same
+    # reason it gives the plug 0.70: it is the same profile.
     _zc = (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
-    _throat_h = P.USB_PLUG_H + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE
-    pocket_d = P.BOTTOM_T - (_zc - _throat_h / 2)
-    ox, oy = P.BOARD_ORIGIN
-    part -= _block(
-        ox + P.BOARD_W - P.USB_TAB_W - 1.0, ox + P.BOARD_W + 2.0,
-        oy + P.BOARD_D / 2 - P.USB_W / 2 - 1.0,
-        oy + P.BOARD_D / 2 + P.USB_W / 2 + 1.0,
-        P.BOTTOM_T - pocket_d, P.BOTTOM_T + 0.1,
-    )
+    _tw = P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE
+    _th = P.USB_PLUG_H + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE
+    _ox = P.BOARD_ORIGIN[0]
+    part -= _stadium((P.USB_CY, _zc), _tw, _th, P.USB_AXIS,
+                     _ox + P.BOARD_W - P.USB_TAB_W - 1.0, P.CASE_W / 2 + 0.1)
 
     for x, y in P.POST_XY:
         part -= _tube(x, y, -0.1, P.BOTTOM_T + 0.1, P.SCREW_CLEAR_DIA)

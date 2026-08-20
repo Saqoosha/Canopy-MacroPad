@@ -122,7 +122,16 @@ def main():
     margins = {
         # Receptacle sits in a 1.00 pocket cut into the plate top, so the
         # floor it cares about is that pocket's floor, not Z_FLOOR.
-        "USB-C shell to pocket floor": P.Z_USB_BOTTOM - (P.BOTTOM_T - 1.00),
+        # The 1.00 that used to be here was the rectangular pocket's depth,
+        # and it outlived the pocket -- the clearance is cut with the
+        # throat's profile now, so the floor is the throat's floor. A
+        # check reading a constant nothing builds from any more reports
+        # forever and cannot go red.
+        "USB-C shell to the clearance floor": (
+            P.Z_USB_BOTTOM
+            - ((P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
+               - (P.USB_PLUG_H + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2)
+        ),
         "USB port bezel left in the wall": (
             P.WALL - (P.CASE_W / 2 - (P.USB_CX + P.USB_OVERHANG))
         ),
