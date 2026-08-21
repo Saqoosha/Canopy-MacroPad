@@ -232,31 +232,23 @@ END_HOOK_FIT = 0.40
 # nose is the lead-in on that side.
 END_HOOK_CHAMFER_IN = 0.30
 
-# A fillet where that wall meets the plate. Saqoosha printed the first
-# coupon, picked it up and said it was tiny and fragile -- which it is:
-# 1.00 thick and 2.00 tall with a 0.90 boss hanging off the far side, a
-# cantilever loaded at the tip. Nothing in the model had an opinion about
-# that. A boolean asks what two solids share and a margin asks how much
-# room is left; neither is a question about surviving being handled.
+# **How thick the wall is.** Only the outer SEAM_STEP_W of it is in the
+# shell's relief; the rest stands in the cavity, which is empty from
+# Z_FLOOR to Z_PLATE_BOTTOM at that end. So the wall is as thick as it is
+# useful rather than as thick as the seam.
 #
-# It can only go **inboard**. Outboard the shell's skirt fills the root
-# to Z_FLOOR and its own material carries on to the slot, so there is
-# SEAM_STEP_H of band there and the shell is in it. Inboard is the case
-# cavity, empty from Z_FLOOR to Z_PLATE_BOTTOM, with the board's
-# underside 2.30 higher again and the receptacle's clearance cut 1.00
-# clear of the band in y.
+# It was 1.00 -- the seam's width, and nothing else -- and Saqoosha broke
+# the first coupon in his hand: 1.00 thick, 2.00 tall, with a 0.90 boss on
+# the far side, a cantilever loaded at the tip. A root fillet was tried
+# first and it is the wrong shape for this. A fillet is 3.00 at the very
+# root and back to 1.00 at the top, where the boss actually pulls; a
+# block is 3.00 the whole way up. Saqoosha drew a rectangle and meant one.
 #
-# It waited for END_HOOK_FIT deliberately: changing the case mid-sweep
-# would have stopped the coupon and the part being the same thing, which
-# is the one property that makes that coupon worth more than a drawing.
-# The fit is settled at 0.40 now, so it can come in.
-# 2.00 is the ceiling, not a preference: a fillet taller than the wall it
-# braces is standing proud of it, and the wall is END_HOOK_SEAM_Z -
-# BOTTOM_T high. At the ceiling the root section goes 1.00 -> 3.00.
-# It reaches x 71.50 inboard, which is empty cavity -- the board's
-# underside is 1.30 higher and the receptacle's clearance cut stops 1.00
-# short of the band in y.
-END_HOOK_ROOT_R = 2.00
+# 3.00 is not a limit -- the cavity would take much more. It is three
+# extrusions at a 0.4 nozzle, triples the section, and stops well clear of
+# the receptacle's clearance cut, which ends at |y| 5.50 against this
+# band's 6.50.
+END_HOOK_WALL_T = 3.00
 
 # And a third, on the boss's leading **top** edge.
 #

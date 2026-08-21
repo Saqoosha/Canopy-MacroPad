@@ -174,13 +174,26 @@ def main():
         # The fillet can only grow inboard, and what it must not reach is
         # the receptacle's clearance cut, which is the nearest thing to
         # the band in y.
-        "hook fillet clear of the receptacle cut": (
+        # The probe below compares the wall against END_HOOK_WALL_T, so it
+        # confirms the geometry follows the constant and says nothing
+        # about the constant being big enough. This is the other half:
+        # the wall has to be thicker than the seam that used to set it,
+        # which is the whole point of the change.
+        "hook wall thicker than the seam": (
+            P.END_HOOK_WALL_T - P.SEAM_STEP_W
+        ),
+        "hook wall clear of the receptacle cut": (
             P.END_HOOK_Y0
             - (P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2
         ),
-        # And it must stay under the board rather than reaching its plane.
-        "hook fillet below the board": (
-            P.Z_BOARD_BOTTOM - (P.BOTTOM_T + P.END_HOOK_ROOT_R)
+        # The wall's top must stay under the board rather than reaching
+        # its plane. It has 1.30 and the board never passes it -- the
+        # chamfer on its inboard top edge was justified as a lead-in for
+        # a board squeezing by, and that was wrong: the two do not share
+        # a height at all. The chamfer stays as a printing lead-in; the
+        # reason it was given does not.
+        "hook wall below the board": (
+            P.Z_BOARD_BOTTOM - P.END_HOOK_SEAM_Z
         ),
         "hook band clear of the plug opening": (
             P.END_HOOK_Y0 - P.USB_PLUG_W / 2
@@ -270,23 +283,16 @@ def main():
     L = P.END_HOOK_L
     prism = lambda c: 2 * L * c ** 2 / 2   # noqa: E731
     real_w, real_b = parts._hook_wall, parts._hook_boss
-    parts._hook_wall = lambda *a: real_w(*a[:-2], 0.001, a[-1])
+    parts._hook_wall = lambda *a: real_w(*a[:-1], 0.001)
     flat_wall = parts.bottom().volume
     parts._hook_wall = real_w
     parts._hook_boss = lambda *a: real_b(*a[:-1], 0.001)
     flat_boss = parts.bottom().volume
     parts._hook_boss = real_b
-    import math
-    parts._hook_wall = lambda *a: real_w(*a[:-1], 0.001)
-    flat_root = parts.bottom().volume
-    parts._hook_wall = real_w
     for label, got, want in (
         ("wall lead-in", flat_wall - built["bottom"].volume,
          prism(P.END_HOOK_CHAMFER_IN)),
-        # The fillet adds rather than removes, so the sign is the other
-        # way and the shape is a quarter round, not a prism.
-        ("root fillet", built["bottom"].volume - flat_root,
-         2 * L * P.END_HOOK_ROOT_R ** 2 * (1 - math.pi / 4)),
+
         ("boss nose", flat_boss - built["bottom"].volume, prism(P.END_HOOK_NOSE)),
     ):
         good = abs(got - want) < 0.02
@@ -377,6 +383,30 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening under the "
           f"throat {leaks:5d} leaks / {len(band) * 4} probed")
+
+    # The wall's thickness, measured on the solid. A margin can say the
+    # constant is 3.00; this says the part is. The fillet it replaces was
+    # 3.00 at the root and 1.00 at the top, so the height it is probed at
+    # is deliberately the top half.
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    thin = 99.0
+    for y0b, y1b in parts._end_hook_bands():
+        cy = (y0b + y1b) / 2
+        for z in (P.END_HOOK_SEAM_Z - 0.25, (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2):
+            # The range has to overshoot the wall. At 60 steps of 0.05
+            # it stopped 0.05 short of a 3.00 wall's far face, never
+            # found a void, and left the sentinel -- reporting 99.00
+            # forever and passing at any thickness.
+            for i in range(int((P.END_HOOK_WALL_T + 2.0) / 0.05)):
+                x = x_seam - i * 0.05
+                pr = Pos(x, cy, z) * Box(0.04, 0.04, 0.04)
+                if (pr & built["bottom"]).volume < 1e-12:
+                    thin = min(thin, x_seam - x)
+                    break
+    good = thin >= P.END_HOOK_WALL_T - 0.10
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} wall thinnest section "
+          f"{thin:8.2f} / {P.END_HOOK_WALL_T:.2f} mm")
 
     # The bed chamfers, measured as an inset rather than believed from
     # the source. Each half prints on a different face and a chamfer is
