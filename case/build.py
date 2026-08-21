@@ -378,6 +378,24 @@ def main():
     print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening under the "
           f"throat {leaks:5d} leaks / {len(band) * 4} probed")
 
+    # The bed chamfers, measured as an inset rather than believed from
+    # the source. Each half prints on a different face and a chamfer is
+    # exactly the kind of feature that can be built and then trimmed off
+    # by a later operation without anything raising.
+    for name, part, zbed, inward in (("shell", built["shell"], P.CASE_H, -1),
+                                     ("bottom", built["bottom"], 0.0, +1)):
+        inset = None
+        for i in range(40):
+            x = P.CASE_W / 2 + 0.4 - i * 0.05
+            pr = Pos(x, 0, zbed + inward * 0.02) * Box(0.04, 0.04, 0.04)
+            if (pr & part).volume > 1e-12:
+                inset = P.CASE_W / 2 - x
+                break
+        good = inset is not None and inset >= P.ELEPHANT_CHAMFER * 0.5
+        ok.append(good)
+        print(f"  [{'ok ' if good else 'BAD'}] {'bed':<7} {name} outline inset at "
+              f"the bed face {inset if inset is not None else float('nan'):8.2f} mm")
+
     # The hook, measured as a shape. A feature can be absent from a
     # perfectly valid part -- a cut placed inside a void, a boss trimmed
     # off by a closing intersection -- and every other check still passes.

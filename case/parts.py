@@ -180,9 +180,24 @@ def _end_hook_bands():
     ]
 
 
+def _bed_chamfer(solid, z, size):
+    """Chamfer the outline that lands on the print bed.
+
+    Taken on the base slab, before anything is cut into it: there is one
+    face at that height and one loop of edges round it, so the selection
+    cannot pick something else. After the holes, feet and counterbores go
+    in there are dozens of edges at z and no honest way to name the right
+    ones.
+    """
+    face = solid.faces().filter_by_position(Axis.Z, z - 1e-6, z + 1e-6)
+    return chamfer(face.edges(), length=size)
+
+
 def shell():
     """Top shell: the switch plate, its walls, and the board clamp."""
     outer = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R, P.Z_FLOOR, P.CASE_H)
+    # This half prints flipped, so CASE_H is the face on the bed.
+    outer = _bed_chamfer(outer, P.CASE_H, P.ELEPHANT_CHAMFER)
     cavity = _slab(
         P.CASE_W - 2 * P.WALL,
         P.CASE_D - 2 * P.WALL,
@@ -262,6 +277,8 @@ def bottom():
     """Bottom plate: columns under the board, USB pocket, screw seats."""
     part = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R,
                  0.0, P.BOTTOM_T - P.SEAM_STEP_H)
+    # This half prints the right way up, so z 0 is the face on the bed.
+    part = _bed_chamfer(part, 0.0, P.ELEPHANT_CHAMFER)
     part += _slab(P.CASE_W - 2 * P.SEAM_STEP_W, P.CASE_D - 2 * P.SEAM_STEP_W,
                   max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                   P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)

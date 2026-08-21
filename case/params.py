@@ -250,7 +250,13 @@ END_HOOK_CHAMFER_IN = 0.30
 # would have stopped the coupon and the part being the same thing, which
 # is the one property that makes that coupon worth more than a drawing.
 # The fit is settled at 0.40 now, so it can come in.
-END_HOOK_ROOT_R = 1.00
+# 2.00 is the ceiling, not a preference: a fillet taller than the wall it
+# braces is standing proud of it, and the wall is END_HOOK_SEAM_Z -
+# BOTTOM_T high. At the ceiling the root section goes 1.00 -> 3.00.
+# It reaches x 71.50 inboard, which is empty cavity -- the board's
+# underside is 1.30 higher and the receptacle's clearance cut stops 1.00
+# short of the band in y.
+END_HOOK_ROOT_R = 2.00
 
 # And a third, on the boss's leading **top** edge.
 #
@@ -262,6 +268,14 @@ END_HOOK_ROOT_R = 1.00
 # that meets the slot's roof is the top one. Saqoosha read it off the
 # section drawing.
 END_HOOK_NOSE = 0.35
+
+# Elephant foot: the first layer is squashed and bulges past the outline,
+# so the edge that lands on the bed gets a chamfer to give it somewhere
+# to go. **Both halves need it and on different faces** -- the plate
+# prints on its underside at z 0, the shell prints flipped so its bed
+# face is the switch plate's top at CASE_H. Neither is the seam, which
+# stands away from the bed on both.
+ELEPHANT_CHAMFER = 0.40
 
 FOOT_DIA = 8.00
 FOOT_H = 2.00
