@@ -229,6 +229,9 @@ def shell():
     for x, y in P.PRESS_XY:
         part += _tube(x, y, P.Z_BOARD_TOP + P.BOARD_CLAMP_SLACK,
                       P.Z_PLATE_BOTTOM, P.STANDOFF_DIA)
+    for x, y in P.BACK_PRESS_XY:
+        part += _tube(x, y, P.Z_BOARD_TOP + P.BOARD_CLAMP_SLACK,
+                      P.Z_PLATE_BOTTOM, P.BACK_COLUMN_DIA)
 
     for x, y in P.POST_XY:
         part += _tube(x, y, P.Z_FLOOR, P.Z_PLATE_BOTTOM, P.POST_DIA)
@@ -290,6 +293,8 @@ def bottom():
     # Columns under the press points, so the clamp is a sandwich.
     for x, y in P.PRESS_XY:
         part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.COLUMN_DIA)
+    for x, y in P.BACK_PRESS_XY:
+        part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.BACK_COLUMN_DIA)
 
     # Clearance under the receptacle, cut with the **port's own profile**
     # rather than a box. It was a rectangle, and a rectangle is what you

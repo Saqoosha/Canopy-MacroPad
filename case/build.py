@@ -243,8 +243,19 @@ def main():
             - P.POST_DIA / 2
         ),
         "board columns inside the cavity": min(
-            P.CASE_D / 2 - P.WALL - abs(y) - P.COLUMN_DIA / 2
-            for _, y in P.PRESS_XY
+            P.CASE_D / 2 - P.WALL - abs(y) - dia / 2
+            for y, dia in (
+                *[(y, P.COLUMN_DIA) for _, y in P.PRESS_XY],
+                *[(y, P.BACK_COLUMN_DIA) for _, y in P.BACK_PRESS_XY],
+            )
+        ),
+        # BACK_PRESS_Y is derived to leave 0.26 here. Kept as a measurement
+        # of the placed columns, not of that formula, so a hand-edit of
+        # the y (or a second diameter) still has somewhere to go red.
+        "back columns clear the socket": min(
+            (y - P.BOARD_ORIGIN[1]) - P.BACK_COLUMN_DIA / 2
+            - (P.SWITCH_Y + P.SOCKET_LOCAL[3])
+            for _, y in P.BACK_PRESS_XY
         ),
         "USB plug overmold above the desk": (
             (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2 - 3.25

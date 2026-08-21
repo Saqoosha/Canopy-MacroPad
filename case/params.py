@@ -340,21 +340,31 @@ USB_CX, USB_CY = board_xy((BOARD_W, BOARD_D / 2))
 USB_AXIS = "x"
 
 # Shell presses the board down, bottom plate pushes it up, at the same
-# points. The Choc socket sits on the back half of each switch
-# (board-local y ~13..18), so both press rows stay in front of it.
+# points. One row per long edge is the clamp; a third row between them
+# (7.50, in front of the sockets) was there when both rows had to live
+# on the front half, and it does nothing once the back edge is held.
 # 2.50 also clears COLUMN_DIA of the cavity wall (2.20 left only 0.15).
-PRESS_Y = (2.50, 7.50)
-PRESS_XY = [
-    board_xy((SWITCH_X[i] + SWITCH_PITCH / 2, y))
-    for i in range(len(SWITCH_X) - 1)
-    for y in PRESS_Y
-]
+#
+# Between switches, not under them: the same x serves the back row too.
+PRESS_X = [SWITCH_X[i] + SWITCH_PITCH / 2 for i in range(len(SWITCH_X) - 1)]
+PRESS_Y = (2.50,)
+PRESS_XY = [board_xy((x, y)) for x in PRESS_X for y in PRESS_Y]
 
 # Choc hot-swap socket envelope under the board, relative to a switch
 # centre. Pad extents from pcb.SOCKET_PADS, grown a hair for the plastic
 # body around them -- the boolean needs the shape a column would hit,
 # not a summary of the pads alone.
 SOCKET_LOCAL = (-4.5, 9.5, 2.2, 7.4)  # x0, x1, y0, y1
+
+# The other long edge. SOCKET_LOCAL's back is SWITCH_Y + 7.4 = 18.195,
+# leaving 3.395 to BOARD_D. COLUMN_DIA 4.50 needs 4.50 plus wall
+# clearance and does not fit; 3.00 does, with 0.26 to the socket box
+# (the collision) and 0.135 to the board edge. Same x as the front
+# row -- between switches, which is also where the real socket mesh
+# stops at y 15.33, so the 0.26 is to the envelope, not the part.
+BACK_COLUMN_DIA = 3.00
+BACK_PRESS_Y = SWITCH_Y + SOCKET_LOCAL[3] + 0.26 + BACK_COLUMN_DIA / 2
+BACK_PRESS_XY = [board_xy((x, BACK_PRESS_Y)) for x in PRESS_X]
 
 FOOT_XY = [
     (x, y)
