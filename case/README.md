@@ -61,9 +61,12 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-There are two, and the small one exists so that re-asking one question
+There are three, and the small ones exist so that re-asking one question
 does not cost a reprint of the answers already settled:
-`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own.
+`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own and
+`out/<layout>/coupon-hole.stl` is the switch-hole row, three diameters
+engraved, on a plate at the real `PLATE_T` -- a Choc v2 clips into that
+thickness, so a thicker test piece would answer neither half.
 
 `out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
@@ -71,7 +74,7 @@ can settle, and getting them wrong costs a two-hour reprint:
 
 | Test | What it settles | Status |
 |---|---|---|
-| switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
+| switch into the square hole | `SWITCH_HOLE` | **settled at 14.00 on a Choc v2** — all three swept holes take the switch and 14.00 is the one that grips. It won at the bottom of the sweep, so tighter was never printed; the direction of better is tighter and a hole that grips is the whole requirement. `out/<layout>/coupon-hole.stl` asks this on its own, at the real `PLATE_T`, since the plate's thickness has to hold the clips too. The 14.15 above it is the **MX** answer from the three-board case and does not carry over: 13.95 nominal plus this machine's 0.15 hole shrink predicted 14.10, and 14.00 is what grips, so the shrink is not one number across features |
 | M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
 | M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled, and confirmed on a printed plate** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |

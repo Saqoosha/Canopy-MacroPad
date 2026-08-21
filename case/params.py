@@ -35,17 +35,41 @@ SWITCH_Y = pcb.SWITCH_Y
 OUT_NAME = "choc"
 
 # --- Choc v2 plate ------------------------------------------------------
-# 13.95 cutout off Kailh CPG135301D01, plus this machine's 0.15 shrink.
-# Has never been checked against a Choc v2 -- none has been on this desk
-# -- so HOLE_SWEEP brackets it rather than trusting it.
-SWITCH_HOLE = 14.10
+# **Settled on a real Choc v2.** All three swept holes take the switch;
+# 14.00 is the one that is tight enough to hold it, and 14.10 and 14.20
+# only snap. It won at the **bottom** of the sweep, so how much tighter
+# still works was never found -- and is deliberately not being looked
+# for. The direction of better here is tighter, tighter than 14.00 was
+# not printed, and a hole that grips is the whole requirement. If a
+# reprint ever comes out loose the sweep runs downward from here.
+#
+# It is also **not where the arithmetic pointed.** 14.10 was 13.95 off
+# Kailh's CPG135301D01 drawing plus the 0.15 this machine pulls a hole
+# in -- the constant `SWITCH_HOLE` measured on MX, where 14.15 seats a
+# 14.00 switch. Here the same reasoning wants 14.10 and 14.00 is what
+# grips, so the correction is 0.05 rather than 0.15. **The shrink is not
+# one number across features**, which is exactly why the sweep exists and
+# why the coupon outranks the tables.
+SWITCH_HOLE = 14.00
 PLATE_TOP_TO_PCB = 2.20
 PLATE_T = 1.30          # Choc's clips need 1.30; there is no fallback now
 SOCKET_DROP = 1.90
 HOLE_SWEEP = (14.00, 14.10, 14.20)
-# 0.20 left a 14.0 square switch fouling the corner arcs of a 14.10 hole
-# (corner centre at 6.85, switch corner at 7.0, dist 0.212 > 0.20). 0.10
-# clears; the MX spec's 0.3 is a maximum, not a target.
+# 0.10, and the arithmetic that chose it no longer clears. It was
+# written for a 14.10 hole: a 14.0 *square* switch put its corner 0.212
+# from the arc centre against a 0.20 radius, so 0.20 fouled and 0.10 did
+# not. At 14.00 the same sum says 0.10 fouls too, by 0.041.
+#
+# The printed coupon disagrees and it outranks the sum. A Choc v2 goes
+# into the 14.00 hole and grips. The model's switch is a square with
+# PLATE_HOLE_R corners and a real one is not square -- its corners are
+# radiused -- so the calculation is pessimistic about a shape it does not
+# have. Left at 0.10 on that evidence, and the sum is recorded here as
+# the thing that stopped being true rather than deleted.
+#
+# `build.py` cannot referee this: mock.py draws the switch body from
+# SWITCH_HOLE with the same PLATE_HOLE_R, so its boolean agrees with
+# itself at any value.
 PLATE_HOLE_R = 0.10
 
 # Board outline corner comes from the PCB. Two sources for the same edge
