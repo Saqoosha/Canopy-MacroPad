@@ -336,6 +336,13 @@ they cover different halves:
   "top"]').click()`), screenshot, and check `list_console_messages` for
   errors. Four real rendering bugs were found this way and none of them
   raised an error, so the screenshot is the test, not the console.
+- **The section cap is a volume test.** It counts front faces against
+  back faces and fills where they do not cancel, which is defined for a
+  body that has an interior. The PCB and its packages have no volume --
+  they are surfaces EasyEDA exported -- so the stencil never cancels and
+  the cap paints every remaining face with the cut colour. `dump()` marks
+  each part `closed`, and the cap loop skips the ones that are not.
+  Clipping them is still right; filling a surface is the bug.
 
 ## Remaining on the case
 

@@ -60,6 +60,57 @@ def envelopes():
     return {k: (v - boards[k]) for k, v in mock.everything().items()}
 
 
+def mesh_closed(tris):
+    """True iff every edge is shared by exactly two triangles of opposite winding.
+
+    The section cap counts front faces against back faces, which is a
+    volume test: it is defined for a body that has an interior. EasyEDA's
+    board and packages are surfaces -- they have no volume -- so the
+    stencil never cancels and the cap paints the remaining silhouette
+    with the cut colour. That is how every PCB face filled in. Vertices
+    are snapped to 0.01 mm so shared edges survive tessellation.
+    """
+    v = np.round(np.asarray(tris, dtype=np.float64).reshape(-1, 3) * 100)
+    faces = v.astype(np.int64).reshape(-1, 3, 3)
+    leftover = {}
+    for f in faces:
+        for i in range(3):
+            a = (int(f[i, 0]), int(f[i, 1]), int(f[i, 2]))
+            b = (int(f[(i + 1) % 3, 0]), int(f[(i + 1) % 3, 1]),
+                 int(f[(i + 1) % 3, 2]))
+            rev = (b, a)
+            if leftover.get(rev, 0):
+                leftover[rev] -= 1
+                if leftover[rev] == 0:
+                    del leftover[rev]
+            else:
+                leftover[(a, b)] = leftover.get((a, b), 0) + 1
+    return not leftover
+
+
+def _prove_mesh_closed():
+    """A triangle is open; a cube is not. Dropping one cube face is the
+    injection, leftover edges rather than a boolean that cannot go red."""
+    tri = np.array([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]])
+    assert not mesh_closed(tri), "a lone triangle must read open"
+    # Unit cube, outward CCW. Each quad is two triangles.
+    quads = [
+        ((0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)),  # -z
+        ((0, 0, 1), (0, 1, 1), (1, 1, 1), (1, 0, 1)),  # +z
+        ((0, 0, 0), (0, 0, 1), (1, 0, 1), (1, 0, 0)),  # -y
+        ((0, 1, 0), (1, 1, 0), (1, 1, 1), (0, 1, 1)),  # +y
+        ((0, 0, 0), (0, 1, 0), (0, 1, 1), (0, 0, 1)),  # -x
+        ((1, 0, 0), (1, 0, 1), (1, 1, 1), (1, 1, 0)),  # +x
+    ]
+    faces = []
+    for a, b, c, d in quads:
+        faces.append([a, b, c])
+        faces.append([a, c, d])
+    cube = np.array(faces, dtype=np.float64)
+    assert mesh_closed(cube), "a cube must read closed"
+    assert not mesh_closed(cube[:-2]), "a cube minus a face must read open"
+
+
 def dump():
     """Tessellate the scene and write it next to its STLs."""
     parts = []
@@ -80,15 +131,17 @@ def dump():
         if name == "board":
             continue
         mesh = product.mesh_of(name, solid)
-        tris = mesh.vertices[mesh.faces].reshape(-1, 3)
+        tris = mesh.vertices[mesh.faces]
+        flat = tris.reshape(-1, 3)
         parts.append({
             "name": name,
             "color": color,
             "alpha": alpha,
             "lift": lift,
-            "count": len(tris),
+            "count": len(flat),
+            "closed": mesh_closed(tris),
         })
-        blobs.append(tris.astype(np.float64))
+        blobs.append(flat.astype(np.float64))
 
     # The real board, with every component's actual package on it. It rides
     # at the slab's lift so it explodes with the rest of the stack, and it
@@ -109,6 +162,7 @@ def dump():
             "alpha": 1.0,
             "lift": 20.0,
             "count": len(flat),
+            "closed": mesh_closed(tris),
         })
         blobs.append(flat.astype(np.float64))
 
@@ -132,8 +186,10 @@ def dump():
     }
     path = OUT / P.OUT_NAME / "geom.json"
     path.write_text(json.dumps(payload))
+    n_closed = sum(1 for p in parts if p["closed"])
     print(f"  {path}  {len(data) / 1024:.0f} KB of int16, "
-          f"{sum(p['count'] for p in parts) // 3} triangles")
+          f"{sum(p['count'] for p in parts) // 3} triangles, "
+          f"{n_closed} closed / {len(parts) - n_closed} open for the section cap")
 
 
 # The part list is also the legend, so the labels have to say what a
@@ -143,8 +199,7 @@ LABELS = {
     "bottom": ("Bottom plate", "printed"),
     "board": ("PCB", "as fabricated, RP2040 + 6\u00d7 Choc v2"),
     "sw": ("Switches", "Kailh Choc v2"),
-    "cap": ("Keycaps", "1U clear ABS"),
-    "led": ("NeoPixels", "under each key"),
+    "cap": ("Keycaps", "wrk. MX Pure, frosted PC"),
 }
 STATUS = [
     ("idle", product.KEY_COLORS[0]),
@@ -576,7 +631,7 @@ function resize(w, h){
 function hex(h){ return [parseInt(h.slice(1,3),16)/255,
   parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]; }
 function group(name){
-  const m = name.match(/^(shell|bottom|board|sw|cap|led)/);
+  const m = name.match(/^(shell|bottom|board|sw|cap)/);
   return m ? m[1] : name;
 }
 
@@ -794,8 +849,10 @@ function render(){
   /* 1b. cap the cut. Per part, because Fusion fills each body in its own
      colour and a single grey cap loses which wall you are looking at.
      The stencil counts front faces against back faces with the clip
-     active: where the plane is inside a closed body the two do not
-     cancel, and that is exactly where the quad is allowed to paint.
+     active: where the plane is inside a body the two do not cancel,
+     and that is exactly where the quad is allowed to paint. The PCB
+     and its packages have no volume -- they are surfaces -- so there
+     is no interior to fill. Those parts are still clipped.
 
      Depth is off while counting so every layer is seen, and back on for
      the quad so the cut face is occluded by anything nearer. */
@@ -809,6 +866,7 @@ function render(){
     gl.bufferData(gl.ARRAY_BUFFER, capQuad(PL), gl.DYNAMIC_DRAW);
     gl.enable(gl.STENCIL_TEST);
     for (const p of solid) {
+      if (!p.closed) continue;
       gl.clearBufferiv(gl.STENCIL, 0, new Int32Array([0]));
       gl.useProgram(prog);
       gl.bindVertexArray(sc.vao);
@@ -1073,5 +1131,6 @@ buildParts(); buildDims();
 
 
 if __name__ == "__main__":
+    _prove_mesh_closed()
     mode = sys.argv[1] if len(sys.argv) > 1 else "dump"
     {"dump": dump, "page": page}[mode]()
