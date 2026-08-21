@@ -590,6 +590,38 @@ def hook_coupon():
     return part
 
 
+def hole_coupon():
+    """The switch-hole row on its own, at the real PLATE_T.
+
+    `coupon()` asks four questions and three of them are answered --
+    PILOT_DIA at 2.95, SCREW_CLEAR_DIA at 3.70, CLEAR_CHAMFER at 0.60,
+    all settled on this machine with this filament. Only HOLE_SWEEP is
+    open, because no Choc v2 had been on the desk. Reprinting the whole
+    thing costs 6.36 cm3 to re-ask three settled questions; this is the
+    row alone, the same reason `clear_coupon()` exists.
+
+    The plate is the real 1.30 -- **that is half of what is being
+    asked.** A Choc v2 clips into the plate, so the hole has to seat the
+    switch *and* the thickness has to hold its clips. A thicker test
+    plate would answer neither.
+    """
+    L = coupon_layout()
+    margin = 3.0
+    hole_pitch = P.SWITCH_HOLE + 4.0
+    n = len(P.HOLE_SWEEP)
+    w = (n - 1) * hole_pitch + P.SWITCH_HOLE + 2 * margin
+    d = P.SWITCH_HOLE + 2 * margin + 6.0
+    xs = [-w / 2 + margin + P.SWITCH_HOLE / 2 + i * hole_pitch for i in range(n)]
+
+    part = _slab(w, d, 2.0, 0.0, P.PLATE_T)
+    for x, dia in zip(xs, P.HOLE_SWEEP):
+        part -= Pos(x, 0.0, -0.1) * extrude(
+            RectangleRounded(dia, dia, P.PLATE_HOLE_R), amount=P.PLATE_T + 0.2)
+        part -= Pos(x, P.SWITCH_HOLE / 2 + 2.5, P.PLATE_T - 0.4) * extrude(
+            _label(f"{dia:.2f}"), amount=0.5)
+    return part
+
+
 def clear_coupon_layout():
     L = coupon_layout()
     n = len(P.CLEAR_SWEEP)

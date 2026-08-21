@@ -57,6 +57,7 @@ def main():
         "bottom": parts.bottom(),
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
+        "coupon-hole": parts.hole_coupon(),
         "coupon-hook": parts.hook_coupon(),
         "end-test": parts.end_test(),
     }
@@ -383,6 +384,30 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening under the "
           f"throat {leaks:5d} leaks / {len(band) * 4} probed")
+
+    # The hole coupon asks two things at once and the plate's thickness
+    # is the second: a Choc v2 clips into it, so a test plate at anything
+    # but the real PLATE_T answers neither question. And the three holes
+    # have to actually differ -- a sweep whose entries come out the same
+    # tests nothing and looks exactly like one that works.
+    hc = built["coupon-hole"]
+    bb = hc.bounding_box()
+    t = bb.size.Z
+    n_want = len(P.HOLE_SWEEP)
+    # Slice the plate and count what is missing -- but only the openings
+    # big enough to be switch holes. Counting every void made it 19, the
+    # engraved digits included, and "at least 3" is then true however
+    # many holes there are.
+    # The slab is *inside* the coupon's outline. Oversizing it by 1 mm
+    # made the surrounding frame a void too, and counting that gave 4 of
+    # 3 -- which is not a failure of the part.
+    slab = Pos(0, 0, t / 2) * Box(bb.size.X - 1, bb.size.Y - 1, t * 0.5)
+    voids = [v for v in (slab - hc).solids()
+             if v.bounding_box().size.X > min(P.HOLE_SWEEP) - 0.5]
+    good = abs(t - P.PLATE_T) < 1e-6 and len(voids) == n_want
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} hole plate {t:.2f} / "
+          f"{P.PLATE_T:.2f} mm, {len(voids)} switch openings / {n_want}")
 
     # The wall's thickness, measured on the solid. A margin can say the
     # constant is 3.00; this says the part is. The fillet it replaces was
