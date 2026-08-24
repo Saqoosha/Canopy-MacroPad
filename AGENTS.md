@@ -20,14 +20,20 @@ what the README does not.
   so it runs on a fresh machine. `--probe` first, always.
 - `docs/canopy-macropad-handoff.md` — the original design brief, vendored
   verbatim. Not edited here.
+- `pcb/` — the custom board: EasyEDA-side scripting in its own
+  `README.md`, and what to do with the fabricated article in `BRINGUP.md`.
 - `case/` — the printed enclosure, parametric in `build123d`. Its own
   `README.md` carries the stack, the print settings and the assembly
   order. Nothing in `firmware/` depends on it and it depends on nothing
-  in `firmware/`; the only shared facts are board dimensions, and those
-  live in `case/params.py` with their source named. The key field is
-  three boards now -- two 4978 breakouts then the NeoKey, left to right
-  -- and `firmware/code.py`'s key numbering follows the case's layout
-  rather than the other way round.
+  in `firmware/`.
+
+  Board dimensions are the shared fact, and `case/params.py` now **loads
+  `pcb/params.py` by path** rather than restating them, so there is one
+  source rather than two that agree until they do not. The key field is
+  one board -- the custom PCB, six Choc sockets on 19.05 -- and both the
+  case and `firmware/code.py`'s key numbering follow it. The older
+  `stacked` and `inline` layouts are gone from the source; the
+  directories of the same names under `case/out/` are their leftovers.
 
 ## Patching files with a script
 
@@ -65,6 +71,20 @@ is gone -- which is how a session lost a finished `case/params.py` while
 tidying up a fault it had just proved. Either commit before injecting, so
 git really is the backup, or copy the file aside and copy it back. The
 reverse substitution works too and has the advantage of asserting.
+
+**In a worktree, use absolute paths for everything.** The shell's working
+directory resets to the repository root between commands, so a relative
+path written while "in" `.claude/worktrees/<name>/` silently addresses the
+*other* checkout -- and because `firmware/code.py`, `tools/mpad.py` and
+`AGENTS.md` all exist in both, nothing errors. It reads as success. One
+session did it three times in an afternoon, each worse than the last: it
+read the main checkout's `code.py` and designed a port against a file that
+had already been ported; it then flashed that same wrong `code.py` to a
+board and read the old firmware's console output as the new firmware's
+test result; and it ran `py_compile` on the unedited copy and reported
+"compiles" for a change that was somewhere else entirely. **The third one
+is the shape to fear** -- not a broken command, a green one, standing in
+for a check that never ran.
 
 ## Editing the case
 
@@ -439,28 +459,58 @@ on a reprint. `stacked` has not been printed at all.
 
 ## Editing the firmware
 
-- **The keypad is two halves and the index space is one.** Keys 0-1 are
-  two 4978 breakouts on GPIO, keys 2-5 a NeoKey on I2C, and `GPIO_BASE`
-  / `SEESAW_BASE` are the only two constants that know which way round.
-  Indices are static: key 2 stays key 2 when the NeoKey is silent,
-  because the host maps index to pane and a silent renumbering focuses
-  the wrong session. That is also why `NUM_KEYS` is a constant 6 and
-  `HELLO <ver> 0` can no longer happen.
-- **One line is the whole four-key build.** Empty `GPIO_KEY_PIN_NAMES`
-  and `SEESAW_BASE` falls to 0, `NUM_KEYS` to 4, and the GPIO setup is
-  skipped whole -- the NeoKey goes back to being keys 0-3. There is
-  deliberately no autodetection: an absent breakout is electrically
-  identical to a present one nobody is pressing, pulled high either way,
-  with no readback on the pixel line and no capacitive sense on an
-  RP2040. Any automatic answer would be a guess, and a wrong guess
+- **Two devices, one file, and `PROFILES` is the whole difference.** The
+  QT Py build is two 4978 breakouts on GPIO (keys 0-1) plus a NeoKey on
+  I2C (keys 2-5); the custom PCB is six switches straight to GPIO and one
+  six-pixel chain. They cannot share a pin table even though they share
+  pin *numbers* -- the PCB was laid out against the QT Py's broken-out
+  GPIO on purpose, so GPIO3 is the breakouts' pixel line on one board and
+  KEY0 on the other. `GPIO_BASE` / `SEESAW_BASE` still know which way
+  round the halves go; the profile decides what the halves are.
+
+  Indices stay static within a profile: key 2 is key 2 when the NeoKey is
+  silent, because the host maps index to pane and a silent renumbering
+  focuses the wrong session. Both real profiles come to `NUM_KEYS` 6, by
+  different sums -- 2 + 4 and 6 + 0.
+- **Pins are GPIO numbers through `microcontroller.pin`, never names
+  through `board`.** `board` carries a per-build name table: all seven of
+  `MOSI`/`MISO`/`SCK`/`TX`/`RX`/`SDA`/`SCL` exist on the QT Py build and
+  **none** of them on the generic `raspberry_pi_pico` build the PCB runs.
+  Both halves of that were read off the two devices, not assumed. Resolve
+  them inside the setup guard, not at module scope, or a wrong-board flash
+  is a silent brick instead of a board that still talks.
+- **The profile is chosen by which CircuitPython *binary* is running, and
+  that is not the detection this file forbids.** Whether a breakout is
+  *wired* is electrically unknowable -- an absent one and a present one
+  nobody is pressing are both pulled high, with no readback on the pixel
+  line and no capacitive sense on an RP2040 -- so that question was always
+  a human's to answer. `sys.implementation._build` is a compile-time
+  string with no guess in it: `adafruit_qtpy_rp2040` and
+  `raspberry_pi_pico`, both read off their own board's REPL.
+  `MPAD_BOARD` in `settings.toml` overrides the table, per device and
+  without editing this file.
+
+  **An unrecognised answer gets no fallback profile.** It claims no pins
+  and no addresses and reports `ERR board ...`, because a wrong guess
   renumbers every key silently -- the one failure this file is built to
-  prevent. Flashing is one file copy, so the person doing the copy is
-  the only honest source of truth. The guard around the setup is not
-  cosmetic: `NeoPixel(pin, 0)` would either raise, giving a four-key
-  board an `ERR gpio pixels` on every connect forever about hardware it
-  never had, or leave an empty group nobody writes to.
-- **A dead NeoKey costs exactly four keys. A dead *cable* costs all
-  six.** The GPIO reads sit outside every guard and each pad's
+  prevent. So `HELLO <ver> 0` is reachable again and now means exactly
+  "this firmware does not know what board it is on". Claiming six keys
+  that resolve to no pins would be a positive claim of health, which is
+  worse than silence.
+- **Each half is skipped whole when its profile entry is empty**, and
+  neither skip is cosmetic. `NeoPixel(pin, 0)` is a zero-length strip --
+  either an exception, and then that board reports `ERR gpio pixels` on
+  every connect forever about hardware it never had, or an empty group
+  nothing writes to. The I2C skip is the mirror: running it on the PCB
+  would import `adafruit_neokey` and call `board.STEMMA_I2C()` on a device
+  with neither, putting `ERR i2c setup ...` on every connect about a bus
+  that cannot be fixed because it was never there. Both would teach a host
+  to ignore the real error.
+- **On the QT Py, a dead NeoKey costs exactly four keys and a dead
+  *cable* costs all six.** None of this applies to the PCB, which has no
+  bus and no cable: everything there is soldered, so the only faults it
+  can have are setup ones. The GPIO reads sit outside every guard and each
+  pad's
   `get_keys()` and each pixel group's `show()` is guarded separately, so
   every I2C fault that leaves the cable plugged in -- a missing library,
   a wrong address, a seesaw that stops answering -- costs only the four
@@ -498,27 +548,31 @@ on a reprint. `stacked` has not been printed at all.
   `boot_out.txt` **from the REPL**, not off the drive: mounting the
   drive is what makes the gate take the other branch and overwrite the
   line you came for.
-- `boot.py` depends on `adafruit_neokey` in `lib/`, which used to be
-  `code.py`'s alone, and holds its own copy of the `0x30` from
-  `PAD_ADDRESSES` **and of the GPIO pin names** — it cannot import
-  `code.py` without running the whole program. The address and the
-  library fail in the harmless direction: the drive stays enabled. The
-  pin names have a second failure mode worth naming, because it is
-  silent: a name that still exists but points at the wrong pin reads
-  high through its pull-up, so keys 0-1 quietly stop opening the drive
-  while the NeoKey's four still do.
+- **`boot.py` carries its own copy of the profile table**, deliberately
+  the smallest one that answers its two questions -- which pins to read,
+  and whether there is a bus worth probing. It cannot import `code.py`
+  without running the whole program, so the duplication is the import
+  that cannot happen rather than an oversight; keeping the copy minimal is
+  what keeps it from drifting.
 
-  That copy is also why **"one line switches the build" is true of
-  `code.py` and not of `boot.py`.** Emptying `GPIO_KEY_PIN_NAMES` gives
-  a four-key firmware; `boot.py` goes on reading `MISO` and `SCK`
-  regardless, and on a board with no breakouts they read high through
-  their pull-ups, so the gate falls through to the I2C path and behaves
-  correctly. Left alone on purpose: deriving one file's constants from
-  the other is the import that cannot happen, and the cost of the
-  asymmetry is two pin reads that always say "not held".
-- `lib/` needs `neopixel.mpy` as well now, for the breakouts' chain.
-  Missing, keys 0-1 report presses and never light, and the host is told
-  `ERR gpio pixels ...`.
+  Every way it can be wrong fails in the harmless direction, which is the
+  property to preserve. A profile that will not resolve raises out of the
+  gate's `try`, and the handler leaves the drive **enabled** -- a board
+  this file does not recognise is exactly a board someone needs to copy a
+  new `code.py` to. A missing library or a wrong address does the same.
+  The one failure worth naming because it is silent: a GPIO number that
+  exists but is wrong reads high through its pull-up, so that key quietly
+  stops opening the drive while the others still do.
+
+  The gate opens on any of the profile's GPIO keys -- two on the QT Py,
+  six on the PCB -- and the seesaw probe with its 0.5 s is skipped
+  entirely when the profile has no addresses.
+- `lib/` needs `neopixel.mpy` on both boards; missing, keys report
+  presses and never light and the host is told `ERR gpio pixels ...`.
+  `adafruit_pixelbuf` is a **core** module, so that one file is the whole
+  pixel dependency. `adafruit_neokey` and `adafruit_seesaw` are needed
+  only by the `qtpy` profile -- the PCB never touches I2C, so their
+  absence there costs nothing and is never reported.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
 
@@ -548,20 +602,34 @@ tools/mpad.py --probe          # expect: PONG 3 6, and CIRCUITPY now gone
 
 Known-good answers, for telling a healthy board from a sick one:
 
-| State | The device says |
-|---|---|
-| healthy | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
-| NeoKey or `adafruit_neokey` missing | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
-| `neopixel` missing | `HELLO 3 6` + `ERR gpio pixels ...`, keys 0-1 dark but still reporting presses |
-| bus lost while running, cable still in | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
-| Qwiic cable unplugged | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, and keys 0-1 dark and stuck unpressed — they draw `VDD` and `GND` off the NeoKey, so the cable carries their power too |
-| firmware died past 60 s uptime | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
-| firmware died inside 60 s | `ERR fatal-halted ...` on every later connect, stays red |
+| State | Board | The device says |
+|---|---|---|
+| healthy | both | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
+| unknown build, no `MPAD_BOARD` | both | `HELLO 3 0` + `ERR board <build> is not one of pcb/qtpy`, no keypad claimed at all. Not a wiring fault |
+| `neopixel` missing | both | `HELLO 3 6` + `ERR gpio pixels ...`, the GPIO keys dark but still reporting presses |
+| NeoKey or `adafruit_neokey` missing | qtpy | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
+| bus lost while running, cable still in | qtpy | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
+| Qwiic cable unplugged | qtpy | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, and keys 0-1 dark and stuck unpressed — they draw `VDD` and `GND` off the NeoKey, so the cable carries their power too |
+| firmware died past 60 s uptime | both | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
+| firmware died inside 60 s | both | `ERR fatal-halted ...` on every later connect, stays red |
 
-USB identity: VID `0x239A`, PID `0x80F8`, product `Canopy MacroPad`,
-manufacturer `Saqoosha`. Two ports enumerate; **never pick by trailing
-number** — only `P` → `PONG` identifies the data port, because the
-console echoes `P` as REPL input and never answers.
+No `ERR i2c` of any kind can appear on the PCB: the profile has no
+addresses, so that half is never built and has nothing to report.
+
+USB identity: product `Canopy MacroPad`, manufacturer `Saqoosha`, VID
+`0x239A`. **The PID is not part of the identity** — `boot.py` sets only
+the strings, so the VID and PID come from the CircuitPython build, and the
+same firmware measures `0x80F8` on the QT Py build against `0x80F4` on the
+PCB's stock Pico build. Both host-side matchers already ignore it, and
+Canopy's `MacroPadDevice.swift` says why it must: pinning a build-owned
+number fails *closed*, and a device that never connects looks exactly like
+a bad cable. Match on the product string.
+
+Two ports enumerate; **never pick by trailing number** — only `P` →
+`PONG` identifies the data port, because the console echoes `P` as REPL
+input and never answers. The suffix is not even stable across ports on one
+machine: the same board read `usbmodem21101` and `usbmodem2101` an hour
+apart.
 
 Tracebacks land on the **console** port, never the data port. Read them
 by interrupting the REPL there (`\x03`) and reloading (`\x04`).
