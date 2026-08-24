@@ -86,6 +86,47 @@ test result; and it ran `py_compile` on the unedited copy and reported
 is the shape to fear** -- not a broken command, a green one, standing in
 for a check that never ran.
 
+**Merging a long-diverged branch here needs two different tests, because
+the documents and the code fail differently.** 36 hunks over 9 files, from
+two lines of work on the same object.
+
+*Code is decided by a measurement, not a preference.* Ask whether one
+side's `params.py` still defines the constants the other side's code
+reads: 0 mentions of `NEOKEY`/`BREAKOUT`/`QTPY` against 119 settled five
+files in one command, because the losing side would not have been a merge
+but a build failure. `_circ_rect` and `_rect_gap` were called 7 times on
+one side and 0 on the other -- dead code, not lost work. Check separately
+that nothing *device-agnostic* rides along: the camera-as-a-quaternion
+work looked like it was only on one side and was already on both (`qBasis`
+6 occurrences either way).
+
+*Documents usually keep both sides, and that is where the trap is.* If the
+other branch **moved** a bullet as well as editing it, the same lesson
+sits inside your hunk and outside it, and "keep both" silently duplicates
+it. Two such pairs went opposite ways in one file -- one where this
+branch's copy was current and the other side's was stale, one where the
+reverse held -- so a strategy flag cannot settle it and reading can.
+
+*Assert every splice, and expect the assertions to earn their keep.* Two
+fired. One caught an assumption about **where** a section began: the other
+side's taxonomy started above the conflict, so taking "its side" would
+have duplicated the first entry. The other caught
+`"A third screw at mid-span"` failing to match **because it wraps across a
+line** -- `replace()` would have returned the string unchanged and dropped
+a fact while reporting success.
+
+*Finish on the build, not on the marker count.* Zero markers means the
+text parses, not that the model holds together; `build.py` ending in `all
+checks passed` is what says the resolved files still agree with each
+other.
+
+**`/merge-cleanup` cannot run from inside the worktree it is cleaning
+up.** The branch is checked out there, so the worktree has to be removed
+before the branch can be deleted, and every step after the merge belongs
+in the primary checkout. Before removing it, confirm the primary repo has
+its own `case/.venv` -- the worktree's is ~570 MB of build123d and goes
+with it.
+
 ## Editing the case
 
 Environment is a venv at `case/.venv`, Python 3.12 (`uv venv --python
@@ -513,45 +554,32 @@ different halves:
   each part `closed`, and the cap loop skips the ones that are not.
   Clipping them is still right; filling a surface is the bug.
 
-## Remaining on the case
+## Where the case stands
 
-`inline` is the layout that exists as a physical object; `stacked` has
-never been printed. **The reasoning behind every settled number is in
-`case/README.md`** -- this is the state, not the story.
+Both halves of the `choc` case are printed and fitting, and every number
+it owns is settled on a part. **The reasoning behind each one is in
+`case/README.md`** -- that is the story, this is only the state. The
+earlier device's `inline` case is likewise finished, assembled and in
+use; its numbers are in the same file, under the sections marked as that
+device's.
 
-Settled on real parts: `SWITCH_HOLE` 14.15, `PEG_DIA` 2.30, `QTPY_SLOP`
-0.40, the USB-C opening, `PILOT_DIA` 2.95 with a Ø3.40 x 0.60 lead-in,
-`SCREW_CLEAR_DIA` 3.70 with `CLEAR_CHAMFER` 0.60, and
-`QTPY_STEMMA_NOTCH` 1.00. The assembled six-key unit added two the model
-could not have: a breakout needs no locating peg (a plate-mount switch
-clips to the top plate and its pins go into the board's socket, so the
-switch ties the two together), and the field's outer edge has no seam to
-press on, which is what `EDGE_RIB_W` is for.
+Nothing on either case is open. The one item that reads like an open
+question is not one: the Ø8 feet leave 0.70 of plate over their recesses
+under the wire channel, and nothing moves -- a Ø8 foot at y ±5.99 in a
+25.99 case cannot clear a channel reaching ±5.60, and the feet are placed
+so it does not rock. The number is the answer, and
+`plate left under the wire channel` holds it.
 
 **A fit is a claim about a distribution, and one assembly is one
-sample.** The notch was on the open list for rounds as "the plug goes in
-but takes some working at, a reprint would want 1.5-2.0", off a single
-impression from a single print. Saqoosha has built several since and the
-plug goes in every time. Every number on this case that held up was felt
-more than once -- `PILOT_DIA` and `CLEAR_SWEEP` side by side on a coupon,
-`SWITCH_HOLE` and `PEG_DIA` across two prints -- and the one that was
-not was also the one that read wrong. When a fit is written up from one
-handling, say that is what it is, and do not let it name a replacement
-number it has not earned.
-
-**The six-key `inline` case is printed, assembled and closing**, at
-13.33 with 4.36 under the boards, an 11.20 wire channel, 3.00 field pads
-and the QT Py's pad pockets and wire notch. The wires have room. The one
-change since that print is the pad pocket running off the near end, which
-removes a rail stub the wires were bending round; it needs no reprint.
-
-Open -- and the list is down to one entry that is not really a question:
-
-- The Ø8 feet sit under the wire channel and leave 0.70 of plate over
-  their recesses. Nothing moves -- a Ø8 foot at y ±5.99 in a 25.99 case
-  cannot clear a channel reaching ±5.60, and the feet are where they are
-  so it does not rock -- so the number is the answer and
-  `plate left under the wire channel` holds it.
+sample.** The Qwiic notch sat on the open list for rounds as "the plug
+goes in but takes some working at, a reprint would want 1.5-2.0", off a
+single impression from a single print; several builds later the plug goes
+in every time at 1.00. Every number that held up was felt more than once
+-- `PILOT_DIA` and `CLEAR_SWEEP` side by side on a coupon, `SWITCH_HOLE`
+and `PEG_DIA` across two prints, `STEM_CLEAR` across two sweeps and then
+the caps themselves -- and the one that was not was also the one that
+read wrong. When a fit is written up from one handling, say that is what
+it is, and do not let it name a replacement number it has not earned.
 
 
 ## Editing the firmware
