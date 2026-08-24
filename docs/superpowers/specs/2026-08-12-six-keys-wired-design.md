@@ -274,11 +274,17 @@ static above.
 1. `python3 -m py_compile firmware/*.py tools/mpad.py`
 2. `MPAD_LAYOUT=inline python build.py` and again for `stacked`, both
    ending in `all checks passed`
-3. meter `VCC` on the NeoKey before wiring anything
+3. ~~meter `VCC` on the NeoKey before wiring anything~~ — dropped, for
+   the reason given under Electrical: the voltage was a proxy, and six
+   pixels side by side answer the question it stood in for.
 4. `tools/mpad.py --probe` reports `PONG 3 6`
 5. `tools/mpad.py --demo` lights six keys; each goes white while held
-6. unplug the Qwiic cable while running: keys 4 and 5 keep reporting,
-   and the host gets the I2C error
+6. ~~unplug the Qwiic cable while running: keys 4 and 5 keep reporting,
+   and the host gets the I2C error~~ — wrong twice. The GPIO pair is
+   keys 0 and 1, not 4 and 5; and the built unit takes the breakouts'
+   power off `JP1`/`JP5`, so pulling the cable takes all six. What this
+   step tests now is any *other* I2C fault: a wrong address or a missing
+   library costs exactly the NeoKey's four.
 7. hold a **breakout** key while plugging in: `CIRCUITPY` mounts. Two
    traps here, both of which make a broken gate look like a working
    one. A `boot.py` change needs a **hard** reset — copying `code.py`

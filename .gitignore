@@ -5,3 +5,4 @@ case/.venv/
 case/out/*/tmp/
 case/out/*/geom.json
 case/ref/*.step
+.claude/worktrees/

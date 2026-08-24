@@ -4,7 +4,6 @@ A two-part printed enclosure for the **custom MacroPad PCB** — one board,
 six Choc sockets on 19.05, its own RP2040 and USB-C. Parametric, in
 `build123d`; the way to change it is to change a number in `params.py` and
 rebuild.
-
 **One layout**, `choc`, and no switch to select it. `params.py` loads
 `pcb/params.py` by path, so the board's width, corner radius, switch pitch
 and pad positions are read rather than restated — the two files cannot
@@ -28,37 +27,47 @@ single-key breakouts on GPIO — driven by a QT Py, and the case came in two
 layouts from one source, chosen with `MPAD_LAYOUT`. They differed only in
 where the QT Py went, and that one decision moved every dimension:
 
-| | `stacked` (default) | `inline` |
+| | `stacked` | `inline` (default) |
 |---|---|---|
 | QT Py | under the keys, **face down** | right of the keys, **face up** |
 | USB-C | back wall, low | right end |
-| size | **97.6 × 27.6 × 17.5** | **120.5 × 26.0 × 11.8** |
-| footprint | 26.9 cm² | 31.3 cm² |
-| to the top of a keycap | 31.9 mm | **26.2 mm** |
+| size | **135.7 × 27.6 × 17.49** | **158.6 × 25.99 × 13.33** |
+| footprint | 37.5 cm² | 41.2 cm² |
+| to the top of a keycap | 31.9 mm | **27.7 mm** |
 | BOOT / RESET | open the case: they face you | open the case: unclip the board |
 | who holds the QT Py | bottom plate, alone | shell from above, plate below |
 | Qwiic cable | **100 mm**, down an end bay | **50 mm**, but with 35 mm of slack to fold into a 12 mm gap |
 | handedness | either end takes the cable | **right-handed**: the cable can only come off the right socket |
 
+One plate spans all three boards, which is why they are one field and not
+three pockets: `KEY_FIELD_W` is `2 × 19.05 + 76.20 = 114.30`, the boards
+are the same 21.59 deep and the same 1.570 thick, and the switch pitch
+carries straight across the seams with nothing to tune.
+
 `stacked` was the compact one and `inline` the low one. Neither was
 strictly better — a shorter pad sits closer to keyboard height, a smaller
 one takes less desk.
 
-![The inline case, closed with keycaps on, and open with the NeoKey and
-the QT Py seated in the shell above the bottom plate](images/inline-built.jpg)
+![The four-key inline case, closed with keycaps on, and open with the
+NeoKey and the QT Py seated in the shell above the bottom
+plate](images/inline-built.jpg)
+`inline` is the layout that exists as a physical object, and it has been
+printed twice: **the four-key case in the photograph, and the six-key one
+that replaced it** — printed, wired, closing, and the pad in use. The
+photograph is the older one; the picture of the six-key unit is the
+wiring shot in the main README, shell turned over.
 
-`inline` is the layout that exists as a physical object. It printed flat,
-without supports, and closed on the first attempt. Four numbers stopped
-being guesses when it did: `SWITCH_HOLE` at 14.15 (a Durock Ice King
-seats correctly), `PEG_DIA` at 2.30 (the NeoKey drops onto the pegs free,
-with a little play), `QTPY_SLOP` at 0.40, and the USB-C opening, where a
-real cable seats fully with about 1 mm around its housing — worth knowing,
-because `USB_PLUG_W/H` were never measured off anything.
+The four-key print took four numbers out of the guess column. It printed
+flat, without supports, and closed on the first attempt: `SWITCH_HOLE` at
+14.15 (a Durock Ice King seats correctly), `PEG_DIA` at 2.30 (the NeoKey
+drops onto the pegs free, with a little play), `QTPY_SLOP` at 0.40, and
+the USB-C opening, where a real cable seats fully with about 1 mm around
+its housing — worth knowing, because `USB_PLUG_W/H` were never measured
+off anything.
 
-Two things the part says that the model does not. `QTPY_STEMMA_NOTCH` at
-1.00 takes some working at — the Qwiic plug does go in, but a reprint
-would want 1.5–2.0. And the M3 has now been driven into a post: it goes,
-but hard enough to be the first thing anyone says about the part. That
+One thing the part says that the model does not. The M3 has now been
+driven into a post: it goes, but hard enough to be the first thing
+anyone says about the part. That
 sent `PILOT_DIA` to the coupon, which settled it at 2.95 — the how is
 under "Print the coupon first" — and put a Ø3.40 × 0.60 lead-in at every
 mouth. The reprinted shell has both and the screw goes in clean.
@@ -70,7 +79,46 @@ time, and it was wrong — see "Print the coupon first", where two rows of
 holes found the real cause under the counterbore. **A plate has been
 printed at Ø3.70 with the 0.60 chamfer and it is right**: the bores come
 out clean, with no filament hanging in them, and the screws go in easily.
-That is the last number on this case to stop being a prediction.
+That is the last *printed fit* on this case to stop being a prediction —
+every hole, post and pocket has now been felt against the real part.
+
+**Then the six-key unit was wired, and three things came back that no
+check could have asked for.** Each one is a fact about assembly rather
+than about geometry, which is exactly the class the boolean cannot see:
+
+- **The wires would not lie down.** `UNDER_BOARD_AIR` went 0.40 → 1.40 on
+  that evidence, so the gap under the boards is 4.36 and the case 13.33
+  instead of 12.33. It bought a shape rather than a size — see *The wires
+  have a trench* below.
+- **A breakout wants no locating peg.** A plate-mount switch clips into
+  the top plate and its pins go into the board's socket, so the switch is
+  what ties the board to the plate; the supports set its height and the
+  shell presses it down. Removing the pegs also removed the only feature
+  that made a breakout look like it had a wrong way round.
+- **The field's outer left edge had nothing pressing on it.** A seam is
+  between two boards, so the leftmost breakout was held on one side only.
+  `EDGE_RIB_W` at 1.50 is the plate reaching down along that edge —
+  more bearing area than the 4.20 circle that will not fit there anyway.
+
+And one that was arithmetic all along: the first six-key unit closed with
+0.2 of gap at the centre of the seam, because the board stack was holding
+the halves apart. `BOARD_CLAMP_SLACK` at 0.20 stops the standoffs acting
+as jacks; the rest is the parts not being flat off the bed, which is what
+the seam step is for.
+
+**One entry came off this list by being done again.**
+`QTPY_STEMMA_NOTCH` at 1.00 was written up as tight — "the plug goes in,
+but a reprint would want 1.5–2.0" — on one impression from one print.
+Several builds later the plug goes in every time and nothing about it is
+a problem, so 1.00 is settled and the reprint knob is not needed. Worth
+keeping as a shape rather than a number: **a fit is a claim about a
+distribution, and one assembly is one sample.** The numbers on this case
+that held up were all felt more than once, side by side or minutes
+apart; this one was not, and it read worse than it was. Nothing checks
+it either way — `mock.py` builds the mated plug at the receptacle's own
+6.00 width, so the plug's width is assumed rather than measured and no
+boolean has an opinion.
+
 `stacked` has never been printed at all.
 
 Print target is a **Bambu A1 mini**, 0.4 nozzle, 0.2 layer, PLA Basic.
@@ -87,7 +135,6 @@ does not cost a reprint of the answers already settled:
 `out/<layout>/coupon-hole.stl` is the switch-hole row, three diameters
 engraved, on a plate at the real `PLATE_T` -- a Choc v2 clips into that
 thickness, so a thicker test piece would answer neither half.
-
 `out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
@@ -185,7 +232,7 @@ To re-settle any of it after a filament or nozzle change: print the
 coupon, drive a screw into each post, drop one through each hole, set the
 numbers to the smallest ones that pass, rerun `build.py`, print the real
 thing. The coupon carries the real features at their real sizes — the
-plate is 1.6 mm and the post is whatever that layout's post is, 7.8 mm
+plate is 1.6 mm and the post is whatever that layout's post is, 9.3 mm
 inline and 13.5 mm stacked — so a fit that works here works in the case.
 
 ## Dummy keycaps
@@ -336,18 +383,20 @@ into the gap. It fits; it is not tidy.
 vertically and at opposite ends of the case; the run is roughly 60 mm
 before bends. Either:
 
-- a **100 mm STEMMA QT / Qwiic cable** — keeps the device's no-soldering
-  property, which the main README argues for at length, or
+- a **100 mm STEMMA QT / Qwiic cable**, or
 - **soldered wires** to the NeoKey's `JP1`/`JP5` headers. Nothing in the
   case needs changing for this: wire takes less room than a plug, and the
   channel is sized for the plug.
+
+The old argument for the cable — that it keeps the pad solder-free — is
+gone either way. The six-key field needs five soldered wires, and the
+`JP1`/`JP5` header is where two of them already land.
 
 ## Build
 
     uv venv --python 3.12 .venv
     uv pip install --python .venv/bin/python build123d trimesh matplotlib
     .venv/bin/python build.py      # must end in "all checks passed"
-
 There is **one layout now**, `choc`, and it writes into `out/choc/`.
 `MPAD_LAYOUT` is gone with the two it used to select: `params.OUT_NAME` is
 the name, and it is not a switch. The `inline` and `stacked` directories
@@ -362,6 +411,12 @@ produced them was removed with the layouts.
     .venv/bin/python webgl.py dump
     .venv/bin/python webgl.py page                    # -> out/viewer.html
 
+**Run all five after every geometry change.** `build.py`
+rewrites only the STLs and STEPs, so a partial sweep leaves the renders
+and the viewer describing the previous shape, which reads as verified
+rather than stale. Note that the shell's exports come out byte-different
+on every run even when nothing changed — see `AGENTS.md`; compare the
+geometry, not the bytes.
 **The viewer is live at <https://saqoosha.github.io/Canopy-MacroPad/>**,
 served off the `gh-pages` branch, which holds nothing but this one file
 as `index.html` plus an empty `.nojekyll`. It is a copy, so it goes stale
@@ -389,7 +444,7 @@ geometry embedded as int16.
 
 It has **orthographic projection and Top / Front / Left presets**, which
 is what makes it usable for reading the design rather than admiring it —
-in ortho a height is a height, and the plan view puts the four keys on
+in ortho a height is a height, and the plan view puts all six keys on
 one line with no foreshortening to argue with.
 
 Four things in it were not obvious:
@@ -432,7 +487,7 @@ Four things in it were not obvious:
 `product.py` and `webgl.py` are the only files here that are not
 load-bearing. Their keycap and switch shapes are eyeballed, nothing checks
 them, and no dimension in either feeds anything else — they exist so the
-pad can be looked at. The four keys wear the status colours from the main
+pad can be looked at. The keys wear the status colours from the main
 README, since what this device is *for* is the one thing a picture of it
 should say.
 
@@ -552,7 +607,7 @@ argument is the same argument this case has, one board fewer.
 
 This one is the `stacked` layout, which is where the Z fight is —
 `inline` puts the QT Py beside the keys instead of under them and comes
-out 11.8 tall against 17.5. Z is measured from the outside of the bottom
+out 13.33 tall against 17.49. Z is measured from the outside of the bottom
 plate. Read it bottom-up — the USB-C shell is the lowest thing in the
 case now, and everything above is stacked on that one clearance.
 
@@ -599,7 +654,10 @@ free length, even the shallowest hook asks it for 19% surface strain
 where PLA yields near 2. It never bent; it was forced.
 
 A cantilever that deflects 0.40 within 2% wants about 5 mm of length and
-this plate is 2.40 thick, so no hook in this geometry can work. **If the
+this plate is 2.40 thick, so no hook in this geometry can work. A third
+screw at mid-span is out for a different reason: the boards fill the case
+wall to wall there, 0.200 between the field and the cavity against the
+5.60 a post needs. **If the
 centre ever lifts, the next thing to try is a magnet pair under the
 boards, not a plastic spring.**
 
@@ -661,7 +719,6 @@ wall and the fit is a clearance between boss and slot, so the two do not
 touch -- but changing the case mid-sweep would mean the coupon and the
 part had stopped being the same thing, which is the one property that
 makes this coupon worth more than a drawn one.
-
 **The wires have a trench, and the case grew for them.** Five have to
 cross the whole field, and the first wired unit would not lie down: the
 space under the boards was 3.36 mm, of which a hot-swap socket took 1.83
@@ -698,10 +755,33 @@ the feet are where they are so the case does not rock. It is a thickness
 rather than a hole, so no boolean sees it and `plate left under the wire
 channel` is what holds it.
 
-**Nothing screws through either PCB.** Four standoffs come down off the
-plate, each ending in a Ø2.3 peg that drops into the NeoKey's M2.5 holes
-and fixes it in X and Y; the bottom plate's columns push it up against
-them. Four M3 button-head self-tappers into the corner posts hold the two
+**Nothing screws through any of the three PCBs**, and the three are not
+held the same way.
+
+The NeoKey is a sandwich. Four standoffs come down off the plate, each
+ending in a Ø2.3 peg that drops into its M2.5 holes and fixes it in X and
+Y; four Ø4.5 columns stand directly under those same holes and push it
+up. Force path straight through the board, no moment anywhere.
+
+**A breakout cannot have that, and the arithmetic is why.** Its mounting
+hole sits 7.62 from its switch centre and a plate-mount switch is 14
+wide, so the hole clears the body by 0.62 where `STANDOFF_DIA` needs
+2.10 — a standoff there fouls the switch by 1.48. So the breakouts are
+pressed at the **seams** between boards instead, which are switch-gap
+centres by construction: 4.20 in the 5.05 that 19.05 pitch leaves, the
+one figure this case already trusts. Nothing can stand above a breakout
+except at those seams, so its push-down and its push-up are never
+collinear, and that is paid for from below — Ø3.0 columns on the seams,
+plus two pads at the field's outer left edge, where no seam reaches. That
+same edge gets `EDGE_RIB_W`, because a seam only exists between two
+boards and the leftmost breakout would otherwise be pressed on one side
+only.
+
+Two Ø2.3 pegs per breakout were in the model and are gone: the assembled
+unit showed the switch already ties the board to the plate through its
+socket. `BREAKOUT_HOLES` stays, because it is board data.
+
+Four M3 button-head self-tappers into the corner posts hold the two
 halves together, and that is every fastener in the design. The 2.5 that
 appears next to the NeoKey is that board's own mounting hole, which takes
 a peg and never a screw — the two threads are unrelated.
@@ -723,6 +803,38 @@ down by two pinch bars on its clear margins with the plate closing
 underneath. There is nothing above it to hide from, so face up costs
 nothing and puts the USB-C out the right end.
 
+**The rails run full width and give way at three points.** They were
+narrowed once, held 1.80 back off the board's edge so they missed the
+castellated pads — which spent clearance along their whole length to
+solve a problem in three places, and left 1.10 mm and 0.89 mm of ledge to
+carry the board. They are 2.90 and 2.69 now, and `QTPY_PADS_USED` cuts a
+pocket where `SCK`, `MISO` and `MOSI` are soldered, and that pocket runs
+off the near end rather than stopping short of the first pad: stopping
+left a 3.671 mm stub of rail between the pads and the notch the wires
+leave through, and every wire had to bend round it. What carries the
+board is the other rail full length and 8.750 of this one past the pads,
+on the side nothing runs along. Which three pads
+those are is a wiring fact, so it lives in `params.py` next to the wiring
+rather than in the geometry.
+
+And the pocket wall gives way too. The frame runs all the way round the
+board, so a wire soldered to JP3 had the board's edge to leave from and
+nowhere to go — the fourth time this case has fitted a board and then
+made itself impossible to wire, after both Qwiic sockets and the USB
+port. `QTPY_WIRE_NOTCH_W`/`_H` open the wall between the pocket and the
+key field, just above the screw post the wires have to clear anyway and
+stopping short of the plate, so what is left is a bridge rather than a
+missing wall. Measured, not guessed: a bundle laid from the pads to the
+channel shared 10.240 mm³ with that wall and nothing with the plate, and
+shares nothing with either now.
+
+Their inner ends are still trimmed to `QTPY_UNDER_X`. The clear strips
+were read off the board by eye and the second one starts at 14.40 while
+the first real component reaches 14.414 — 0.014 inside it, which only
+matters once a rail is pulled onto that boundary, and which the mock
+could not see at all until the QT Py's underside stopped being one
+hand-drawn box.
+
 Switches go in **from the top, through the plate**, after the case is
 closed — the hot-swap sockets mean they stay removable without opening
 anything, and the plate keeps them square while they seat.
@@ -732,22 +844,38 @@ anything, and the plate keeps them square while they seat.
 Different in each layout, because a different half carries the QT Py.
 Both wire up before they close, which is the price of the depth.
 
-**`inline`** — the shell carries both boards; the bottom plate only holds
-them up.
+**Solder the harness first, off the case.** Five wires, and the case has
+no way to add one afterwards: `MOSI` to breakout 0's `NEO_IN` and its
+`NEO_OUT` on to breakout 1, `MISO` and `SCK` to the two `SWITCHA` pads,
+and `VDD`/`GND` for both boards off the NeoKey's `JP1`/`JP5` header —
+which is also `SWITCHC`'s ground. The main README's table is the
+authority on which pad is which, and its warning applies here: the boards
+sit rotated in the case, so reading the silk off a photograph gets the
+harness mirrored.
+
+**`inline`** — the shell locates the QT Py and the NeoKey; the breakouts
+are only laid in, and the bottom plate holds all three up. This is the
+order the built unit was assembled in.
 
 1. Drop the QT Py into the shell's pocket, **face up**, USB-C first into
    the right-end opening, so the pinch bars land on its two clear
-   margins.
+   margins. Its three wires leave through the notch in the pocket wall,
+   above the screw post.
 2. Plug the Qwiic cable into its socket. It faces back toward the NeoKey
-   across the 12 mm gap, and there is a notch in the pocket wall for
-   exactly this.
+   across the 12 mm gap, and there is a second notch in the pocket wall
+   for exactly this.
 3. Drop the NeoKey onto the shell's four pegs and plug the other end into
    its **right** socket — inline is right-handed, the left one has a
    screw post in front of it.
-4. Fold the cable's slack into the gap between the boards. It is 35 mm
+4. Butt the two breakouts onto the NeoKey's left edge. Nothing locates
+   them but the seam standoffs above and the edge rib at the far end; the
+   switches are what will hold them once the plate is on.
+5. Fold the cable's slack into the gap between the boards. It is 35 mm
    longer than the run; nothing is routed for you.
-5. Close the halves, four M3 × 10 button-head self-tappers, four Ø8 feet.
-6. Press the switches in through the plate. Keycaps.
+6. Dress the five wires into the bottom plate's channel — 11.20 wide and
+   1.20 deep, running the length of the field — then close the halves,
+   four M3 × 10 button-head self-tappers, four Ø8 feet.
+7. Press the switches in through the plate. Keycaps.
 
 **`stacked`** — the bottom plate carries the QT Py alone, because the
 NeoKey covers the case wall to wall and nothing above can reach it.
@@ -758,10 +886,15 @@ NeoKey covers the case wall to wall and nothing above can reach it.
    2.5 mm strip ahead of the board.
 3. Drop the NeoKey onto the shell's four pegs and plug the other end into
    either of its end sockets.
-4. Route the slack down whichever end bay the cable came from and lay it
+4. Butt the two breakouts onto the NeoKey's left edge, as `inline`.
+5. Route the slack down whichever end bay the cable came from and lay it
    along the floor. Both bays are open.
-5. Close the halves, four M3 × 10 button-head self-tappers, four Ø8 feet.
-6. Press the switches in through the plate. Keycaps.
+6. Dress the five wires into the plate's channel, then close the halves,
+   four M3 × 10 button-head self-tappers, four Ø8 feet.
+7. Press the switches in through the plate. Keycaps.
+
+That second list is derived from the model, not from having done it:
+`stacked` has never been printed.
 
 ## BOM beyond the boards
 
@@ -770,7 +903,12 @@ NeoKey covers the case wall to wall and nothing above can reach it.
 | STEMMA QT / Qwiic cable | 1 | 100 mm for `stacked`; the existing 50 mm for `inline` |
 | M3 × 10 self-tapping, button head | 4 | into Ø2.95 pilots with a Ø3.40 lead-in, through Ø3.70 clearance chamfered 0.60; counterbored 1.00 so the feet still clear the dome |
 | Ø8 × 2 rubber feet | 4 | 0.5 recess, so they stand 1.5 proud |
-| PLA Basic | ~19 g | shell 10.6 cm³, bottom 7.9 cm³ |
+| 26AWG stranded wire | 5 runs | the channel is sized for 1.30 mm of insulated wire |
+| PLA Basic | ~23 g | `inline`: shell 14.30 cm³, bottom 8.21 cm³ |
+
+Those two volumes come out of `build.py`, which is solid volume; the mass
+is the four-key print's measured ~19 g scaled by it, at the same infill,
+rather than anything weighed.
 
 ## Slicer
 
@@ -785,16 +923,21 @@ Everything default except:
 ## Deliberately not here
 
 - **No tilt.** A wedge means the bottom is no longer flat, which means
-  supports or a second setup, to fix a problem four keys do not have.
+  supports or a second setup, to fix a problem one row of keys does not
+  have.
 - **No BOOT/RESET port.** Removed on request, and it holds up: the buttons
   are needed once, to write a UF2, and four screws is a fine price for
   that. An uninterrupted plate is worth more than a paperclip hole. (Which
   button is which was never settled either — the QT Py schematic's net
   names did not resolve to designators.)
-- **No routed cable channel.** The floor beside the QT Py is open and the
-  cable can lie where it likes. A channel sized for a plug that has not
-  been fitted yet is a guess with walls around it.
-- **No second-board provision.** The end bays would take a daisy-chain
-  cable out through a knockout, and a second NeoKey is a real item in the
-  main README's future. Not built, because nothing needs it yet and a
-  knockout that has never been used is just a weak spot in a wall.
+- **No routed path for the *Qwiic cable*.** The harness has a trench,
+  because five soldered wires have to cross the whole field and there is
+  one place they can. The cable is the opposite case: it is 35 mm longer
+  than its run and the floor beside the QT Py is open, so it lies where
+  it likes. A channel sized for a plug that has not been fitted yet is a
+  guess with walls around it.
+- **No knockout for a daisy-chained board.** The end bays would take a
+  cable out through one. Not built: the six-key field is the design, the
+  main README rules out a second NeoKey on its own grounds (it gives
+  eight keys, not six), and a knockout that has never been used is just a
+  weak spot in a wall.

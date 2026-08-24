@@ -16,8 +16,14 @@ the host: the protocol has one index space and the device reports its
 size. The firmware picks a board profile from the CircuitPython build it
 booted, so neither the wire protocol nor the key numbering moves.
 
-![The inline case, closed with keycaps on, and open with the NeoKey and
-the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
+![The four-key inline case, closed with keycaps on, and open with the
+NeoKey and the QT Py seated in the shell above the bottom
+plate](case/images/inline-built.jpg)
+
+**That photograph is the four-key print**, which is the pad that existed
+before the breakouts. The six-key `inline` case is printed, wired and
+closing; the photograph of *it* is the wiring shot further down, taken
+with the shell turned over. Nothing here is waiting on hardware.
 
 That is the **first** device, in the `inline` case, printed on a Bambu A1
 mini. The enclosure is parametric, and it is also **[a model you can turn
@@ -211,6 +217,22 @@ sockets and their NeoPixels already fitted:
 | QT Py `SCK` | breakout 1 `SWITCHA`, pulled up |
 | NeoKey `JP1`/`JP5` `VIN` | both breakouts' `VDD` |
 | NeoKey `JP1`/`JP5` `G` | both breakouts' `GND`, and `SWITCHC` |
+
+![The same wiring drawn on the assembled boards: every pad named, the
+three signal wires on the top row and the two power wires on the bottom
+one](docs/wiring/wiring-six-key.jpg)
+
+The photograph is the shell turned over, so the face in it is the one the
+wires go on. Pad names and positions in it come out of Adafruit's Eagle
+`.brd` files for the 4978 and the 4980, **not** off the silk in the photo
+— the boards sit rotated in the case, so that silk runs the opposite way
+from the table above, and reading left to right off the picture is how
+you get the wiring mirrored.
+
+`docs/wiring/` holds the photograph and the script that draws on it;
+`python3 docs/wiring/annotate.py` redraws the image. Every coordinate in
+it is a pixel position on `boards.jpg` at its native size, so replacing
+that photograph means re-reading all of them — nothing derives a scale.
 
 Power comes off the NeoKey rather than the QT Py, so only three wires
 cross the case. `JP1` and `JP5` are the headers on the NeoKey's long
@@ -462,17 +484,17 @@ Global brightness 60. Every period is 2000 ms; only the floor changes,
 and that is what separates "alive" from "answer me".
 
 **These values are tuned against a supply voltage nobody has written
-down.** The pixels sit on the incoming Qwiic rail rather than behind the
-NeoKey's regulator, so the number that produced this table is whatever
-the QT Py hands the cable, minus whatever 50 mm of thin Qwiic conductor
-drops under load. Until it is measured the whole table rests on a
-variable. Measuring it:
+down, and that is no longer a debt.** The pixels sit on the incoming
+Qwiic rail rather than behind the NeoKey's regulator, so the number that
+produced this table is whatever the QT Py hands the cable, minus whatever
+the wire drops under load. It was never metered — see
+[Hardware](#hardware): the voltage was only ever a proxy for whether the
+two halves of the keypad match, and six pixels side by side answer that
+directly. They do.
 
-```
-tools/mpad.py --load       # every key full white at brightness 100
-```
-
-Three things about that reading, each of which changes what it means:
+If a number is ever wanted anyway, `tools/mpad.py --load` puts every key
+at full white and brightness 100. Two things about that reading, each of
+which changes what it means:
 
 - **Probe at an LED's `VDD`, not at the QT Py.** The two differ by
   exactly the cable drop being looked for.
@@ -480,12 +502,6 @@ Three things about that reading, each of which changes what it means:
   is not the case that browns out. `--load` exists to produce the other
   one; the shipped brightness of 60 is not what the supply has to
   survive.
-- **Take it at four keys and again at six.** One number cannot separate a
-  cable drop from a regulator giving up; two can, because they fail
-  differently — a regulator at its limit lets go all at once, a cable
-  sags gradually and shifts colour on the way. If six reads much below
-  four, suspect the cable first: it is the cheapest thing in the stack to
-  replace, and a shorter or thicker one needs no redesign.
 
 What the bench actually taught, none of which was predictable on paper:
 
@@ -519,13 +535,16 @@ What the bench actually taught, none of which was predictable on paper:
   construction** — the grey-axis values are corrected individually
   instead, by eye, like every other colour here. The five saturated status
   colours need none of this.
-- **Some of the cast is per-LED, and that part is left alone.** With all
-  four keys set to one value, key 1 reads neutral while 0, 2 and 3 do
-  not. Correcting that needs a per-key gain table, which would be valid
-  for this one assembled unit and wrong for the next — so only the
-  systematic part is corrected, and the residual spread is accepted. Idle
-  is the one colour carrying no hue meaning, so a little variation in it
-  costs nothing.
+- **Some of the cast is per-LED, and that part is left alone.** On the
+  four-key pad, one of the NeoKey's four read neutral at a value the
+  other three did not; on six, one pixel reads faintly purple against the
+  rest. Same finding twice, and the second time it was checked against
+  the supply and cleared — that pixel is on the same node as its
+  neighbours, and they agree. Correcting it needs a per-key gain table,
+  which would be valid for this one assembled unit and wrong for the next
+  — so only the systematic part is corrected, and the residual spread is
+  accepted. Idle is the one colour carrying no hue meaning, so a little
+  variation in it costs nothing.
 - **Equal amplitude does not read as equal motion across hues.** Cyan sits
   near the eye's sensitivity peak and looks far brighter than blue, so the
   same modulation reads as less movement. Cyan's floor is 40 against
@@ -712,14 +731,22 @@ cables sold with phones carry no data pairs), a hub or dock passing power
 but not data, or a dead cable. Try a known-good data cable straight into
 the Mac before suspecting the board.
 
-## Phase 1 scope
+## Where this is
 
 Six keys, USB wired, status out and focus in. **Built, and built twice.**
 
 The first device is an Adafruit QT Py RP2040 with two 4978 breakouts on
 GPIO and a NeoKey on I2C, in the printed `inline` case — the one in the
-photo above. It is assembled, Canopy drives it, and the numbers its
-assembly settled are in [case/](case/).
+photo above. It is assembled, wired, closing, and Canopy drives it.
+
+What that unit settled, none of which the model could have: both halves
+of the keypad read as the same white at `B 100`, so the Snap-Apart
+fallback is not needed; a breakout wants no locating peg, because the
+switch clips to the plate and ties the board to it through its socket;
+the five wires needed a millimetre of case they did not have; and the
+Qwiic pocket's notch, the last thing on that list, is simply fine at 1.00
+several builds later. The rest of its numbers are in [case/](case/), and
+the custom board inherited all of them.
 
 The second is a **custom two-layer PCB** that replaces all of it: one
 board, six Kailh Choc hot-swap sockets on 19.05, six SK6812MINI-E, an
