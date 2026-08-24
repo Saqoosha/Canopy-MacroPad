@@ -209,6 +209,15 @@ one, not necessarily the only one.
   individually said 8 x 0.00936 at x 1.15..1.25, y 0.60..0.65, which is
   a rib; the total said nothing. A sum hides the structure that names
   the cause, and `.solids()` is one call away.
+
+  **A bounding box is a sum too, and it lies the same way.** A probe that
+  catches two features reports one box spanning both, which reads as a
+  single enormous feature: a 4.8-long strip across a cross arm crossed
+  the ring either side of it and returned a 1.200 arm as **4.800**, and
+  the same shape of read said a 0.10 rib was 3.600 long and put material
+  where a plain min/max suggested a solid run. Three times in one
+  afternoon. Any probe whose result might hold more than one piece gets
+  `.solids()` and a length check before its `.size` is believed.
 - **A case-space constant describes one layout.** `WIRE_LANE_Y` was
   written as a pair of case-space numbers off an `inline` scan. `stacked`
   seats the field 0.805 further back, so the same trench went 0.400 into
@@ -234,7 +243,14 @@ one, not necessarily the only one.
 - **Prove a check fires before trusting it**, and **inject the fault by
   moving geometry, not by shrinking it to nothing.** A zero-width `Box`
   makes OCCT throw, so the build dies before the check ever runs and the
-  test proves nothing. Injections also have to isolate one thing: growing
+  test proves nothing. **`&` on a clean part does the same thing**, which
+  is the trap on the other side: build123d raises `Cannot intersect shape
+  with empty compound` rather than returning an empty result, so every
+  clearance check written as a bare `a & b` dies at the first value that
+  actually clears -- twice here, an annulus that came out empty at
+  `CAP_BEAR_DIA` 5.00 and a chained `cap & stem & ribs` the moment the
+  slot cleared the ribs, both killing the run mid-checks. `_shared()` in
+  `build.py` is the guarded form and clearance checks use it. Injections also have to isolate one thing: growing
   `QTPY_LIP` to reach a button grew its height too and tripped a
   different check entirely. Moving the feature 60 mm sideways, or setting
   one diameter past its limit, keeps the fault where it was aimed.

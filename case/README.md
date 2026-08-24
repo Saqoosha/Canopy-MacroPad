@@ -97,6 +97,7 @@ can settle, and getting them wrong costs a two-hour reprint:
 | switch into the square hole | `SWITCH_HOLE` | **settled at 14.00 on a Choc v2** — all three swept holes take the switch and 14.00 is the one that grips. It won at the bottom of the sweep, so tighter was never printed; the direction of better is tighter and a hole that grips is the whole requirement. `out/<layout>/coupon-hole.stl` asks this on its own, at the real `PLATE_T`, since the plate's thickness has to hold the clips too. The 14.15 above it is the **MX** answer from the three-board case and does not carry over: 13.95 nominal plus this machine's 0.15 hole shrink predicted 14.10, and 14.00 is what grips, so the shrink is not one number across features |
 | M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
 | M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled, and confirmed on a printed plate** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
+| a printed cross socket onto a real stem | `STEM_CLEAR` | **settled at 0.00**, across two sweeps and then on the caps themselves. `out/<layout>/coupon-stem.stl` asks it alone, four tokens at 0.00 to 0.10; what the number is really against is the arm's retention ribs, and *Dummy keycaps* carries why 0.00 is a floor rather than an untested edge |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
 `PILOT_DIA` was the last one open, and the only one the coupon could
@@ -190,7 +191,8 @@ inline and 13.5 mm stacked — so a fit that works here works in the case.
 ## Dummy keycaps
 
 The wrk. MX Pure set is ordered and is not here, so `out/choc/keycap.stl`
-is a blank 1U to press in the meantime — 0.64 cm³ each, six of them.
+is a blank 1U to press in the meantime — 0.65 cm³ each, about 0.8 g in
+PLA, and six are printed and on the switches.
 It carries the photographed cap's envelope, 18.40 square on a 4.20
 corner, so the swap when the real ones land changes the plastic and
 nothing else.
