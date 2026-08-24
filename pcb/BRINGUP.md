@@ -10,6 +10,45 @@ firmware and its bring-up console. This board does not run that firmware
 yet: `firmware/code.py` uses QT Py pin names and half its code is an I2C
 NeoKey that does not exist here.
 
+## The boards are a revision the EasyEDA document no longer is
+
+Check this before reordering. The fabricated boards carry **88 vias**; the
+live document has **97**, and the nine extra are a 3x3 grid on 1.0 mm
+pitch at x 119.5/120.5/121.5, y 10/11/12 — dead centre on U3, all on GND.
+That is the RP2040's **stock exposed-pad via array**, which
+`thermal_fanout.py` exists to remove: the board uses no via-in-pad
+process, so the exposed pad is fanned out to ordinary vias *outside* pad
+57's paste area instead. Reordering from the document as it stands would
+either need filled-and-capped via processing or wick solder off the
+thermal pad during reflow.
+
+**The boards are the correct revision. The document is the regressed
+one.** Nothing here was designed to change; it came back on its own,
+after the Gerber was exported (the drill file is stamped 2026-08-17
+17:50:17 and matches the 88).
+
+The project's own guard says so without ambiguity — `python3
+via_in_pad.py` against the live document reports all nine as
+`U3.57 GND ... centre`, and its docstring is explicit that every annular
+overlap here "is unexpected and remains a build failure". Two commands
+settle the question at any time:
+
+```
+unzip -p out/manufacturing/canopy_macropad-gerber.zip \
+  Drill_PTH_Through_Via.DRL | grep -c '^X'     # what was fabricated
+python3 via_in_pad.py                          # what the document is now
+```
+
+**And the export cannot catch this.** `all.sh` runs `thermal_fanout.py`
+and `via_in_pad.py`; `export_manufacturing.py` runs neither. Its checks
+are about file completeness — both copper layers present, U1 in the BOM
+and the CPL — so it will happily produce a Gerber from a document
+`all.sh` would reject. DRC will not catch it either: a same-net via in a
+same-net pad is electrically legal, and it is a manufacturing decision
+rather than a rule violation. **Run `./all.sh` before an export, not
+after**, and treat a clean `export_manufacturing.py` as saying nothing
+about the design.
+
 ## What JLCPCB populates, and what it leaves for you
 
 Economic PCBA on the bottom side assembles only what the quote in

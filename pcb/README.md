@@ -440,6 +440,18 @@ unavailable C2940195 XSON part is absent; and that U1 is present in the CPL.
 Passing export checks prove file completeness, not DRC cleanliness, so run the
 EasyEDA DRC panel immediately before upload.
 
+**And run `./all.sh` before the export, not after.** The exporter runs
+none of the design guards -- not `via_in_pad.py`, not `thermal_fanout.py`
+-- so it will produce a perfectly complete Gerber from a document `all.sh`
+would reject. This is not hypothetical: U3's stock 3x3 exposed-pad via
+array reappeared in the live document after one export, nine GND vias
+straight through pad 57, which is exactly the via-in-pad this board is
+built to avoid. DRC does not catch it either, because a same-net via in a
+same-net pad breaks no rule -- it is a manufacturing decision. The first
+fabricated boards escaped only because the export happened before the
+regression rather than after it. `pcb/BRINGUP.md` carries the two commands
+that compare a fabricated drill file against the document at any time.
+
 The board is now a dedicated two-layer redesign: Bottom carries the GND pour,
 Top carries the 3V3 pour and backbone, and every signal and power net has an
 explicit ordinary-copper path. Do not reuse an older four-layer Gerber archive.
