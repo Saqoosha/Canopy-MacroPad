@@ -73,14 +73,18 @@ any desk toy is, and a mounted volume disappearing makes macOS say
 using. Ejecting first works and nobody does it.
 
 **Hold any of the six keys through a boot and `CIRCUITPY` mounts as
-before.** Any hard reset counts — replug, `RST`, or
-`microcontroller.reset()` — since that is when `boot.py` runs. The GPIO
-pair is read first, because two pin reads cost nothing against the
-seesaw's 0.5 s software reset, and a key held there skips the bus
-entirely. On the I2C side only `0x30` is probed, so a second NeoKey's
-keys would not work as the gate. The drive then stays mounted for the
-rest of the session, so an edit-and-copy loop needs the finger only
-once.
+before.** Any hard reset counts — replug, `RST` where there is one, or
+`microcontroller.reset()` — since that is when `boot.py` runs. The drive
+then stays mounted for the rest of the session, so an edit-and-copy loop
+needs the finger only once.
+
+How the six are read differs by board, and `boot.py` carries its own small
+copy of the profile table to know which. On the **PCB** all six are GPIO
+and there is no bus to probe. On the **wired pad** the GPIO pair is read
+first, because two pin reads cost nothing against the seesaw's 0.5 s
+software reset and a key held there skips the bus entirely; on the I2C
+side only `0x30` is probed, so a second NeoKey's keys would not work as
+the gate.
 
 Rather than enumerate the ways the read can fail, state the property
 that holds by inspection: **`disable_usb_drive()` is reachable on
@@ -118,6 +122,47 @@ not run again until the board does.
 
 ## Hardware
 
+Two devices, so two bills of materials. The custom PCB is the current one
+and replaces every board in the other; the wired pad is still assembled
+and still works, and the numbers its assembly settled are inherited whole.
+
+### The custom PCB
+
+One board, 139.60 × 21.59 mm, two layers, 1.6 mm, fabricated and partly
+assembled by JLCPCB. Designed in EasyEDA by script — `pcb/README.md` for
+that side of it, `pcb/BRINGUP.md` for what to do with the article when it
+arrives.
+
+| Ref | Part | LCSC | Role |
+|---|---|---|---|
+| U3 | RP2040 | C2961140 | controller, CircuitPython |
+| U1 | W25Q64JVSSIQ | C179171 | 8 MB QSPI flash |
+| U2 | ABM8-272-T3 | C9900091606 | 12 MHz crystal |
+| U4 | XC6206P332MR-G | C5446 | 3V3 LDO, everything sits behind it |
+| D1 | USBLC6-2SC6 | C323793 | USB ESD |
+| USBC1 | TYPE-C-31-M-12 | C165948 | USB-C receptacle |
+| LED1-6 | SK6812MINI-E | C5149201 | reverse-mount pixels, one chain on GPIO25 |
+| SK1-6 | CPG135001S30 | — | Kailh Choc hot-swap sockets, 19.05 pitch |
+| SW1 | TS263065A | — | BOOT, beside the USB-C |
+| R3, R4 | 27 Ω | C25100 | USB D+/D− series |
+| R5, R6 | 5.1 kΩ | C25905 | USB-C CC pulldowns |
+| R1, R2 | 1 kΩ | C11702 | BOOT series, crystal damping |
+| — | Kailh Choc v2 ×6 | — | low-profile, hot-swappable |
+| — | wrk. MX Pure keycaps ×6 | — | frosted PC |
+
+Everything is on the **bottom** face — the Gerber archive carries a bottom
+paste layer and no top one, which is the quickest way to confirm it. No
+Qwiic cable, no inter-board wiring, and nothing hangs off an unregulated
+rail: the pixels' `VDD` and the RP2040 both sit on 3V3 behind U4. That
+last one is a real difference and not a detail — see `pcb/BRINGUP.md` for
+what it cost to check, and for why the pixels run below their own
+datasheet minimum on purpose.
+
+### The wired pad, which came first
+
+Still assembled, still driven by Canopy, and the source of every number
+the case inherited.
+
 | Part | SKU | Role |
 |---|---|---|
 | Adafruit QT Py RP2040 | ssci 7211 / ADA-4900 | controller, CircuitPython |
@@ -126,6 +171,16 @@ not run again until the board does.
 | Qwiic cable 50mm | ssci 6896 / SFE-PRT-17260 | QT Py ↔ NeoKey |
 | Durock Ice King Linear ×6 | — | MX compatible, clear housing |
 | Clear ABS keycaps ×6 | — | placeholder for printed caps |
+
+Everything from here to this section's last paragraph is that device —
+the cable, the five wires, the power tap, the rail argument. None of it
+describes the PCB, which has one board and no cable at all.
+
+One thing in there does carry over, because it is physics rather than
+wiring: **an SK6812's green and blue dies drop out first**, so a sagging
+rail reads as a warm shift and not as darkness. The PCB runs the same
+family on 3V3 deliberately, and that sentence is why a white pixel is the
+sensitive test for its rail — `pcb/BRINGUP.md` uses it twice.
 
 **Why not a second NeoKey 1x4**: it gives eight keys, not six, and is
 152 mm of board. **Why not the Snap-Apart 5x6 broken to 1x6**: one
@@ -478,6 +533,16 @@ What the bench actually taught, none of which was predictable on paper:
 
 ## Bring-up
 
+**This is the wired pad's procedure.** The PCB's is different in its first
+two steps and has its own file: [`pcb/BRINGUP.md`](pcb/BRINGUP.md). Three
+things differ and each will stop you. It has **no RST button** — SW1 is
+BOOT and there is nothing to tap, so the bootloader is entered by holding
+SW1 through a plug-in (or by bridging its bare footprint, before SW1 is
+soldered). It runs a **stock `raspberry_pi_pico` build**, not the QT Py
+one. And its `lib/` needs **`neopixel.mpy` only** — `adafruit_neokey` and
+`adafruit_seesaw` are for a bus it does not have, and their absence is
+never even reported. Everything from step 3 down is the same on both.
+
 1. With USB connected, **hold BOOT, tap RST, release BOOT** → the
    `RPI-RP2` volume appears. Double-tapping RST did not work here on
    2026-08-08 with CircuitPython 10.2.1. Drop the [CircuitPython
@@ -489,7 +554,8 @@ What the bench actually taught, none of which was predictable on paper:
    `neopixel` is the one the breakouts need; without it keys 0-1 still
    report presses and simply never light, and the host is told
    `ERR gpio pixels ...`. `adafruit_hid` is not needed and must not be
-   used.
+   used. `adafruit_pixelbuf` is a core module and is not in the bundle
+   list for that reason.
 3. Copy `firmware/boot.py` **and** `firmware/code.py` to `CIRCUITPY/`,
    then **hard reset**. `boot.py` only re-runs on a hard reset, and only
    a hard reset re-enumerates USB, which is what actually applies the CDC
@@ -575,6 +641,11 @@ coupling both halves went out of their way to avoid.
 
 ### When the keypad is missing
 
+**The wired pad only.** The PCB has no bus and no cable, so its profile
+carries no I2C addresses and that whole half of the firmware is never
+built — no `ERR i2c` of any kind can appear on it. Its equivalent failure
+is a different one, `ERR board`, below.
+
 `board.STEMMA_I2C()` raises `RuntimeError: No pull up found on SDA or SCL`
 when the Qwiic cable is not seated — the I2C pull-ups live on the NeoKey
 board, not the QT Py. The firmware catches this and keeps the serial half
@@ -591,20 +662,44 @@ the same path and reads `ERR i2c setup ImportError: no module named
 'adafruit_neokey' (reset required after fixing)`. `code.py` builds both
 from one `"setup {}: {}"`.
 
-**The key count does not drop.** It used to: `HELLO <ver> 0` meant
-"device present, keypad absent". It cannot any more, because the GPIO
-half cannot fail to enumerate and key 2 has to stay key 2 whether or not
-the NeoKey answered — the host maps index to pane, and letting the
-boards renumber when a cable is out would quietly focus the wrong
-session. So the count is always 6 and the `ERR` is what says which half
-is missing. The host should hold the connection and paint normally; the
-four keys behind the missing board simply do not light, and writes to
-them are dropped in silence exactly like an out-of-range index.
+**The key count does not drop for a missing keypad.** It used to:
+`HELLO <ver> 0` once meant "device present, keypad absent". It stopped
+meaning that, because the GPIO half cannot fail to enumerate and key 2 has
+to stay key 2 whether or not the NeoKey answered — the host maps index to
+pane, and letting the boards renumber when a cable is out would quietly
+focus the wrong session. So for any hardware fault the count is 6 and the
+`ERR` is what says which half is missing. The host should hold the
+connection and paint normally; the four keys behind the missing board
+simply do not light, and writes to them are dropped in silence exactly
+like an out-of-range index.
 
 `CIRCUITPY` comes back in this state, because the same missing keypad
 fails the drive gate open. That is a useful tell rather than a second
 fault: drive present *and* two ports means the gate could not read the
 keypad, and the keypad is what to go and look at.
+
+### When the firmware does not know what board it is on
+
+`HELLO <ver> 0` is reachable again, with one meaning and only one: the
+board profile did not resolve. It arrives with
+
+```
+HELLO 3 0
+ERR board build 'something' is not one of pcb/qtpy (set MPAD_BOARD in settings.toml)
+```
+
+and the device claims no pins and no addresses at all. That is deliberate.
+The profile is chosen from `sys.implementation._build`, a compile-time
+string, and if it is not in the table the firmware has no honest way to
+guess: a wrong guess renumbers every key silently, which is the one
+failure the whole file is arranged to prevent. Claiming six keys that
+resolve to no hardware would be a positive claim of health, and that is
+worse than saying nothing.
+
+It is not a wiring fault and no amount of looking at the board will fix
+it. The fix is one line in `CIRCUITPY/settings.toml` — `MPAD_BOARD="pcb"`
+or `"qtpy"` — and a reset; no reflash. The most likely cause is a
+CircuitPython upgrade that renamed a build.
 
 ### When nothing enumerates
 
