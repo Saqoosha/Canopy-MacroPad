@@ -1,0 +1,192 @@
+# pcb/ — bringing the fabricated board up
+
+`README.md` next to this file is the design half: how to drive EasyEDA
+from Python and every way that API has bitten. This file is the other
+half — what to do when the boards arrive from JLCPCB, in what order, and
+which of those steps prove less than they look like they prove.
+
+The root `README.md` and `AGENTS.md` describe the **QT Py** build's
+firmware and its bring-up console. This board does not run that firmware
+yet: `firmware/code.py` uses QT Py pin names and half its code is an I2C
+NeoKey that does not exist here.
+
+## What JLCPCB populates, and what it leaves for you
+
+Economic PCBA on the bottom side assembles only what the quote in
+`README.md` marks as required — U3 (RP2040), U1 (flash), U2 (crystal), U4
+(LDO), USBC1, D1 and every passive. **SW1, LED1-6 and SK1-6 come DNP**,
+which is what that section asked for. A board with no BOOT button is the
+expected delivery, not a fab error.
+
+Everything is on the **bottom** face. The Gerber archive carries
+`Gerber_BottomPasteMaskLayer.GBP` and no top paste layer at all, which is
+the quickest confirmation of that.
+
+## The order to test in
+
+Each step exists because it can be done before the next one, and because
+a failure at that step is cheaper to find there. **The value of the list
+is as much in what each step cannot see as in what it checks.**
+
+1. **Visual, against the render.** `out/board-final.png` and
+   `out/board-large.png` are **stale**: both predate SW1 moving beside
+   USB-C (`layout.py`'s own comment says "it lives beside USB-C *now*"),
+   so SW1 is simply not drawn in them. The Gerbers come from the live
+   EasyEDA document and are correct; only the figures are old. Read
+   `out/manufacturing/canopy_macropad-cpl.xlsx` for where a part actually
+   is — it is generated from the same export.
+2. **Shorts, before any power.** VBUS-GND and 3V3-GND. A short here and a
+   plugged-in board is a damaged host port.
+3. **Power, ideally metered.** 3.30 V out of U4.
+4. **Plug in and look for `RPI-RP2`.** This proves U4 and the 3V3 rail,
+   the RP2040 itself, the crystal (the bootrom's USB needs the 12 MHz
+   XOSC), and the whole USB path — connector, D+/D-, the 27 R series
+   pair, the 5.1 k CC pair, the USBLC6.
+
+   **It does not prove the flash.** An RP2040 falls into BOOTSEL when its
+   flash is blank, when it is dead, and when it is absent, and all three
+   look exactly like a healthy first boot. On a fresh board the flash *is*
+   blank, so this step is guaranteed to succeed and tells you nothing
+   about U1.
+5. **Write a UF2.** This is the flash test, and it is the first step that
+   can fail for a reason the previous ones could not see. `CIRCUITPY`
+   appearing means the flash was erased, written and read back.
+6. **KEY traces, with nothing soldered.** Pull each KEY GPIO up and
+   bridge a hot-swap socket's two pads with tweezers — pad 1 is `KEYn`
+   and pad 2 is GND (`place_mcu.py`'s net map), so a bridge is
+   electrically what the switch does and needs no separate ground lead.
+   Six traces, RP2040 ball to socket pad, before committing any solder.
+7. **LED1 only.** It is the head of the chain (`GPIO25 -> LED1.DIN`);
+   every later pixel is fed by the one before it, so no other LED can be
+   tested alone.
+8. **The rest, then the chase.** See "a chain diagnoses itself" below.
+
+## Three ways into the UF2 bootloader
+
+All three watched working on the built board. Worth knowing all of them,
+because the first one does not exist until SW1 is soldered and the third
+does not exist until the board runs CircuitPython.
+
+- **Hold SW1 through a plug-in.** The normal way, once SW1 is on.
+- **Bridge SW1's bare footprint.** The pads are live with no part on
+  them: pad A goes through R1 (1 k) to `QSPI_SS`, pad B to GND. Bridge
+  **across the 3.4 mm lead span**, not the 1.8 mm pitch — the two pads
+  sharing a column are the same net and shorting them does nothing. Hold
+  the bridge *while* plugging in; the RP2040 only samples `QSPI_SS` at
+  power-on.
+- **From the CircuitPython REPL.**
+  ```python
+  import microcontroller
+  microcontroller.on_next_reset(microcontroller.RunMode.BOOTLOADER)
+  microcontroller.reset()
+  ```
+
+There is no reset button on this board, so before flashing anything onto
+a bare board it is worth knowing which of these is available.
+
+## Measured on the board
+
+Numbers from the first assembled unit, usable as a baseline for the next
+one.
+
+| Fact | Value |
+|---|---|
+| Board UID | `DF6590575F5D2026` |
+| CPU | 125 MHz — the PLL locked to the 12 MHz XOSC, so CircuitPython running at all proves U2 |
+| `CIRCUITPY` free | 7,308,288 bytes |
+| Die temperature, idle | ~31.8 °C |
+| KEY0-5 | GPIO 3, 4, 6, 20, 5, 24 — measured in order, no swaps, no shorts |
+| PIXEL | GPIO25 |
+| Debounce that holds | 3 samples at 5 ms; every press of a real Choc measured 142 ms or longer |
+
+**7 MB means the flash *reported* 8 MB.** CircuitPython reads the JEDEC
+capacity at runtime, which is why a build compiled for a 2 MB Pico
+exposes 7 MB here. It confirms U1 is the W25Q64 and that QSPI works; it
+is not a surface test, because formatting writes structures, not every
+block.
+
+**SK6812MINI-E runs on the 3V3 rail**, which is below its 3.7 V datasheet
+minimum. Red, green and blue all came up at full strength — and blue is
+the one that would have died first, having the highest forward voltage, so
+its survival is the meaningful half of that result. The rail was chosen on
+the other side of the trade: at 3V3 the RP2040's 3.3 V output clears the
+part's `0.7 * VDD` = 2.31 V input threshold with room, where a 5 V rail
+would have put 3.3 V against 3.5 V.
+
+**`neopixel_write` is a core module** on the RP2040 port, so the pixels
+need nothing in `lib/`. Its argument is the whole chain's buffer, three
+bytes per pixel, **GRB on the wire**.
+
+## A chain diagnoses itself
+
+LED4 came out a visibly different colour from the other five, and it was
+fixed by reflowing without desoldering anything, on this reasoning:
+
+**Data passed through LED4 and reached LED5, and LED5 was correct.** That
+alone proves LED4's DIN, its internal IC and its DOUT are all healthy —
+the digital path is not a suspect, by evidence rather than by probing.
+What remains is VDD and GND. A half-wetted supply joint adds resistance,
+and blue and green starve first, so the symptom of a bad supply pad on a
+chained pixel is *one pixel gone warm*. Reflowing its supply pads fixed
+it; the part was innocent.
+
+This only works because the part sits in a chain. An isolated LED offers
+no such evidence and has to be metered.
+
+Which is also what the **chase** phase of a pad test is for: light one
+pixel at a time, 0 through 5. It is the only test that *locates* a broken
+hop — everything downstream of a dead link stays dark, so the index where
+the walk stops names the break (stops after N ⇒ `N.DOUT -> (N+1).DIN`).
+In every other pattern, a downstream failure just looks like "some LEDs
+are off".
+
+## Two things a host-side log cannot tell you
+
+Both of these produced a confident-looking pass on this board before
+someone noticed what they were actually reporting.
+
+- **A console log proves the firmware sent the data, not that a pixel
+  lit.** A chase printing `chase 0` through `chase 5` prints exactly the
+  same lines on a board with no LEDs on it at all. Only the person
+  looking at the board can answer that one, so ask them what they saw
+  rather than reporting the log as a result.
+- **Change-only logging cannot see a stuck input.** A KEY net shorted to
+  GND on the board reads low from the very first sample and never
+  produces an edge, so it is invisible in a log of transitions. Print the
+  **initial** state, and repeat it in a heartbeat — all six reading high
+  is itself a fab-defect check, and it costs nothing.
+
+## Driving the board from the host
+
+`tools/mpad.py` does not apply yet: it looks for the two-CDC device
+`firmware/boot.py` creates, and a stock CircuitPython build enumerates one
+console port only. Until the firmware is ported, the console port is the
+whole interface.
+
+Two things about it, the second of which is the fix for the first:
+
+- **`code.py`'s startup prints are emitted before a host can reattach**
+  after a reset, so they are dropped. Watching the console for a
+  boot-time line is not a test.
+- **Attach first, then force a reload.** `\x03` stops `code.py` and
+  prints *"Press any key to enter the REPL"* — and that next key is
+  consumed opening the prompt, so send it alone and wait to actually see
+  `>>>`. Then `\x04` re-runs `code.py` with the host already listening,
+  and the startup lines arrive.
+
+Copying `code.py` to `/Volumes/CIRCUITPY/` triggers auto-reload, which is
+a **soft** reset — enough for `code.py`, never enough for `boot.py`. And
+`rm` the `._*` AppleDouble files macOS leaves behind.
+
+## Open
+
+- **Six pixels at full white may exceed the LDO.** U4 is an XC6206P332,
+  a 200 mA class part, and six SK6812MINI-E at full white on 3V3
+  estimates to 180-240 mA. Nothing has metered it, and bring-up
+  deliberately never drove that state — the pad test's all-on phase is
+  held at 64. This is the next number to measure, with a meter inline.
+- **The flash has not been surface tested.** Writing and reading back the
+  full 7 MB would turn "the flash reports 8 MB" into "8 MB works".
+- **`firmware/` is still the QT Py build.** Pin names, the whole I2C
+  NeoKey half, and `boot.py`'s drive gate all need porting. The
+  measurements in this file are what that port should be built on.

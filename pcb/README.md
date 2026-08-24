@@ -1,9 +1,14 @@
-# pcb/ — bring-up and known API traps
+# pcb/ — EasyEDA bring-up and known API traps
 
 The board's own geometry, licensing, and what it's cloned from are in
 `NOTICE.md`. This file is the operational half: how to talk to the EasyEDA
 client from Python, and the specific ways the API has already bitten this
 project.
+
+**`BRINGUP.md` is the other kind of bring-up** — what to do with the
+fabricated boards once they arrive from JLCPCB, in what order, and which
+of those steps prove less than they appear to. Nothing here needs the
+physical board; nothing there needs EasyEDA.
 
 ## Starting the bridge
 
