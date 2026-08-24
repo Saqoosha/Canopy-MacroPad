@@ -529,6 +529,16 @@ on a reprint. `stacked` has not been printed at all.
   it is told. Which pane, which status, when to pulse — all host-side.
   Resist moving policy down here; the split is what keeps the protocol
   portable to BLE.
+- **Low-brightness smoothing is the known open improvement.**
+  `PULSE_GAMMA` is 1.0 because a deep pulse at low global brightness runs
+  out of 8-bit levels near its floor, and the perceptual curve was spent
+  to keep the levels rather than the other way round. Temporal dithering
+  is the actual answer and is cheap here -- the pulse already repaints at
+  50 Hz. It was investigated once on the QT Py, on scratch scripts that
+  only ever lived on that board's `CIRCUITPY`; **their conclusions do not
+  carry to the PCB**, whose pixels are a different part on a regulated
+  3V3 rail rather than the QT Py's unregulated Qwiic one. The constant's
+  own comment carries the detail.
 - **An uncaught exception is indistinguishable from a dead board.**
   CircuitPython drops to the REPL, the data port goes silent, and the
   LEDs freeze at their last value. Every I2C touch in the main loop is

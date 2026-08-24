@@ -273,6 +273,24 @@ DEFAULT_PULSE_PERIOD_NS = 2_000_000_000
 # trades the perceptual curve for movement that never runs out of steps.
 # 1.0 makes the exponentiation an identity; it is kept as a retunable
 # knob, not left behind by accident.
+#
+# The knob exists because the underlying problem was not solved, only
+# stepped around: at low brightness there are not enough levels, and 1.0
+# spends the perceptual curve to keep what levels there are. **Temporal
+# dithering is the improvement this is waiting for** -- trading update
+# rate for effective depth, which is the standard answer to running out
+# of amplitude resolution, and cheap here because the pulse already
+# repaints at 50 Hz (`PULSE_STEP_NS`).
+#
+# It was investigated once on the QT Py, on scratch scripts that live on
+# that board's CIRCUITPY and were never committed. Do not treat their
+# conclusions as carrying over: the PCB changed the premise underneath
+# them. Its pixels are SK6812MINI-E on the regulated 3V3 rail, below
+# their own datasheet minimum, where the QT Py's hang off the
+# unregulated Qwiic rail and are a different part on two separate
+# chains. How the bottom of the range quantises is a property of the
+# driver and its supply, so the measurement is worth re-running here
+# before anything is tuned.
 PULSE_GAMMA = 1.0
 
 # How long a color or floor change takes to complete. An instant switch
