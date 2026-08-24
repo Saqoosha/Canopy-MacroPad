@@ -90,13 +90,32 @@ naming this exact fix.
   centres to copper already touching those pads. The final Net panel must say
   `Ratlines (0)`; hiding the Ratline layer is not verification.
 
-- **`pcb_Drc.check()` can redraw stale yellow X markers even when it finds no
-  current violation.** On this board the call exceeds the bridge's fixed 30 s
-  timeout, and this EasyEDA release has also rejected the asynchronous result
-  with an internal `Error: undefined`. Do not scrape the editor's private tab
-  state and call that a DRC result. Run **Design -> Check DRC** in the client
-  and read the bottom DRC panel; the required result is `All (0)`. If an
-  interactive DRC has left old Xs behind, use **Design -> Clear Errors** once.
+- **`pcb_Drc.check()` still exceeds the bridge's 30 s timeout, and the
+  button's speed says nothing about that.** Both halves are measured on the
+  same board minutes apart: the client's **Check DRC** finishes in about a
+  second, while `pcb_Drc.check(false)` through the bridge times out at
+  30000 ms. They are different paths, not a fast case and a slow case, so
+  "DRC is slow here" is the wrong lesson to carry — it is quick, and worth
+  running often. What cannot be done is *scripting* it, which is why the
+  export still has no automated DRC gate. This release has also rejected the
+  asynchronous result with an internal `Error: undefined`, and the call can
+  redraw stale yellow X markers even when it finds no current violation.
+
+  So: run **Design -> Check DRC** in the client and read the bottom **DRC**
+  panel; the required result is `All (0)`. Do not scrape the editor's private
+  tab state and call that a DRC result, and do not read the X markers on the
+  canvas as a count — if an interactive DRC has left old ones behind, use
+  **Design -> Clear Errors** once.
+
+- **The Net panel is the PCB editor's *left* panel, and `plane_ratlines.py`
+  cannot run without it open.** Its tabs are `Page | Net | Component |
+  Object` at the top left, and the tree under `Net` carries Nets, Net
+  Classes, **Ratlines**, Differential Pair, Equal Length Group and Pads Pair
+  Group. The script reads `[data-itemid="NetTab|_|Ratlines"]` straight out of
+  the DOM, so with the panel closed it stops with `Ratlines row is not
+  available` — and that message does **not** distinguish "the panel is shut"
+  from "there are no ratlines". Both were guessed at here and the guess was
+  wrong: the panel was shut, and there were four, all on 3V3.
   `removeIndicatorMarkers()` is a different marker system and does not remove
   DRC Xs, and the public `pcb_Drc` API exposes no Clear Errors method. Yellow X
   objects are UI state, not stored Multi-Layer primitives; hiding Multi-Layer

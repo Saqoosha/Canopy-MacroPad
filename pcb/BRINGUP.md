@@ -10,28 +10,34 @@ firmware and its bring-up console. This board does not run that firmware
 yet: `firmware/code.py` uses QT Py pin names and half its code is an I2C
 NeoKey that does not exist here.
 
-## The boards are a revision the EasyEDA document no longer is
+## The document regressed once, silently, and the boards did not
 
-Check this before reordering. The fabricated boards carry **88 vias**; the
-live document has **97**, and the nine extra are a 3x3 grid on 1.0 mm
-pitch at x 119.5/120.5/121.5, y 10/11/12 — dead centre on U3, all on GND.
-That is the RP2040's **stock exposed-pad via array**, which
-`thermal_fanout.py` exists to remove: the board uses no via-in-pad
-process, so the exposed pad is fanned out to ordinary vias *outside* pad
-57's paste area instead. Reordering from the document as it stands would
-either need filled-and-capped via processing or wick solder off the
-thermal pad during reflow.
+Worth reading before reordering, because the mechanism is still there.
 
-**The boards are the correct revision. The document is the regressed
-one.** Nothing here was designed to change; it came back on its own,
-after the Gerber was exported (the drill file is stamped 2026-08-17
-17:50:17 and matches the 88).
+At one point the fabricated boards carried **88 vias** and the live
+document had **97**. The nine extra were a 3x3 grid on 1.0 mm pitch at
+x 119.5/120.5/121.5, y 10/11/12 — dead centre on U3, all GND. That is the
+RP2040's **stock exposed-pad via array**, which `thermal_fanout.py` exists
+to remove: this board uses no via-in-pad process, so the exposed pad is
+fanned out to ordinary vias *outside* pad 57's paste area instead.
+Reordering in that state would have needed filled-and-capped via
+processing, or wicked solder off the thermal pad during reflow.
 
-The project's own guard says so without ambiguity — `python3
-via_in_pad.py` against the live document reports all nine as
-`U3.57 GND ... centre`, and its docstring is explicit that every annular
-overlap here "is unexpected and remains a build failure". Two commands
-settle the question at any time:
+**Nothing was designed to change.** The array came back on its own, after
+the Gerber was exported — the drill file is stamped 2026-08-17 17:50:17
+and matches the 88 — so the first order escaped by ordering before the
+regression rather than by anything catching it.
+
+**Fixed by re-running `./all.sh`,** which is a full rebuild rather than a
+repair, and the rebuild turned out to be near-deterministic: 87 of the
+board's 88 vias came back at *identical* coordinates, none appeared that
+the board lacks, and the single one that did not return —
+(125.400, 3.500) — is proven unnecessary by `connect.py` still finding all
+32 nets single connected islands without it. So the document now differs
+from the boards by one absent via and nothing else. The guard is silent,
+DRC reads `All (0)`.
+
+Two commands settle the question at any time:
 
 ```
 unzip -p out/manufacturing/canopy_macropad-gerber.zip \
