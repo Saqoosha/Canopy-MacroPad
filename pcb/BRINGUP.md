@@ -136,6 +136,29 @@ the other side of the trade: at 3V3 the RP2040's 3.3 V output clears the
 part's `0.7 * VDD` = 2.31 V input threshold with room, where a 5 V rail
 would have put 3.3 V against 3.5 V.
 
+**And that rail carries everything, which the QT Py's does not.** On the
+QT Py the pixels hang off the incoming Qwiic rail, unregulated; here every
+pixel's VDD and the RP2040 both sit behind U4, one XC6206 in SOT-23-3. So
+the pixels' worst case is the regulator's worst case, and it was worth
+asking about.
+
+**It holds.** Six pixels at `ffffff` through a 10/25/50/75/100 brightness
+ramp caused no reset at any step — and a reset is the signal that cannot
+be missed, because the firmware announces a fresh `HELLO` on the same port
+the test is listening to. Then an A/B with **load as the only variable**:
+LED0 told `ffffff` at brightness 100 with only itself lit, against LED0
+told the same thing with all six lit. No colour difference. That is the
+sensitive form of the question — blue and green have the higher forward
+voltage and starve first, so a sagging rail shows up as one white going
+warm, which is the same reading that found LED4's dry supply pad. Staring
+at a single 100% white and asking "is that reddish?" cannot answer it;
+there is nothing to compare against and the eye adapts.
+
+Not measured, and deliberately: **sustained** full white. 1.7 V times the
+board's draw is not much thermal room in that package, and no host holds
+that state — so the case that would need a heat measurement is one the
+device never enters. That is a scope decision, not a gap.
+
 **`neopixel_write` is a core module** on the RP2040 port, so the pixels
 need nothing in `lib/`. Its argument is the whole chain's buffer, three
 bytes per pixel, **GRB on the wire**.
@@ -218,13 +241,11 @@ Copying `code.py` to `/Volumes/CIRCUITPY/` triggers auto-reload, which is
 a **soft** reset — enough for `code.py`, never enough for `boot.py`. And
 `rm` the `._*` AppleDouble files macOS leaves behind.
 
-## Open
+## Where this stands
 
-- **Six pixels at full white may exceed the LDO.** U4 is an XC6206P332,
-  a 200 mA class part, and six SK6812MINI-E at full white on 3V3
-  estimates to 180-240 mA. Nothing has metered it, and bring-up
-  deliberately never drove that state — the pad test's all-on phase is
-  held at 64. This is the next number to measure, with a meter inline.
+Nothing on the electrical side is open any more. What is left is one
+requirement and one piece of paperwork.
+
 - **`lib/neopixel.mpy` has to be on the board.** `adafruit_pixelbuf` is a
   core module on this build, so that one file is the whole dependency;
   `adafruit_neokey` is not needed, because the `pcb` profile never touches
