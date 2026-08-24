@@ -158,12 +158,25 @@ someone noticed what they were actually reporting.
 
 ## Driving the board from the host
 
-`tools/mpad.py` does not apply yet: it looks for the two-CDC device
-`firmware/boot.py` creates, and a stock CircuitPython build enumerates one
-console port only. Until the firmware is ported, the console port is the
-whole interface.
+Once `firmware/boot.py` is on the board and it has had a **hard** reset,
+`tools/mpad.py --probe` is the whole test:
 
-Two things about it, the second of which is the fix for the first:
+```
+usb: product='Canopy MacroPad' vid=9114 pid=33012 (0x239a / 0x80f4)
+  /dev/cu.usbmodem2101  console/silent (no PONG (saw: nothing))
+  /dev/cu.usbmodem2103  DATA   -> PONG 3 6
+```
+
+That PID is **not** the one the root `README.md` records, and neither
+reading is wrong: `boot.py` sets only the manufacturer and product
+strings, so the VID and PID come from the CircuitPython build. The QT Py
+build answers `0x80F8`, the stock Pico build this board runs answers
+`0x80F4`. Match on `Canopy MacroPad`, never on the PID.
+
+Before `boot.py` is on the board there is one console port only, and
+`code.py` falls back to it — `HELLO`, `PONG` and `K` lines arrive mixed in
+with `print` output, which is enough to test the whole protocol. Two
+things about reading it, the second of which is the fix for the first:
 
 - **`code.py`'s startup prints are emitted before a host can reattach**
   after a reset, so they are dropped. Watching the console for a
@@ -187,6 +200,23 @@ a **soft** reset — enough for `code.py`, never enough for `boot.py`. And
   held at 64. This is the next number to measure, with a meter inline.
 - **The flash has not been surface tested.** Writing and reading back the
   full 7 MB would turn "the flash reports 8 MB" into "8 MB works".
-- **`firmware/` is still the QT Py build.** Pin names, the whole I2C
-  NeoKey half, and `boot.py`'s drive gate all need porting. The
-  measurements in this file are what that port should be built on.
+- **A host that matches on the PID will not find this board.** Whether
+  Canopy.app does is a question for the `Canopy` repo, not this one.
+  Setting a fixed VID/PID in `boot.py` would settle it, and is not done on
+  a guess.
+- **`lib/neopixel.mpy` has to be on the board.** `adafruit_pixelbuf` is a
+  core module on this build, so that one file is the whole dependency;
+  `adafruit_neokey` is not needed, because the `pcb` profile never touches
+  I2C. Without it the keys still report presses and the host is told `ERR
+  gpio pixels ImportError`.
+
+`firmware/` now runs on both boards from one source, selected by the
+`PROFILES` table at the top of `firmware/code.py` (and a deliberately
+smaller copy of it in `firmware/boot.py`, which cannot import `code.py`).
+That table and the comment above it are the explanation; `AGENTS.md`'s
+"Editing the firmware" section still describes the QT Py build alone and
+has not caught up.
+
+Verified on this board: `HELLO 3 6`, `PONG 3 6` on the data port, all six
+keys reporting edges through the protocol, both branches of `boot.py`'s
+drive gate, and no `ERR` of any kind.

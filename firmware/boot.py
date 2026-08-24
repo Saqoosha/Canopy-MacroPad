@@ -53,6 +53,14 @@ supervisor.set_usb_identification(
 # remove and a perfectly survivable outcome. Proven by injection, not by
 # reading: see AGENTS.md for the two faults that were watched to fire.
 #
+# The I2C half of the read costs a seesaw software reset before USB
+# finishes enumerating -- 0.5 s flat, from
+# `adafruit_seesaw.Seesaw.sw_reset`'s `post_reset_delay` default, not a
+# bench number -- and code.py pays it again on its own init.
+# Boot-to-enumeration roughly doubles. Holding one of the two GPIO keys
+# skips it outright, which is a side effect of reading them first and
+# not the reason for it.
+#
 # `storage` is imported here rather than at module scope so that nothing
 # this feature needs can run before usb_hid.disable() above. A module
 # top raise in boot.py skips the whole file, and the default USB config
@@ -60,36 +68,94 @@ supervisor.set_usb_identification(
 # exists to prevent. See AGENTS.md on why usb_midi.disable() was
 # declined for the same reason.
 try:
+    import os
     import storage
+    import sys
 
-    import board
     import digitalio
+    import microcontroller
 
-    # The pin names are duplicated from code.py's KEY_PIN_NAMES, for the
-    # same reason 0x30 used to be duplicated here: boot.py cannot import
-    # code.py without running the whole program. If the two lists drift
-    # apart, a name that does not exist raises and the drive is simply
-    # always enabled; a name that exists but is wrong reads high through
-    # its pull-up, so that one key quietly stops opening the drive while
-    # the rest still do. The second is the one to watch for, because it
-    # looks like nothing at all.
+    # Duplicated from code.py's PROFILES for the same reason 0x30 used to
+    # be duplicated below: boot.py cannot import code.py without running
+    # the whole program. Deliberately the smallest copy that answers this
+    # file's one question -- which pins to read, and whether there is a
+    # bus worth probing -- so there is less of it to drift.
+    #
+    # Failing to resolve a profile raises out of this block, and the
+    # handler at the bottom leaves the drive enabled. That is the right
+    # direction: a board this file does not recognise is exactly a board
+    # someone needs to copy a new code.py to.
+    PROFILES = {
+        "qtpy": {"gpio_keys": (4, 6), "pad_addresses": (0x30,)},
+        "pcb": {"gpio_keys": (3, 4, 6, 20, 5, 24), "pad_addresses": ()},
+    }
+    BUILD_TO_PROFILE = {
+        "adafruit_qtpy_rp2040": "qtpy",
+        "raspberry_pi_pico": "pcb",
+    }
+    profile = PROFILES[
+        os.getenv("MPAD_BOARD")
+        or BUILD_TO_PROFILE[sys.implementation._build]]
+
+    # The GPIO keys first, because they are nearly free: a handful of pin
+    # reads against the seesaw software reset below, which costs 0.5 s
+    # flat. A finger on any one of them answers the question without the
+    # bus being touched at all -- so a board with no Qwiic cable, or
+    # without the library, can still ask for the drive deliberately
+    # instead of only getting it by failing. On the PCB there is no bus
+    # at all and these reads are the whole gate.
+    #
+    # GPIO *numbers*, not `board` names, for the reason code.py gives:
+    # `board`'s name table is per build and the QT Py's names are absent
+    # from the generic build the PCB runs. A number that does not exist
+    # raises and the drive is simply always enabled; a number that exists
+    # but is wrong reads high through its pull-up, so that key quietly
+    # stops opening the drive while the others still do. The second is
+    # the one to watch for, because it looks like nothing at all.
     held = False
     switches = []
-    for name in ("MOSI", "MISO", "SCK", "TX", "RX", "SDA"):
-        switch = digitalio.DigitalInOut(getattr(board, name))
+    for num in profile["gpio_keys"]:
+        switch = digitalio.DigitalInOut(
+            getattr(microcontroller.pin, "GPIO{}".format(num)))
         switch.switch_to_input(pull=digitalio.Pull.UP)
         switches.append(switch)
     for switch in switches:
-        # Pull-up plus a diode to ground: pressed reads low.
+        # Pull-up to a switch on ground -- through the breakout's diode on
+        # the QT Py, straight to ground on the PCB. Pressed reads low
+        # either way.
         held = held or not switch.value
     for switch in switches:
-        # Tidiness, not necessity: CircuitPython unlocks and deinits the
-        # board busses when the boot VM tears down, so code.py claims
-        # these same pins fine a moment later either way. Measured,
-        # because reading could not settle it -- a gate forced to raise
-        # here still left code.py reporting HELLO 3 6.
         switch.deinit()
 
+    if not held and profile["pad_addresses"]:
+        # Only the first board is probed, so a second board's keys would
+        # not work as the gate; an address that does not answer costs a
+        # boot delay to learn nothing. If the profile's addresses ever go
+        # wrong, this gate throws forever and the drive is simply always
+        # enabled, which is the failure direction we want anyway.
+        #
+        # Reached only when the profile has an address at all, so a board
+        # with no I2C keypad never pays the 0.5 s and never fails here
+        # about a bus it does not have.
+        #
+        # Both imports sit here rather than at the top of the block so
+        # that a missing library, or a `board` with no STEMMA_I2C on it,
+        # costs only the four keys that need them.
+        import board
+
+        from adafruit_neokey.neokey1x4 import NeoKey1x4
+
+        i2c = board.STEMMA_I2C()
+        held = any(
+            NeoKey1x4(i2c, addr=profile["pad_addresses"][0]).get_keys())
+        # Tidiness, not necessity: CircuitPython unlocks and deinits the
+        # board busses when the boot VM tears down, so code.py opens the
+        # bus fine even when a raise above skips this line. Measured,
+        # because reading could not settle it -- a gate forced to raise
+        # here still left code.py reporting HELLO 3 4. The pin deinits
+        # above are the same kind of tidiness, and matter a little more:
+        # code.py claims those two pins itself a moment later.
+        i2c.deinit()
     if held:
         print("usb drive: enabled (key held at boot)")
     else:

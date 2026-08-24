@@ -542,6 +542,24 @@ The data port took the higher trailing number here, but do not select on
 that. `P` → `PONG` is the only reliable discriminator: the console port
 runs the REPL, which echoes `P` as typed text and never answers.
 
+**And do not select on the PID either.** `boot.py` sets the manufacturer
+and product strings and nothing else, so the VID and PID are whatever the
+CircuitPython build carries — a property of the binary, not of this
+firmware and not of the product. The same `boot.py` on the custom PCB,
+running a stock `raspberry_pi_pico` build, measures `0x239A` / **`0x80F4`**
+against the QT Py's `0x80F8` above. Both readings are correct; neither is
+the device's identity.
+
+So **`Canopy MacroPad` is the identifier**, and `P` → `PONG` is the port
+test. `tools/mpad.py` was already written that way — it matches the VID
+and the product string and never looks at the PID, which is why it found
+the PCB unchanged. A host that matches on the PID will not.
+
+Setting a fixed VID/PID in `boot.py` would make the identity independent
+of the build, and is deliberately not done: it is an outward-facing change
+to how the device presents itself on the bus, and nothing has yet shown a
+host that needs it.
+
 ### When the keypad is missing
 
 `board.STEMMA_I2C()` raises `RuntimeError: No pull up found on SDA or SCL`
