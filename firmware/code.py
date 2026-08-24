@@ -133,13 +133,13 @@ PROFILES = {
 # An unrecognised answer gets **no** fallback profile. A wrong guess
 # renumbers every key silently, which is the one failure this file is
 # built to prevent, so it comes up with no hardware at all and says so.
-# `raspberry_pi_pico` was read off the built PCB. `adafruit_qtpy_rp2040`
-# is that board's definition name and has NOT been read off the QT Py --
-# if it is wrong, that device comes up with `HELLO <ver> 0` and `ERR board
-# ...` rather than with wrong pins, and `MPAD_BOARD=qtpy` fixes it without
-# a reflash. That is the failure direction this table was arranged for,
-# but it is an unverified string and worth checking the next time the QT
-# Py is on a cable: `print(sys.implementation._build)` from its REPL.
+# Both strings were read off their own board's REPL, not taken from a
+# board definition: `print(sys.implementation._build)` answers
+# 'raspberry_pi_pico' on the built PCB and 'adafruit_qtpy_rp2040' on the
+# QT Py. Worth re-reading after a CircuitPython upgrade, and the failure
+# if one ever stops matching is the safe one -- that board comes up with
+# `HELLO <ver> 0` and `ERR board ...` rather than with wrong pins, and
+# `MPAD_BOARD` in settings.toml fixes it without a reflash.
 BUILD_TO_PROFILE = {
     "adafruit_qtpy_rp2040": "qtpy",
     "raspberry_pi_pico": "pcb",
