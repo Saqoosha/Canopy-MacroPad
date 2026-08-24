@@ -20,14 +20,20 @@ what the README does not.
   so it runs on a fresh machine. `--probe` first, always.
 - `docs/canopy-macropad-handoff.md` — the original design brief, vendored
   verbatim. Not edited here.
+- `pcb/` — the custom board: EasyEDA-side scripting in its own
+  `README.md`, and what to do with the fabricated article in `BRINGUP.md`.
 - `case/` — the printed enclosure, parametric in `build123d`. Its own
   `README.md` carries the stack, the print settings and the assembly
   order. Nothing in `firmware/` depends on it and it depends on nothing
-  in `firmware/`; the only shared facts are board dimensions, and those
-  live in `case/params.py` with their source named. The key field is
-  three boards now -- two 4978 breakouts then the NeoKey, left to right
-  -- and `firmware/code.py`'s key numbering follows the case's layout
-  rather than the other way round.
+  in `firmware/`.
+
+  Board dimensions are the shared fact, and `case/params.py` now **loads
+  `pcb/params.py` by path** rather than restating them, so there is one
+  source rather than two that agree until they do not. The key field is
+  one board -- the custom PCB, six Choc sockets on 19.05 -- and both the
+  case and `firmware/code.py`'s key numbering follow it. The older
+  `stacked` and `inline` layouts are gone from the source; the
+  directories of the same names under `case/out/` are their leftovers.
 
 ## Patching files with a script
 
@@ -66,6 +72,20 @@ tidying up a fault it had just proved. Either commit before injecting, so
 git really is the backup, or copy the file aside and copy it back. The
 reverse substitution works too and has the advantage of asserting.
 
+**In a worktree, use absolute paths for everything.** The shell's working
+directory resets to the repository root between commands, so a relative
+path written while "in" `.claude/worktrees/<name>/` silently addresses the
+*other* checkout -- and because `firmware/code.py`, `tools/mpad.py` and
+`AGENTS.md` all exist in both, nothing errors. It reads as success. One
+session did it three times in an afternoon, each worse than the last: it
+read the main checkout's `code.py` and designed a port against a file that
+had already been ported; it then flashed that same wrong `code.py` to a
+board and read the old firmware's console output as the new firmware's
+test result; and it ran `py_compile` on the unedited copy and reported
+"compiles" for a change that was somewhere else entirely. **The third one
+is the shape to fear** -- not a broken command, a green one, standing in
+for a check that never ran.
+
 ## Editing the case
 
 Environment is a venv at `case/.venv`, Python 3.12 (`uv venv --python
@@ -74,11 +94,17 @@ system Python is 3.14 and has no build123d; whether that is a wheel gap
 or just a missing install was never checked, so 3.12 is the known-good
 one, not necessarily the only one.
 
-- **Two layouts come out of the same source**, selected with
-  `MPAD_LAYOUT=stacked|inline`, and each writes to `out/<layout>/`. A
-  change is not done until **both** build clean — they share every part
-  of the geometry except where the QT Py sits, so a "small" edit reaches
-  further than it looks.
+- **One layout, `choc`, and no switch to select it.** `MPAD_LAYOUT` is
+  gone with the two layouts it chose; `params.OUT_NAME` is the output
+  directory's name, not an axis. The `out/inline/` and `out/stacked/`
+  directories are the earlier device's, kept because that case is still
+  assembled and its source is not — they cannot be rebuilt, so do not
+  treat a stale figure in them as something a rerun will fix.
+- **`params.py` loads `pcb/params.py` by path.** Board width, corner
+  radius, switch pitch and pad positions are read from the PCB's own
+  source rather than restated, so the two cannot drift into disagreeing.
+  A change to the board reaches the case on the next build with nothing
+  to keep in step by hand.
 - **Change a number in `params.py`, never the geometry in `parts.py`.**
   Every dimension that matters is derived, so a hand-edit to a part is a
   number that stops agreeing with the rest of the model silently. Board
@@ -160,6 +186,28 @@ one, not necessarily the only one.
   last time is the same disease as trusting the arithmetic one, a level
   up.
 
+  **All of it is one animal: a probe whose question is well formed and
+  whose sampling silently misses.** The boolean's sampling misses a cut,
+  the required-volume probe's misses thinness, and a *grid* misses
+  anything narrower than its step -- the Choc v2 stem's retention ribs
+  are 0.10 wide and every probe of that arm returned 1.200, correctly,
+  by landing either side of them. The tell is the same each time and it
+  is not an error message: **a small residual nobody can attribute.**
+  0.075 mm³ of interference with no explanation was the ribs. What turns
+  a residual into a cause is refusing to sum it -- eight pieces listed
+  individually said 8 x 0.00936 at x 1.15..1.25, y 0.60..0.65, which is
+  a rib; the total said nothing. A sum hides the structure that names
+  the cause, and `.solids()` is one call away.
+
+  **A bounding box is a sum too, and it lies the same way.** A probe that
+  catches two features reports one box spanning both, which reads as a
+  single enormous feature: a 4.8-long strip across a cross arm crossed
+  the ring either side of it and returned a 1.200 arm as **4.800**, and
+  the same shape of read said a 0.10 rib was 3.600 long and put material
+  where a plain min/max suggested a solid run. Three times in one
+  afternoon. Any probe whose result might hold more than one piece gets
+  `.solids()` and a length check before its `.size` is believed.
+
   **4 — The feature is not in the part.** A cut placed inside a void does
   nothing: a chamfer written below the counterbore top would have printed
   two identical coupon rows while the experiment concluded that
@@ -182,6 +230,20 @@ one, not necessarily the only one.
   the cavity" used `COLUMN_DIA` for every column after the field pads got
   their own smaller one. **Whenever a constant stops being the only one
   of its kind, grep the checks for it.**
+
+  Three: **the check stood still and the model gained detail under it.**
+  "The bore must not touch the stem" was correct, was watched red, and
+  stopped being true the moment the Choc v2's retention ribs were
+  measured -- the bore is *supposed* to squeeze those, so contact became
+  the intended behaviour and nothing about the check had changed. This
+  one is the opposite direction from the first two and grepping cannot
+  find it: there is no constant to follow, only a premise that quietly
+  stopped holding. **When the geometry a check guards gets more
+  detailed, re-read what the check assumes**, not just what it measures.
+  What that check is now: the arm body is a wall and is checked at
+  0.000, the squeeze on the ribs is printed as a reading with no
+  pass/fail, because no value of it is wrong in the model and only a
+  pressed token can say.
 - **Prove a check fires before trusting it**, and **inject the fault by
   moving geometry, not by shrinking it to nothing.** A zero-width `Box`
   makes OCCT throw, so the build dies before the check runs and the test
@@ -190,6 +252,9 @@ one, not necessarily the only one.
   different check. Moving a feature 60 mm sideways, or setting one
   diameter past its limit, keeps the fault where it was aimed. Restore
   from a copy, never from git.
+
+  injection separated the two. **Watch what a check fires on, not just
+  that it fires.**
 
   This rule exists because of the standoff: its diameter was cut on the
   stated grounds that the check had flagged it, and it never had -- the
@@ -237,14 +302,28 @@ one, not necessarily the only one.
   extrusion, a hair rather than a wall. Nothing related the two numbers.
   `_clear_strips()` is the one place the clamp happens now and the cut
   takes its edge from there, so the sliver cannot exist at any value.
-- **A case-space constant describes one layout.** `WIRE_LANE_Y` was a
-  pair of case-space numbers off an `inline` scan. `stacked` seats the
-  field 0.805 further back, so the same trench went 0.400 into a NeoKey
-  column there while `inline` stayed green -- the fault living in the
-  layout nobody prints, which is how it would have kept. Anything
+- **A case-space constant describes one layout.** `WIRE_LANE_Y` was
+  written as a pair of case-space numbers off an `inline` scan. `stacked`
+  seats the field 0.805 further back, so the same trench went 0.400 into
+  a NeoKey column there while `inline` stayed green — and the fault was
+  in the layout nobody prints, which is how it would have kept. Anything
   positioned relative to the boards belongs board-local with
-  `FIELD_ORIGIN` applied once; the tell is the margin coming out
-  identical in both layouts.
+  `FIELD_ORIGIN` applied once. There is one layout now, so the tell that
+  used to catch this — the margin coming out identical in both — is gone
+  with it, and the rule is all that is left. That makes it *more*
+  load-bearing than when it was written, not less: nothing measures it
+  any more.
+- **The C-back cut is the case's depth, not the hook's 3 mm.**
+  `_end_hook_bands()` is where the bosses live. A cut that follows them
+  leaves the inner slab standing between them, which is what the shell
+  hits, so the boss never seats. Deepening `END_HOOK_BACK` in X does not
+  fix a Y that never went through. `END_HOOK_BACK` is the painted
+  square's X (1.60); the Y is `CASE_D`. Watched failing at 0.512 mm³
+  with the cut limited to the bands.
+- **Shell slack does not help too-tall columns.** `BOARD_CLAMP_SLACK`
+  sits above the board. Columns that run to `Z_BOARD_BOTTOM` push the
+  board into the switches, which hold the shell up. Printed: a hair
+  under 1 mm of seam, closed if you pressed. `COLUMN_SLACK` is 0.40.
 - **A diff cannot show a contradiction**, because a contradiction is a
   relationship between two places and a diff shows one. This section once
   introduced the pilot mouth as derived from `SCREW_CLEAR_DIA` and, three
@@ -278,6 +357,57 @@ one, not necessarily the only one.
   The way to ask is to lay a wire-sized box where a wire has to run and
   boolean it: 34.501 mm³ against the shell along one route, 10.240 along
   the one actually taken, 0.000 after the notch.
+
+- **An observation with no timestamp on it gets quoted as a fact.** A
+  peer was told its `pcb/` files were uncommitted, on a `git status` that
+  was real when it ran and an hour stale when it was repeated -- the
+  files had been committed in between. Same shape as the worktree cwd
+  mistakes: the measurement was true, and what was missing was *when* and
+  *where* it came from. Re-measure before asserting somebody else's tree,
+  and say when you measured. It cost a round to settle something both
+  sides could have checked in one command.
+
+- **The dummy caps mount on a ring, not on a cross.**
+  `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure
+  set is in the post, and its mount is **read off `ref/choc-v2.step` by
+  `build.py` on every run** rather than taken from an MX table: Choc v2's
+  stem is a cross standing *inside* a Ø6.50/Ø5.50 ring, both topping out
+  on the same plane, so the cap seats on the rim and the bore clears the
+  cross tip by 0.10. `STEM_CLEAR` is the only number here a printer owns
+  and it is **settled at 0.00 on two printed sweeps**: 0.10, 0.15, 0.20,
+  0.25 said 0.10 grips and the rest are loose, and the downward sweep
+  that followed -- 0.00, 0.04, 0.07, 0.10, the last kept as the control
+  -- said 0.00 is tight enough. Unlike this case's other bottom-of-range
+  answers it is a floor with a mechanism, not an untested edge: 0.00 is
+  the slot on the arm body, and past it the bore eats the arm rather
+  than the ribs. The reasoning is `case/README.md`'s *Dummy keycaps*.
+
+  **The arm is 1.20 and the fit is 1.30**, because eight retention ribs
+  stand 0.05 proud of the arm flats, ~0.10 wide, running z 4.10 to 8.39.
+  They are what holds a cap on, so a slot sized on the arm body is sized
+  on the wrong number -- and the printed result is exactly the geometry:
+  0.10 lands the slot flush on the ribs, every looser entry clears them
+  by 0.025 or more. `STEM_CLEAR` is measured from the body, so it doubles
+  as how much rib is left alone, and 0.00 is a floor rather than a round
+  number -- past it the bore is into the arm.
+
+  Finding them and re-checking around them are two general lessons
+  rather than keycap ones, and they live with their own kind: the probe
+  that missed a 0.10 feature is under *a boolean cannot see a trench*,
+  and the check whose premise expired when contact became intended is
+  the third shape under *a check drifts away from the geometry it was
+  written for*.
+
+  Two of this file's older rules earned another instance while it was
+  built. The bore was cut in the **wrong direction** for a round: a valid
+  cap, every interference check green, and the feature simply not in the
+  part -- found only by the volume the cut was supposed to remove
+  (7.474 of a wanted 31.409 mm³). And the check written to prove the seat
+  exists put +0.40 on a *radius* where 0.40 of diameter was meant, so it
+  reported 0.580 mm³ missing from a cap that was fine: **a check
+  measuring its own arithmetic**, the same disease as one positioned from
+  the thing it measures, wearing the other face.
+
 - **A part added to `mock.everything()` reaches four files, and three of
   them fail loudly only if you run them.** `build.py` picks the new part
   up on its own; `section.py` has its own colour table keyed by the mock's
@@ -290,15 +420,15 @@ one, not necessarily the only one.
   comes from `product.py`, `render.py` and `section.py`, so a geometry
   change leaves the figures showing the old design -- which is the worst
   kind of stale, because a finished-looking render reads as a verified
-  one. The full sweep, per layout:
+  one. The full sweep:
 
   ```
-  MPAD_LAYOUT=<layout> .venv/bin/python build.py     # must say all checks passed
-  MPAD_LAYOUT=<layout> .venv/bin/python product.py
-  MPAD_LAYOUT=<layout> .venv/bin/python render.py
-  MPAD_LAYOUT=<layout> .venv/bin/python section.py
-  MPAD_LAYOUT=<layout> .venv/bin/python webgl.py dump
-  .venv/bin/python webgl.py page                     # once, after both dumps
+  .venv/bin/python build.py       # must say all checks passed
+  .venv/bin/python product.py
+  .venv/bin/python render.py
+  .venv/bin/python section.py
+  .venv/bin/python webgl.py dump
+  .venv/bin/python webgl.py page  # -> out/viewer.html
   ```
 
   **A dirty `shell.stl` after a rebuild is not evidence of anything.**
@@ -330,9 +460,9 @@ one, not necessarily the only one.
 
 ## Checking the viewer
 
-`out/viewer.html` is generated by `webgl.py dump` (once per layout) then
-`webgl.py page`. Two ways to verify it, and both are worth doing because
-they cover different halves:
+`out/viewer.html` is generated by `webgl.py dump` then `webgl.py page`.
+Two ways to verify it, and both are worth doing because they cover
+different halves:
 
 - **The data half, without a browser.** Decode `geom.json`'s base64 in
   Python and check it against the parts table beside it. `count` is a
@@ -374,6 +504,14 @@ they cover different halves:
   down-drag [1,0,0]. A thousand steps over the pole leave the basis unit
   to 8.9e-16, and the view direction moves at least 0.0364 every step --
   against the old clamp it was exactly 0.
+
+- **The section cap is a volume test.** It counts front faces against
+  back faces and fills where they do not cancel, which is defined for a
+  body that has an interior. The PCB and its packages have no volume --
+  they are surfaces EasyEDA exported -- so the stencil never cancels and
+  the cap paints every remaining face with the cut colour. `dump()` marks
+  each part `closed`, and the cap loop skips the ones that are not.
+  Clipping them is still right; filling a surface is the bug.
 
 ## Remaining on the case
 
@@ -418,28 +556,58 @@ Open -- and the list is down to one entry that is not really a question:
 
 ## Editing the firmware
 
-- **The keypad is two halves and the index space is one.** Keys 0-1 are
-  two 4978 breakouts on GPIO, keys 2-5 a NeoKey on I2C, and `GPIO_BASE`
-  / `SEESAW_BASE` are the only two constants that know which way round.
-  Indices are static: key 2 stays key 2 when the NeoKey is silent,
-  because the host maps index to pane and a silent renumbering focuses
-  the wrong session. That is also why `NUM_KEYS` is a constant 6 and
-  `HELLO <ver> 0` can no longer happen.
-- **One line is the whole four-key build.** Empty `GPIO_KEY_PIN_NAMES`
-  and `SEESAW_BASE` falls to 0, `NUM_KEYS` to 4, and the GPIO setup is
-  skipped whole -- the NeoKey goes back to being keys 0-3. There is
-  deliberately no autodetection: an absent breakout is electrically
-  identical to a present one nobody is pressing, pulled high either way,
-  with no readback on the pixel line and no capacitive sense on an
-  RP2040. Any automatic answer would be a guess, and a wrong guess
+- **Two devices, one file, and `PROFILES` is the whole difference.** The
+  QT Py build is two 4978 breakouts on GPIO (keys 0-1) plus a NeoKey on
+  I2C (keys 2-5); the custom PCB is six switches straight to GPIO and one
+  six-pixel chain. They cannot share a pin table even though they share
+  pin *numbers* -- the PCB was laid out against the QT Py's broken-out
+  GPIO on purpose, so GPIO3 is the breakouts' pixel line on one board and
+  KEY0 on the other. `GPIO_BASE` / `SEESAW_BASE` still know which way
+  round the halves go; the profile decides what the halves are.
+
+  Indices stay static within a profile: key 2 is key 2 when the NeoKey is
+  silent, because the host maps index to pane and a silent renumbering
+  focuses the wrong session. Both real profiles come to `NUM_KEYS` 6, by
+  different sums -- 2 + 4 and 6 + 0.
+- **Pins are GPIO numbers through `microcontroller.pin`, never names
+  through `board`.** `board` carries a per-build name table: all seven of
+  `MOSI`/`MISO`/`SCK`/`TX`/`RX`/`SDA`/`SCL` exist on the QT Py build and
+  **none** of them on the generic `raspberry_pi_pico` build the PCB runs.
+  Both halves of that were read off the two devices, not assumed. Resolve
+  them inside the setup guard, not at module scope, or a wrong-board flash
+  is a silent brick instead of a board that still talks.
+- **The profile is chosen by which CircuitPython *binary* is running, and
+  that is not the detection this file forbids.** Whether a breakout is
+  *wired* is electrically unknowable -- an absent one and a present one
+  nobody is pressing are both pulled high, with no readback on the pixel
+  line and no capacitive sense on an RP2040 -- so that question was always
+  a human's to answer. `sys.implementation._build` is a compile-time
+  string with no guess in it: `adafruit_qtpy_rp2040` and
+  `raspberry_pi_pico`, both read off their own board's REPL.
+  `MPAD_BOARD` in `settings.toml` overrides the table, per device and
+  without editing this file.
+
+  **An unrecognised answer gets no fallback profile.** It claims no pins
+  and no addresses and reports `ERR board ...`, because a wrong guess
   renumbers every key silently -- the one failure this file is built to
-  prevent. Flashing is one file copy, so the person doing the copy is
-  the only honest source of truth. The guard around the setup is not
-  cosmetic: `NeoPixel(pin, 0)` would either raise, giving a four-key
-  board an `ERR gpio pixels` on every connect forever about hardware it
-  never had, or leave an empty group nobody writes to.
-- **A dead NeoKey costs exactly four keys. A dead *cable* costs all
-  six.** The GPIO reads sit outside every guard and each pad's
+  prevent. So `HELLO <ver> 0` is reachable again and now means exactly
+  "this firmware does not know what board it is on". Claiming six keys
+  that resolve to no pins would be a positive claim of health, which is
+  worse than silence.
+- **Each half is skipped whole when its profile entry is empty**, and
+  neither skip is cosmetic. `NeoPixel(pin, 0)` is a zero-length strip --
+  either an exception, and then that board reports `ERR gpio pixels` on
+  every connect forever about hardware it never had, or an empty group
+  nothing writes to. The I2C skip is the mirror: running it on the PCB
+  would import `adafruit_neokey` and call `board.STEMMA_I2C()` on a device
+  with neither, putting `ERR i2c setup ...` on every connect about a bus
+  that cannot be fixed because it was never there. Both would teach a host
+  to ignore the real error.
+- **On the QT Py, a dead NeoKey costs exactly four keys and a dead
+  *cable* costs all six.** None of this applies to the PCB, which has no
+  bus and no cable: everything there is soldered, so the only faults it
+  can have are setup ones. The GPIO reads sit outside every guard and each
+  pad's
   `get_keys()` and each pixel group's `show()` is guarded separately, so
   every I2C fault that leaves the cable plugged in -- a missing library,
   a wrong address, a seesaw that stops answering -- costs only the four
@@ -458,6 +626,16 @@ Open -- and the list is down to one entry that is not really a question:
   it is told. Which pane, which status, when to pulse — all host-side.
   Resist moving policy down here; the split is what keeps the protocol
   portable to BLE.
+- **Low-brightness smoothing is the known open improvement.**
+  `PULSE_GAMMA` is 1.0 because a deep pulse at low global brightness runs
+  out of 8-bit levels near its floor, and the perceptual curve was spent
+  to keep the levels rather than the other way round. Temporal dithering
+  is the actual answer and is cheap here -- the pulse already repaints at
+  50 Hz. It was investigated once on the QT Py, on scratch scripts that
+  only ever lived on that board's `CIRCUITPY`; **their conclusions do not
+  carry to the PCB**, whose pixels are a different part on a regulated
+  3V3 rail rather than the QT Py's unregulated Qwiic one. The constant's
+  own comment carries the detail.
 - **An uncaught exception is indistinguishable from a dead board.**
   CircuitPython drops to the REPL, the data port goes silent, and the
   LEDs freeze at their last value. Every I2C touch in the main loop is
@@ -477,27 +655,31 @@ Open -- and the list is down to one entry that is not really a question:
   `boot_out.txt` **from the REPL**, not off the drive: mounting the
   drive is what makes the gate take the other branch and overwrite the
   line you came for.
-- `boot.py` depends on `adafruit_neokey` in `lib/`, which used to be
-  `code.py`'s alone, and holds its own copy of the `0x30` from
-  `PAD_ADDRESSES` **and of the GPIO pin names** — it cannot import
-  `code.py` without running the whole program. The address and the
-  library fail in the harmless direction: the drive stays enabled. The
-  pin names have a second failure mode worth naming, because it is
-  silent: a name that still exists but points at the wrong pin reads
-  high through its pull-up, so keys 0-1 quietly stop opening the drive
-  while the NeoKey's four still do.
+- **`boot.py` carries its own copy of the profile table**, deliberately
+  the smallest one that answers its two questions -- which pins to read,
+  and whether there is a bus worth probing. It cannot import `code.py`
+  without running the whole program, so the duplication is the import
+  that cannot happen rather than an oversight; keeping the copy minimal is
+  what keeps it from drifting.
 
-  That copy is also why **"one line switches the build" is true of
-  `code.py` and not of `boot.py`.** Emptying `GPIO_KEY_PIN_NAMES` gives
-  a four-key firmware; `boot.py` goes on reading `MISO` and `SCK`
-  regardless, and on a board with no breakouts they read high through
-  their pull-ups, so the gate falls through to the I2C path and behaves
-  correctly. Left alone on purpose: deriving one file's constants from
-  the other is the import that cannot happen, and the cost of the
-  asymmetry is two pin reads that always say "not held".
-- `lib/` needs `neopixel.mpy` as well now, for the breakouts' chain.
-  Missing, keys 0-1 report presses and never light, and the host is told
-  `ERR gpio pixels ...`.
+  Every way it can be wrong fails in the harmless direction, which is the
+  property to preserve. A profile that will not resolve raises out of the
+  gate's `try`, and the handler leaves the drive **enabled** -- a board
+  this file does not recognise is exactly a board someone needs to copy a
+  new `code.py` to. A missing library or a wrong address does the same.
+  The one failure worth naming because it is silent: a GPIO number that
+  exists but is wrong reads high through its pull-up, so that key quietly
+  stops opening the drive while the others still do.
+
+  The gate opens on any of the profile's GPIO keys -- two on the QT Py,
+  six on the PCB -- and the seesaw probe with its 0.5 s is skipped
+  entirely when the profile has no addresses.
+- `lib/` needs `neopixel.mpy` on both boards; missing, keys report
+  presses and never light and the host is told `ERR gpio pixels ...`.
+  `adafruit_pixelbuf` is a **core** module, so that one file is the whole
+  pixel dependency. `adafruit_neokey` and `adafruit_seesaw` are needed
+  only by the `qtpy` profile -- the PCB never touches I2C, so their
+  absence there costs nothing and is never reported.
 - Deploy by copying to `/Volumes/CIRCUITPY/`, then `rm` the `._*`
   AppleDouble files macOS leaves behind.
 
@@ -527,20 +709,34 @@ tools/mpad.py --probe          # expect: PONG 3 6, and CIRCUITPY now gone
 
 Known-good answers, for telling a healthy board from a sick one:
 
-| State | The device says |
-|---|---|
-| healthy | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
-| NeoKey or `adafruit_neokey` missing | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
-| `neopixel` missing | `HELLO 3 6` + `ERR gpio pixels ...`, keys 0-1 dark but still reporting presses |
-| bus lost while running, cable still in | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
-| Qwiic cable unplugged | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, and keys 0-1 dark and stuck unpressed — they draw `VDD` and `GND` off the NeoKey, so the cable carries their power too |
-| firmware died past 60 s uptime | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
-| firmware died inside 60 s | `ERR fatal-halted ...` on every later connect, stays red |
+| State | Board | The device says |
+|---|---|---|
+| healthy | both | `HELLO 3 6` on connect, `PONG 3 6` to `P` |
+| unknown build, no `MPAD_BOARD` | both | `HELLO 3 0` + `ERR board <build> is not one of pcb/qtpy`, no keypad claimed at all. Not a wiring fault |
+| `neopixel` missing | both | `HELLO 3 6` + `ERR gpio pixels ...`, the GPIO keys dark but still reporting presses |
+| NeoKey or `adafruit_neokey` missing | qtpy | `HELLO 3 6` + `ERR i2c setup ...`, keys 2-5 dark, connection held, and `CIRCUITPY` back (the gate failed open on the same fault) |
+| bus lost while running, cable still in | qtpy | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, keys 0-1 unaffected |
+| Qwiic cable unplugged | qtpy | `HELLO 3 6` + `ERR i2c lost at runtime: ...`, and keys 0-1 dark and stuck unpressed — they draw `VDD` and `GND` off the NeoKey, so the cable carries their power too |
+| firmware died past 60 s uptime | both | `ERR fatal ...`, all keys red, port drops, fresh `HELLO` |
+| firmware died inside 60 s | both | `ERR fatal-halted ...` on every later connect, stays red |
 
-USB identity: VID `0x239A`, PID `0x80F8`, product `Canopy MacroPad`,
-manufacturer `Saqoosha`. Two ports enumerate; **never pick by trailing
-number** — only `P` → `PONG` identifies the data port, because the
-console echoes `P` as REPL input and never answers.
+No `ERR i2c` of any kind can appear on the PCB: the profile has no
+addresses, so that half is never built and has nothing to report.
+
+USB identity: product `Canopy MacroPad`, manufacturer `Saqoosha`, VID
+`0x239A`. **The PID is not part of the identity** — `boot.py` sets only
+the strings, so the VID and PID come from the CircuitPython build, and the
+same firmware measures `0x80F8` on the QT Py build against `0x80F4` on the
+PCB's stock Pico build. Both host-side matchers already ignore it, and
+Canopy's `MacroPadDevice.swift` says why it must: pinning a build-owned
+number fails *closed*, and a device that never connects looks exactly like
+a bad cable. Match on the product string.
+
+Two ports enumerate; **never pick by trailing number** — only `P` →
+`PONG` identifies the data port, because the console echoes `P` as REPL
+input and never answers. The suffix is not even stable across ports on one
+machine: the same board read `usbmodem21101` and `usbmodem2101` an hour
+apart.
 
 Tracebacks land on the **console** port, never the data port. Read them
 by interrupting the REPL there (`\x03`) and reloading (`\x04`).

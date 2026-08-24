@@ -23,24 +23,27 @@ import mock  # noqa: E402
 import params as P  # noqa: E402
 import parts  # noqa: E402
 
-OUT = Path(__file__).parent / "out" / P.LAYOUT
+OUT = Path(__file__).parent / "out" / P.OUT_NAME
 TMP = OUT / "tmp"
 
 STYLE = {
     "shell": ("#3d6ea8", 1.0),
     "bottom": ("#2f5583", 1.0),
-    "NeoKey + sockets": ("#1f7a4d", 0.75),
-    # A shade off the NeoKey rather than a colour of their own: the point
-    # of the section is that the three boards are one plane, so they
-    # should read as one thing with a seam, not as two kinds of part.
-    "breakouts + sockets": ("#2f9a63", 0.75),
+    "board + sockets + USB": ("#1f7a4d", 0.75),
     "switch bodies": ("#b06a1f", 0.55),
-    "QT Py + parts": ("#7a3f9c", 0.75),
 }
+
+# The third cut exists because the first two miss the end hook entirely:
+# one runs along the key row at y = 0 and the other across the middle of
+# the case, and the hook lives in a 3.00 band at |y| 6.50..9.50 beside
+# the USB port. A feature nothing draws is a feature nobody checks.
+_HOOK_Y = P.END_HOOK_Y0 + P.END_HOOK_L / 2
 
 CUTS = [
     ("through the key row  (looking back)", (0, P.SWITCH_XY[0][1], 0), (0, 1, 0), 0, 2),
     ("through the centreline  (looking right)", (0, 0, 0), (1, 0, 0), 1, 2),
+    (f"through the end hook at y = {_HOOK_Y:.2f}  (looking back)",
+     (0, _HOOK_Y, 0), (0, 1, 0), 0, 2),
 ]
 
 
@@ -58,7 +61,7 @@ def meshes():
 
 def main():
     loaded = meshes()
-    fig, axes = plt.subplots(len(CUTS), 1, figsize=(15, 9), dpi=140)
+    fig, axes = plt.subplots(len(CUTS), 1, figsize=(15, 12), dpi=140)
 
     for ax, (title, origin, normal, ha, va) in zip(axes, CUTS):
         for name, mesh in loaded.items():

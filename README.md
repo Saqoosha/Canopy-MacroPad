@@ -4,12 +4,17 @@ Six keys next to the keyboard. Each key mirrors one Canopy pane: its
 LED shows what that pane's Claude session is doing, and pressing it
 focuses that pane and brings Canopy forward.
 
-The six are not one board. Keys 2-5 are a NeoKey 1x4 on I2C, keys 0-1
-are two single-key breakouts read straight off GPIO, and they butt
-together into one 19.05 mm pitch because the breakout happens to be
-exactly one pitch wide with its switch centred in it. Which board a key
-sits on is invisible to the host: the protocol has one index space and
-the device reports its size.
+**There are two of these, and one firmware runs both.** The first is
+three boards butted together: keys 2-5 a NeoKey 1x4 on I2C, keys 0-1 two
+single-key breakouts read straight off GPIO, landing on one 19.05 mm
+pitch because the breakout happens to be exactly one pitch wide with its
+switch centred in it. The second is a **custom PCB** that is all six keys
+on one board — see [Phase 1 scope](#phase-1-scope).
+
+Which board a key sits on, and which device it is, are both invisible to
+the host: the protocol has one index space and the device reports its
+size. The firmware picks a board profile from the CircuitPython build it
+booted, so neither the wire protocol nor the key numbering moves.
 
 ![The four-key inline case, closed with keycaps on, and open with the
 NeoKey and the QT Py seated in the shell above the bottom
@@ -20,10 +25,13 @@ before the breakouts. The six-key `inline` case is printed, wired and
 closing; the photograph of *it* is the wiring shot further down, taken
 with the shell turned over. Nothing here is waiting on hardware.
 
-The enclosure is the `inline` layout, printed on a Bambu A1 mini. It is
-parametric, and it is also **[a model you can turn in a
-browser](https://saqoosha.github.io/Canopy-MacroPad/)** — both layouts,
-orbit, explode, cutaway. How it is built: [`case/README.md`](case/README.md).
+That is the **first** device, in the `inline` case, printed on a Bambu A1
+mini. The enclosure is parametric, and it is also **[a model you can turn
+in a browser](https://saqoosha.github.io/Canopy-MacroPad/)** — orbit,
+explode, cutaway. The published page is the `choc` case, for the custom
+board, so it is **not** the case in the photo above. It is a copy rather
+than a build, so it goes stale on its own; `case/README.md` carries the
+five lines that republish it. How the case is built is there too.
 
 This repository holds the device half. The macOS half lives in the
 [Canopy](https://github.com/saqoosha/Canopy) repository under
@@ -71,14 +79,18 @@ any desk toy is, and a mounted volume disappearing makes macOS say
 using. Ejecting first works and nobody does it.
 
 **Hold any of the six keys through a boot and `CIRCUITPY` mounts as
-before.** Any hard reset counts — replug, `RST`, or
-`microcontroller.reset()` — since that is when `boot.py` runs. The GPIO
-pair is read first, because two pin reads cost nothing against the
-seesaw's 0.5 s software reset, and a key held there skips the bus
-entirely. On the I2C side only `0x30` is probed, so a second NeoKey's
-keys would not work as the gate. The drive then stays mounted for the
-rest of the session, so an edit-and-copy loop needs the finger only
-once.
+before.** Any hard reset counts — replug, `RST` where there is one, or
+`microcontroller.reset()` — since that is when `boot.py` runs. The drive
+then stays mounted for the rest of the session, so an edit-and-copy loop
+needs the finger only once.
+
+How the six are read differs by board, and `boot.py` carries its own small
+copy of the profile table to know which. On the **PCB** all six are GPIO
+and there is no bus to probe. On the **wired pad** the GPIO pair is read
+first, because two pin reads cost nothing against the seesaw's 0.5 s
+software reset and a key held there skips the bus entirely; on the I2C
+side only `0x30` is probed, so a second NeoKey's keys would not work as
+the gate.
 
 Rather than enumerate the ways the read can fail, state the property
 that holds by inspection: **`disable_usb_drive()` is reachable on
@@ -116,6 +128,47 @@ not run again until the board does.
 
 ## Hardware
 
+Two devices, so two bills of materials. The custom PCB is the current one
+and replaces every board in the other; the wired pad is still assembled
+and still works, and the numbers its assembly settled are inherited whole.
+
+### The custom PCB
+
+One board, 139.60 × 21.59 mm, two layers, 1.6 mm, fabricated and partly
+assembled by JLCPCB. Designed in EasyEDA by script — `pcb/README.md` for
+that side of it, `pcb/BRINGUP.md` for what to do with the article when it
+arrives.
+
+| Ref | Part | LCSC | Role |
+|---|---|---|---|
+| U3 | RP2040 | C2961140 | controller, CircuitPython |
+| U1 | W25Q64JVSSIQ | C179171 | 8 MB QSPI flash |
+| U2 | ABM8-272-T3 | C9900091606 | 12 MHz crystal |
+| U4 | XC6206P332MR-G | C5446 | 3V3 LDO, everything sits behind it |
+| D1 | USBLC6-2SC6 | C323793 | USB ESD |
+| USBC1 | TYPE-C-31-M-12 | C165948 | USB-C receptacle |
+| LED1-6 | SK6812MINI-E | C5149201 | reverse-mount pixels, one chain on GPIO25 |
+| SK1-6 | CPG135001S30 | — | Kailh Choc hot-swap sockets, 19.05 pitch |
+| SW1 | TS263065A | — | BOOT, beside the USB-C |
+| R3, R4 | 27 Ω | C25100 | USB D+/D− series |
+| R5, R6 | 5.1 kΩ | C25905 | USB-C CC pulldowns |
+| R1, R2 | 1 kΩ | C11702 | BOOT series, crystal damping |
+| — | Kailh Choc v2 ×6 | — | low-profile, hot-swappable |
+| — | wrk. MX Pure keycaps ×6 | — | frosted PC |
+
+Everything is on the **bottom** face — the Gerber archive carries a bottom
+paste layer and no top one, which is the quickest way to confirm it. No
+Qwiic cable, no inter-board wiring, and nothing hangs off an unregulated
+rail: the pixels' `VDD` and the RP2040 both sit on 3V3 behind U4. That
+last one is a real difference and not a detail — see `pcb/BRINGUP.md` for
+what it cost to check, and for why the pixels run below their own
+datasheet minimum on purpose.
+
+### The wired pad, which came first
+
+Still assembled, still driven by Canopy, and the source of every number
+the case inherited.
+
 | Part | SKU | Role |
 |---|---|---|
 | Adafruit QT Py RP2040 | ssci 7211 / ADA-4900 | controller, CircuitPython |
@@ -124,6 +177,16 @@ not run again until the board does.
 | Qwiic cable 50mm | ssci 6896 / SFE-PRT-17260 | QT Py ↔ NeoKey |
 | Durock Ice King Linear ×6 | — | MX compatible, clear housing |
 | Clear ABS keycaps ×6 | — | placeholder for printed caps |
+
+Everything from here to this section's last paragraph is that device —
+the cable, the five wires, the power tap, the rail argument. None of it
+describes the PCB, which has one board and no cable at all.
+
+One thing in there does carry over, because it is physics rather than
+wiring: **an SK6812's green and blue dies drop out first**, so a sagging
+rail reads as a warm shift and not as darkness. The PCB runs the same
+family on 3V3 deliberately, and that sentence is why a white pixel is the
+sensitive test for its rail — `pcb/BRINGUP.md` uses it twice.
 
 **Why not a second NeoKey 1x4**: it gives eight keys, not six, and is
 152 mm of board. **Why not the Snap-Apart 5x6 broken to 1x6**: one
@@ -489,6 +552,16 @@ What the bench actually taught, none of which was predictable on paper:
 
 ## Bring-up
 
+**This is the wired pad's procedure.** The PCB's is different in its first
+two steps and has its own file: [`pcb/BRINGUP.md`](pcb/BRINGUP.md). Three
+things differ and each will stop you. It has **no RST button** — SW1 is
+BOOT and there is nothing to tap, so the bootloader is entered by holding
+SW1 through a plug-in (or by bridging its bare footprint, before SW1 is
+soldered). It runs a **stock `raspberry_pi_pico` build**, not the QT Py
+one. And its `lib/` needs **`neopixel.mpy` only** — `adafruit_neokey` and
+`adafruit_seesaw` are for a bus it does not have, and their absence is
+never even reported. Everything from step 3 down is the same on both.
+
 1. With USB connected, **hold BOOT, tap RST, release BOOT** → the
    `RPI-RP2` volume appears. Double-tapping RST did not work here on
    2026-08-08 with CircuitPython 10.2.1. Drop the [CircuitPython
@@ -500,7 +573,8 @@ What the bench actually taught, none of which was predictable on paper:
    `neopixel` is the one the breakouts need; without it keys 0-1 still
    report presses and simply never light, and the host is told
    `ERR gpio pixels ...`. `adafruit_hid` is not needed and must not be
-   used.
+   used. `adafruit_pixelbuf` is a core module and is not in the bundle
+   list for that reason.
 3. Copy `firmware/boot.py` **and** `firmware/code.py` to `CIRCUITPY/`,
    then **hard reset**. `boot.py` only re-runs on a hard reset, and only
    a hard reset re-enumerates USB, which is what actually applies the CDC
@@ -561,7 +635,35 @@ The data port took the higher trailing number here, but do not select on
 that. `P` → `PONG` is the only reliable discriminator: the console port
 runs the REPL, which echoes `P` as typed text and never answers.
 
+**And do not select on the PID either.** `boot.py` sets the manufacturer
+and product strings and nothing else, so the VID and PID are whatever the
+CircuitPython build carries — a property of the binary, not of this
+firmware and not of the product. The same `boot.py` on the custom PCB,
+running a stock `raspberry_pi_pico` build, measures `0x239A` / **`0x80F4`**
+against the QT Py's `0x80F8` above. Both readings are correct; neither is
+the device's identity.
+
+So **`Canopy MacroPad` is the identifier**, and `P` → `PONG` is the port
+test. `tools/mpad.py` was already written that way — it matches the VID
+and the product string and never looks at the PID, which is why it found
+the PCB unchanged. A host that matches on the PID will not.
+
+Setting a fixed VID/PID in `boot.py` would make the identity independent
+of the build, and is deliberately not done — **and the host agrees.**
+Canopy matches on the product string plus the vendor id (accepting a
+missing vendor), and `MacroPadDevice.swift` says why the product id is
+left out: it belongs to the board and the CircuitPython build rather than
+to this project, so pinning it would *fail closed*, and a device that
+never connects looks exactly like a bad cable. So the PCB's `0x80F4` costs
+nothing on that side, and pinning a PID here would only reintroduce the
+coupling both halves went out of their way to avoid.
+
 ### When the keypad is missing
+
+**The wired pad only.** The PCB has no bus and no cable, so its profile
+carries no I2C addresses and that whole half of the firmware is never
+built — no `ERR i2c` of any kind can appear on it. Its equivalent failure
+is a different one, `ERR board`, below.
 
 `board.STEMMA_I2C()` raises `RuntimeError: No pull up found on SDA or SCL`
 when the Qwiic cable is not seated — the I2C pull-ups live on the NeoKey
@@ -579,20 +681,44 @@ the same path and reads `ERR i2c setup ImportError: no module named
 'adafruit_neokey' (reset required after fixing)`. `code.py` builds both
 from one `"setup {}: {}"`.
 
-**The key count does not drop.** It used to: `HELLO <ver> 0` meant
-"device present, keypad absent". It cannot any more, because the GPIO
-half cannot fail to enumerate and key 2 has to stay key 2 whether or not
-the NeoKey answered — the host maps index to pane, and letting the
-boards renumber when a cable is out would quietly focus the wrong
-session. So the count is always 6 and the `ERR` is what says which half
-is missing. The host should hold the connection and paint normally; the
-four keys behind the missing board simply do not light, and writes to
-them are dropped in silence exactly like an out-of-range index.
+**The key count does not drop for a missing keypad.** It used to:
+`HELLO <ver> 0` once meant "device present, keypad absent". It stopped
+meaning that, because the GPIO half cannot fail to enumerate and key 2 has
+to stay key 2 whether or not the NeoKey answered — the host maps index to
+pane, and letting the boards renumber when a cable is out would quietly
+focus the wrong session. So for any hardware fault the count is 6 and the
+`ERR` is what says which half is missing. The host should hold the
+connection and paint normally; the four keys behind the missing board
+simply do not light, and writes to them are dropped in silence exactly
+like an out-of-range index.
 
 `CIRCUITPY` comes back in this state, because the same missing keypad
 fails the drive gate open. That is a useful tell rather than a second
 fault: drive present *and* two ports means the gate could not read the
 keypad, and the keypad is what to go and look at.
+
+### When the firmware does not know what board it is on
+
+`HELLO <ver> 0` is reachable again, with one meaning and only one: the
+board profile did not resolve. It arrives with
+
+```
+HELLO 3 0
+ERR board build 'something' is not one of pcb/qtpy (set MPAD_BOARD in settings.toml)
+```
+
+and the device claims no pins and no addresses at all. That is deliberate.
+The profile is chosen from `sys.implementation._build`, a compile-time
+string, and if it is not in the table the firmware has no honest way to
+guess: a wrong guess renumbers every key silently, which is the one
+failure the whole file is arranged to prevent. Claiming six keys that
+resolve to no hardware would be a positive claim of health, and that is
+worse than saying nothing.
+
+It is not a wiring fault and no amount of looking at the board will fix
+it. The fix is one line in `CIRCUITPY/settings.toml` — `MPAD_BOARD="pcb"`
+or `"qtpy"` — and a reset; no reflash. The most likely cause is a
+CircuitPython upgrade that renamed a build.
 
 ### When nothing enumerates
 
@@ -607,24 +733,48 @@ the Mac before suspecting the board.
 
 ## Where this is
 
-Six keys, USB wired, status out and focus in — **built, wired and in
-use.** The enclosure was meant to be a later phase and arrived early:
-`inline` is printed, assembled and closing, `stacked` exists only as
-geometry. See [case/](case/).
+Six keys, USB wired, status out and focus in. **Built, and built twice.**
 
-What the assembled unit settled, none of which the model could have:
-both halves of the keypad read as the same white at `B 100`, so the
-Snap-Apart fallback is not needed; a breakout wants no locating peg,
-because the switch clips to the plate and ties the board to it through
-its socket; and the five wires needed a millimetre of case they did not
-have. Nothing on the case is open — the Qwiic pocket's notch was the last
-entry on that list, and several builds later it is simply fine at 1.00.
+The first device is an Adafruit QT Py RP2040 with two 4978 breakouts on
+GPIO and a NeoKey on I2C, in the printed `inline` case — the one in the
+photo above. It is assembled, wired, closing, and Canopy drives it.
 
-The rest of the later phases — low-profile Choc switches, and wireless on
-a MagSafe charger — are sketched in
-[docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
-deliberately not built yet. The only requirement now is not to block
-them.
+What that unit settled, none of which the model could have: both halves
+of the keypad read as the same white at `B 100`, so the Snap-Apart
+fallback is not needed; a breakout wants no locating peg, because the
+switch clips to the plate and ties the board to it through its socket;
+the five wires needed a millimetre of case they did not have; and the
+Qwiic pocket's notch, the last thing on that list, is simply fine at 1.00
+several builds later. The rest of its numbers are in [case/](case/), and
+the custom board inherited all of them.
+
+The second is a **custom two-layer PCB** that replaces all of it: one
+board, six Kailh Choc hot-swap sockets on 19.05, six SK6812MINI-E, an
+RP2040 and its flash, USB-C and an LDO. Designed in EasyEDA by script
+([pcb/README.md](pcb/README.md)), fabricated by JLCPCB with partial
+assembly, and brought up with every circuit on it verified — what that
+took, in what order, and which of those steps prove less than they look
+like they prove, is [pcb/BRINGUP.md](pcb/BRINGUP.md).
+
+**One firmware runs both.** `firmware/code.py` carries a `PROFILES` table
+and picks its entry from which CircuitPython build it booted, so the two
+devices share a protocol version, a key count and every line of policy.
+The pin tables cannot be shared even though the pin *numbers* are: GPIO3
+is the breakouts' pixel line on one board and KEY0 on the other.
+
+The enclosure followed the board. `case/` is one layout now, `choc`, sized
+from `pcb/params.py` directly rather than from restated dimensions. Both
+halves are printed and both fit: the end hook seats through the C's whole
+depth, and `COLUMN_SLACK` at 0.40 stopped the board support columns
+holding the seam open — the reprinted bottom closes. The `inline` and
+`stacked` directories under `case/out/` are the older device's, from
+layouts the source no longer has.
+
+The one part not yet in hand is the keycaps.
+
+The remaining phase — wireless on a MagSafe charger — is sketched in
+[docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and is
+deliberately not built. The only requirement now is not to block it.
 
 The wireless one has since been costed properly, without anything being
 built:

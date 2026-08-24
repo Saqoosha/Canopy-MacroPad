@@ -68,53 +68,86 @@ supervisor.set_usb_identification(
 # exists to prevent. See AGENTS.md on why usb_midi.disable() was
 # declined for the same reason.
 try:
+    import os
     import storage
+    import sys
 
-    import board
     import digitalio
+    import microcontroller
 
-    # Keys 0 and 1 first, because they are nearly free: two pin reads
-    # against the seesaw software reset below, which costs 0.5 s flat. A
-    # finger on either one answers the question without the bus being
-    # touched at all -- so a board with no Qwiic cable, or without the
-    # library, can still ask for the drive deliberately instead of only
-    # getting it by failing.
+    # Duplicated from code.py's PROFILES for the same reason 0x30 used to
+    # be duplicated below: boot.py cannot import code.py without running
+    # the whole program. Deliberately the smallest copy that answers this
+    # file's one question -- which pins to read, and whether there is a
+    # bus worth probing -- so there is less of it to drift.
     #
-    # The pin names are duplicated from code.py's GPIO_KEY_PIN_NAMES for
-    # the same reason 0x30 is duplicated below: boot.py cannot import
-    # code.py without running the whole program. If they drift apart, a
-    # name that does not exist raises and the drive is simply always
-    # enabled; a name that exists but is wrong reads high through its
-    # pull-up, so these two keys quietly stop opening the drive while the
-    # NeoKey's four still do. The second is the one to watch for, because
-    # it looks like nothing at all.
+    # Failing to resolve a profile raises out of this block, and the
+    # handler at the bottom leaves the drive enabled. That is the right
+    # direction: a board this file does not recognise is exactly a board
+    # someone needs to copy a new code.py to.
+    PROFILES = {
+        "qtpy": {"gpio_keys": (4, 6), "pad_addresses": (0x30,)},
+        "pcb": {"gpio_keys": (3, 4, 6, 20, 5, 24), "pad_addresses": ()},
+    }
+    BUILD_TO_PROFILE = {
+        "adafruit_qtpy_rp2040": "qtpy",
+        "raspberry_pi_pico": "pcb",
+    }
+    profile = PROFILES[
+        os.getenv("MPAD_BOARD")
+        or BUILD_TO_PROFILE[sys.implementation._build]]
+
+    # The GPIO keys first, because they are nearly free: a handful of pin
+    # reads against the seesaw software reset below, which costs 0.5 s
+    # flat. A finger on any one of them answers the question without the
+    # bus being touched at all -- so a board with no Qwiic cable, or
+    # without the library, can still ask for the drive deliberately
+    # instead of only getting it by failing. On the PCB there is no bus
+    # at all and these reads are the whole gate.
+    #
+    # GPIO *numbers*, not `board` names, for the reason code.py gives:
+    # `board`'s name table is per build and the QT Py's names are absent
+    # from the generic build the PCB runs. A number that does not exist
+    # raises and the drive is simply always enabled; a number that exists
+    # but is wrong reads high through its pull-up, so that key quietly
+    # stops opening the drive while the others still do. The second is
+    # the one to watch for, because it looks like nothing at all.
     held = False
     switches = []
-    for name in ("MISO", "SCK"):
-        switch = digitalio.DigitalInOut(getattr(board, name))
+    for num in profile["gpio_keys"]:
+        switch = digitalio.DigitalInOut(
+            getattr(microcontroller.pin, "GPIO{}".format(num)))
         switch.switch_to_input(pull=digitalio.Pull.UP)
         switches.append(switch)
     for switch in switches:
-        # Pull-up plus the breakout's diode to ground: pressed reads low.
+        # Pull-up to a switch on ground -- through the breakout's diode on
+        # the QT Py, straight to ground on the PCB. Pressed reads low
+        # either way.
         held = held or not switch.value
     for switch in switches:
         switch.deinit()
 
-    if not held:
-        # 0x30 is the first entry of code.py's PAD_ADDRESSES -- duplicated
-        # here because boot.py cannot import code.py without running the
-        # whole program. Only the first board is probed, so a second
-        # board's keys would not work as the gate; an address that does
-        # not answer costs a boot delay to learn nothing. If that tuple
-        # ever changes, this gate throws forever and the drive is simply
-        # always enabled, which is the failure direction we want anyway.
+    if not held and profile["pad_addresses"]:
+        # Only the first board is probed, so a second board's keys would
+        # not work as the gate; an address that does not answer costs a
+        # boot delay to learn nothing. If the profile's addresses ever go
+        # wrong, this gate throws forever and the drive is simply always
+        # enabled, which is the failure direction we want anyway.
         #
-        # The import sits here rather than at the top of the block so
-        # that a missing library costs only the four keys that need it.
+        # Reached only when the profile has an address at all, so a board
+        # with no I2C keypad never pays the 0.5 s and never fails here
+        # about a bus it does not have.
+        #
+        # Both imports sit here rather than at the top of the block so
+        # that a missing library, or a `board` with no STEMMA_I2C on it,
+        # costs only the four keys that need them.
+        import board
+
         from adafruit_neokey.neokey1x4 import NeoKey1x4
 
         i2c = board.STEMMA_I2C()
-        held = any(NeoKey1x4(i2c, addr=0x30).get_keys())
+        held = any(
+            NeoKey1x4(i2c, addr=profile["pad_addresses"][0]).get_keys())
         # Tidiness, not necessity: CircuitPython unlocks and deinits the
         # board busses when the boot VM tears down, so code.py opens the
         # bus fine even when a raise above skips this line. Measured,

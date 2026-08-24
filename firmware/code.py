@@ -52,9 +52,10 @@ it receives `ERR no-data-cdc-check-boot-py` right after `HELLO`.
 """
 
 import math
+import os
+import sys
 import time
 
-import board
 import microcontroller
 import usb_cdc
 
@@ -77,74 +78,159 @@ NeoPixel = None
 # 3: adds X, crossfades every C/S, and holds phase across a colour change
 PROTOCOL_VERSION = 3
 
+# Two boards run this file and they are not the same shape. The QT Py
+# build is two Adafruit 4978 breakouts on GPIO plus a NeoKey on I2C; the
+# custom PCB is six switches straight to GPIO and one six-pixel chain.
+#
+# They cannot share one pin table even though they share pin *numbers*.
+# The PCB was laid out against the QT Py's broken-out GPIO on purpose, so
+# the same eleven numbers are available on both -- but GPIO3 is the
+# breakouts' pixel line on one board and KEY0 on the other. Every
+# difference between the two devices lives in this table.
+#
+# Pins are GPIO **numbers**, resolved through `microcontroller.pin`, not
+# names through `board`. `board` carries a per-build name table, and the
+# QT Py's names are simply absent from the generic build the PCB runs --
+# measured on the real board, not assumed: `[n for n in ('MOSI', 'MISO',
+# 'SCK', 'TX', 'RX', 'SDA', 'SCL') if hasattr(board, n)]` returns `[]`
+# there. `microcontroller.pin.GPIOn` is the chip's own numbering and is
+# on every RP2040 build.
+PROFILES = {
+    # Adafruit QT Py RP2040. Keys 0-1 are the two breakouts, keys 2-5 the
+    # NeoKey. All three GPIO sit on the QT Py's 3V/GND edge, so the
+    # harness does not have to cross the board.
+    "qtpy": {
+        "gpio_keys": (4, 6),                # MISO, SCK
+        "gpio_pixel": 3,                    # MOSI
+        "pad_addresses": (0x30,),
+    },
+    # The custom PCB. Six switches on GPIO in the board's physical key
+    # order, one chain of six pixels, and no I2C anywhere on the board --
+    # so the whole I2C half below is skipped rather than failing.
+    "pcb": {
+        "gpio_keys": (3, 4, 6, 20, 5, 24),
+        "gpio_pixel": 25,
+        "pad_addresses": (),
+    },
+}
+
+# Which profile, decided by which CircuitPython **binary** is running.
+#
+# That is not the detection this file forbids, and the difference is the
+# whole reason this one is allowed to be automatic. Whether a breakout is
+# *wired* is electrically unknowable -- an absent one and a present one
+# nobody is pressing are both pulled high, with no readback on the pixel
+# line and no capacitive sense on an RP2040 -- so that question was
+# always a human's to answer. Which build you booted is a compile-time
+# string, and there is no guess in reading it.
+#
+# `settings.toml`'s `MPAD_BOARD` overrides the table, and is the answer
+# of record for a board whose build name is not in it. The PCB currently
+# runs a stock `raspberry_pi_pico` build: a name it does not own, that an
+# actual Pico would also answer to, and that stops matching the day the
+# board gets a definition of its own.
+#
+# An unrecognised answer gets **no** fallback profile. A wrong guess
+# renumbers every key silently, which is the one failure this file is
+# built to prevent, so it comes up with no hardware at all and says so.
+# Both strings were read off their own board's REPL, not taken from a
+# board definition: `print(sys.implementation._build)` answers
+# 'raspberry_pi_pico' on the built PCB and 'adafruit_qtpy_rp2040' on the
+# QT Py. Worth re-reading after a CircuitPython upgrade, and the failure
+# if one ever stops matching is the safe one -- that board comes up with
+# `HELLO <ver> 0` and `ERR board ...` rather than with wrong pins, and
+# `MPAD_BOARD` in settings.toml fixes it without a reflash.
+BUILD_TO_PROFILE = {
+    "adafruit_qtpy_rp2040": "qtpy",
+    "raspberry_pi_pico": "pcb",
+}
+# Read through `getattr` because `_build` is a private attribute, and this
+# line is at module scope where an AttributeError is the silent brick --
+# CircuitPython stops `code.py`, the port goes quiet, and from the host
+# that is indistinguishable from a board that never booted. A release that
+# renames or drops it must land in the failure this file already has a
+# path for: no profile, `ERR board`, and a device that still talks.
+# `os.getenv` is not wrapped, deliberately -- it is public API, and
+# guarding everything that could theoretically move is how a guard stops
+# meaning anything.
+_build = getattr(sys.implementation, "_build", None)
+_forced = os.getenv("MPAD_BOARD")
+BOARD_PROFILE = _forced or BUILD_TO_PROFILE.get(_build)
+if BOARD_PROFILE in PROFILES:
+    board_error = None
+    _profile = PROFILES[BOARD_PROFILE]
+else:
+    board_error = "{} {!r} is not one of {}".format(
+        "MPAD_BOARD" if _forced else "build",
+        _forced or _build,
+        "/".join(sorted(PROFILES)))
+    _profile = {"gpio_keys": (), "gpio_pixel": None, "pad_addresses": ()}
+
 # The I2C addresses of the NeoKey boards, in physical left-to-right key
 # order. This tuple is the single source of truth for how many boards
 # exist -- deriving it the other way round (a count that slices a longer
 # address list) silently clamps instead of failing. A second board needs
-# its A0 jumper bridged on the back to answer 0x31.
-PAD_ADDRESSES = (0x30,)
+# its A0 jumper bridged on the back to answer 0x31. Empty on a board with
+# no I2C keypad, and then nothing here is imported, addressed or reported
+# on.
+PAD_ADDRESSES = _profile["pad_addresses"]
 KEYS_PER_PAD = 4
 SEESAW_KEYS = KEYS_PER_PAD * len(PAD_ADDRESSES)
 
-# Keys 0 and 1: two Adafruit 4978 NeoKey Socket Breakouts, read straight
-# off GPIO. They carry no seesaw, so there is nothing to address and
-# nothing to enumerate -- which is why this is the half that cannot fail
-# to come up, and why the key count below can be a constant.
+# The keys read straight off GPIO, in physical left-to-right order. They
+# carry no seesaw, so there is nothing to address and nothing to
+# enumerate -- which is why this is the half that cannot fail to come up.
+# On the QT Py that is keys 0-1 and they come *before* the NeoKey's four;
+# on the PCB it is all six and there is no other half.
 #
-# Each breakout puts its switch in series with a 1N4148 running SWITCHA
-# to SWITCHC. SWITCHC goes to ground, so a press pulls its input low
-# through the diode. The forward drop at the ~55 uA an internal pull-up
-# supplies is about 0.45 V, under the RP2040's 0.8 V V_IL but not by a
-# wide margin: a key that reads permanently pressed is the symptom of
-# that number being wrong, and an external pull-up is the fix.
+# The switch wiring differs between the boards and only one of them has a
+# margin worth watching. Each 4978 breakout puts its switch in series
+# with a 1N4148 running SWITCHA to SWITCHC, and SWITCHC goes to ground,
+# so a press pulls its input low *through the diode*. The forward drop at
+# the ~55 uA an internal pull-up supplies is about 0.45 V, under the
+# RP2040's 0.8 V V_IL but not by a wide margin: a key that reads
+# permanently pressed is the symptom of that number being wrong, and an
+# external pull-up is the fix. The PCB's switches go straight to ground
+# with no diode in the way, so they have no such margin to lose.
 #
-# Pin *names*, resolved against `board` inside the setup guard rather
-# than here. `board.MISO` on a build that lacks it is an AttributeError
-# at module scope, which is the silent brick again -- and a wrong-board
+# Resolved against `microcontroller.pin` inside the setup guard rather
+# than here. A number missing from it would be an AttributeError at
+# module scope, which is the silent brick again -- and a wrong-board
 # flash is exactly when you want the serial half still talking.
-#
-# In physical left-to-right order, which here means these come *before*
-# the NeoKey's four. All three pins sit on the QT Py's 3V/GND edge, so
-# the harness does not have to cross the board.
-#
-# Empty this tuple for a board with no breakouts and the whole file
-# becomes the four-key firmware: `SEESAW_BASE` falls to 0 so the NeoKey
-# is 0-3 again, `NUM_KEYS` falls to 4, and the setup below is skipped
-# whole. That one line is the entire difference between the two builds.
-#
-# There is deliberately no detection and no strap. An absent breakout is
-# electrically identical to a present one nobody is pressing -- pulled
-# high either way, with no readback on the pixel line and no capacitive
-# sense on an RP2040 -- so any automatic answer would be a guess. A
-# wrong guess renumbers every key silently, which is the one failure
-# this file is built to prevent, and the flash is one file copy. The
-# person doing the copy is the only honest source of truth.
-GPIO_KEY_PIN_NAMES = ("MISO", "SCK")
-GPIO_PIXEL_PIN_NAME = "MOSI"
-GPIO_KEYS = len(GPIO_KEY_PIN_NAMES)
+GPIO_KEY_GPIO = _profile["gpio_keys"]
+GPIO_PIXEL_GPIO = _profile["gpio_pixel"]
+GPIO_KEYS = len(GPIO_KEY_GPIO)
 
-# Index order is physical, left to right, and the case decided it rather
-# than this file: the breakouts sit to the *left* of the NeoKey, because
-# on the right a mated Qwiic plug lands 0.025 mm from the first
-# breakout's switch body and the NeoKey's socket ends up 114 mm from a
-# QT Py holding a 50 mm cable. See case/params.py, BREAKOUT_ORIGINS_LOCAL.
+# Index order is physical, left to right, and on the QT Py the case
+# decided it rather than this file: the breakouts sit to the *left* of
+# the NeoKey, for reasons of plug clearance and cable reach that
+# `case/params.py` owns and states with its own numbers
+# (`BREAKOUT_ORIGINS_LOCAL`). Restating one of them here is how a number
+# gets carried away from what makes it true, so it is not restated.
 #
-# So the GPIO pair is 0-1 and the NeoKey is 2-5 -- or, with the tuple
-# above emptied, there is no pair and the NeoKey is 0-3. These two
-# constants are the only place that knows which way round it goes.
+# So on the QT Py the GPIO pair is 0-1 and the NeoKey is 2-5; on the PCB
+# the GPIO six are 0-5 and `SEESAW_BASE` lands past the end and is never
+# used. These two constants are the only place that knows which way round
+# it goes.
 GPIO_BASE = 0
 SEESAW_BASE = GPIO_KEYS
 
-# Fixed, and deliberately not derived from what enumerated. Key 2 is key
-# 2 whether or not the NeoKey answered: the host maps index to pane, so
-# letting the boards renumber when the Qwiic cable is out would quietly
-# focus the wrong session.
+# Derived from the profile, not from what enumerated at runtime. Key 2 is
+# key 2 whether or not the NeoKey answered: the host maps index to pane,
+# so letting the boards renumber when the Qwiic cable is out would
+# quietly focus the wrong session.
 #
-# The cost is that `HELLO <ver> 0` -- which used to mean "device present,
-# keypad absent" -- can no longer happen. A missing NeoKey now shows up
-# as `HELLO <ver> 6` plus `ERR i2c ...`, and the host paints keys 2-5
-# into a board that is not there. Writes to absent hardware are dropped
-# in silence, the same way an out-of-range index already is.
+# Both real profiles come to 6, by different sums -- 2 + 4 on the QT Py,
+# 6 + 0 on the PCB -- so a missing NeoKey shows up as `HELLO <ver> 6`
+# plus `ERR i2c ...` and the host paints keys 2-5 into a board that is
+# not there. Writes to absent hardware are dropped in silence, the same
+# way an out-of-range index already is.
+#
+# `HELLO <ver> 0` is reachable again, and means one thing only: this
+# firmware does not know what board it is on. It arrives with `ERR board
+# ...`, and it is the honest report -- claiming six keys that resolve to
+# no pins would be a positive claim of health, which is worse than
+# silence.
 NUM_KEYS = SEESAW_KEYS + GPIO_KEYS
 
 # Full brightness is genuinely painful to sit next to, but going too dim
@@ -197,6 +283,24 @@ DEFAULT_PULSE_PERIOD_NS = 2_000_000_000
 # trades the perceptual curve for movement that never runs out of steps.
 # 1.0 makes the exponentiation an identity; it is kept as a retunable
 # knob, not left behind by accident.
+#
+# The knob exists because the underlying problem was not solved, only
+# stepped around: at low brightness there are not enough levels, and 1.0
+# spends the perceptual curve to keep what levels there are. **Temporal
+# dithering is the improvement this is waiting for** -- trading update
+# rate for effective depth, which is the standard answer to running out
+# of amplitude resolution, and cheap here because the pulse already
+# repaints at 50 Hz (`PULSE_STEP_NS`).
+#
+# It was investigated once on the QT Py, on scratch scripts that live on
+# that board's CIRCUITPY and were never committed. Do not treat their
+# conclusions as carrying over: the PCB changed the premise underneath
+# them. Its pixels are SK6812MINI-E on the regulated 3V3 rail, below
+# their own datasheet minimum, where the QT Py's hang off the
+# unregulated Qwiic rail and are a different part on two separate
+# chains. How the bottom of the range quantises is a property of the
+# driver and its supply, so the measurement is worth re-running here
+# before anything is tuned.
 PULSE_GAMMA = 1.0
 
 # How long a color or floor change takes to complete. An instant switch
@@ -240,14 +344,26 @@ I2C_FAIL_LIMIT = 20
 pads = []
 pixel_groups = []
 pad_errors = []
-try:
-    from adafruit_neokey.neokey1x4 import NeoKey1x4
-    i2c = board.STEMMA_I2C()
-except Exception as err:  # noqa: BLE001 - a missing lib and a missing
-    # cable arrive here identically, and both must leave the serial half
-    # alive so the host is told rather than left staring at a dead port.
-    i2c = None
-    pad_errors.append("setup {}: {}".format(type(err).__name__, err))
+i2c = None
+# Skipped whole on a board with no I2C keypad, and the skip is the exact
+# mirror of the GPIO one below. Running it anyway would import
+# `adafruit_neokey` and call `board.STEMMA_I2C()` on a device that has
+# neither, so every connect would carry an `ERR i2c setup ...` about
+# hardware the board was never built with -- forever, and about a fault
+# that cannot be fixed. That is precisely the noise this firmware refuses
+# to emit, and a host told to expect it learns to ignore the real one.
+if PAD_ADDRESSES:
+    try:
+        import board
+
+        from adafruit_neokey.neokey1x4 import NeoKey1x4
+        i2c = board.STEMMA_I2C()
+    except Exception as err:  # noqa: BLE001 - a missing lib and a missing
+        # cable arrive here identically, and both must leave the serial
+        # half alive so the host is told rather than left staring at a
+        # dead port.
+        i2c = None
+        pad_errors.append("setup {}: {}".format(type(err).__name__, err))
 if i2c is not None:
     for slot, addr in enumerate(PAD_ADDRESSES):
         # The base index comes from the slot, not from how many boards
@@ -281,9 +397,9 @@ if i2c is not None:
 # first and separately -- the half that needs nothing stays working when
 # the half that needs something does not.
 #
-# Skipped whole when GPIO_KEY_PIN_NAMES is empty, and the skip is not
+# Skipped whole when the profile has no GPIO keys, and the skip is not
 # cosmetic: `NeoPixel(pin, 0)` is a zero-length strip, which is either
-# an exception -- and then a four-key board reports `ERR gpio pixels` on
+# an exception -- and then such a board reports `ERR gpio pixels` on
 # every single connect, forever, about hardware it was never built with
 # -- or an empty group nothing will ever write to. Neither is worth
 # carrying, and the first would teach a host to ignore that error.
@@ -293,8 +409,9 @@ if GPIO_KEYS:
     try:
         import digitalio
 
-        for name in GPIO_KEY_PIN_NAMES:
-            switch = digitalio.DigitalInOut(getattr(board, name))
+        for num in GPIO_KEY_GPIO:
+            pin = getattr(microcontroller.pin, "GPIO{}".format(num))
+            switch = digitalio.DigitalInOut(pin)
             switch.switch_to_input(pull=digitalio.Pull.UP)
             gpio_switches.append(switch)
     except Exception as err:  # noqa: BLE001
@@ -304,12 +421,14 @@ if GPIO_KEYS:
 
         # GRB is the WS2812 family's wire order and what the NeoKey's
         # seesaw driver already assumes, so the breakouts carrying the
-        # same NEO3535_REVERSE part should match. If keys 0 and 1 come up
-        # with red and green swapped while 2-5 look right, this is the
-        # line -- it is a property of the LED, and nothing in the .brd
-        # files states it.
+        # same NEO3535_REVERSE part should match, and so do the PCB's
+        # SK6812MINI-E. If these keys come up with red and green swapped
+        # while any NeoKey's look right, this is the line -- it is a
+        # property of the LED, and neither the .brd files nor the PCB's
+        # schematic states it.
         gpio_pixels = NeoPixel(
-            getattr(board, GPIO_PIXEL_PIN_NAME), GPIO_KEYS,
+            getattr(microcontroller.pin, "GPIO{}".format(GPIO_PIXEL_GPIO)),
+            GPIO_KEYS,
             auto_write=False, brightness=DEFAULT_BRIGHTNESS,
             pixel_order="GRB")
         gpio_pixels.fill(0x000000)
@@ -648,10 +767,16 @@ if i2c_error:
     print("Check the Qwiic cable between the QT Py and the NeoKey.")
     print("Reconnecting it needs a reset; it is not picked up live.")
 if gpio_error:
-    print("WARNING: breakout keys degraded ({}).".format(gpio_error))
-    print("Keys {}-{} are the two 4978 boards on GPIO {} / pixels on {}."
+    print("WARNING: GPIO keys degraded ({}).".format(gpio_error))
+    print("Keys {}-{} are on GPIO {} / pixels on GPIO {}."
           .format(GPIO_BASE, GPIO_BASE + GPIO_KEYS - 1,
-                  "/".join(GPIO_KEY_PIN_NAMES), GPIO_PIXEL_PIN_NAME))
+                  "/".join(str(n) for n in GPIO_KEY_GPIO),
+                  GPIO_PIXEL_GPIO))
+if board_error:
+    print("WARNING: unknown board ({}).".format(board_error))
+    print("No keypad was claimed at all -- this is not a wiring fault.")
+    print("Set MPAD_BOARD in CIRCUITPY/settings.toml to one of {}, "
+          "then reset.".format("/".join(sorted(PROFILES))))
 
 
 # An uncaught exception is the worst thing that can happen here, and it
@@ -687,6 +812,22 @@ try:
             write_line("HELLO {} {}".format(PROTOCOL_VERSION, NUM_KEYS))
             if using_fallback_port:
                 write_line("ERR no-data-cdc-check-boot-py")
+            if board_error:
+                # First, because it is the reason the other two are
+                # silent: an unresolved profile claims no pins and no
+                # addresses, so neither setup guard ever runs and neither
+                # has anything to report. Without this line the host gets
+                # `HELLO <ver> 0` and no explanation at all.
+                #
+                # It passes the test the declined diagnostics failed --
+                # what state would it be wrong in? None. It fires only
+                # when the profile genuinely did not resolve, which is
+                # never anything but a real fault, and it is the exact
+                # twin of the two below: emitted once, at connect, for a
+                # half of the device that otherwise cannot speak.
+                write_line(
+                    "ERR board {} (set MPAD_BOARD in settings.toml)".format(
+                        board_error))
             if i2c_error:
                 # The advice differs by cause and must not be guessed at:
                 # a keypad missing since boot needs a reset once it is

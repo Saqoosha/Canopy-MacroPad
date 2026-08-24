@@ -1,18 +1,31 @@
 # Canopy MacroPad — case
 
-A two-part printed enclosure for the six-key field — two NeoKey Socket
-Breakouts butted onto a NeoKey 1x4 — and the QT Py that drives it.
-Parametric, in `build123d`; the way to change it is to change a number in
-`params.py` and rebuild.
+A two-part printed enclosure for the **custom MacroPad PCB** — one board,
+six Choc sockets on 19.05, its own RP2040 and USB-C. Parametric, in
+`build123d`; the way to change it is to change a number in `params.py` and
+rebuild.
+**One layout**, `choc`, and no switch to select it. `params.py` loads
+`pcb/params.py` by path, so the board's width, corner radius, switch pitch
+and pad positions are read rather than restated — the two files cannot
+drift into disagreeing. It is printed, both halves: its end hook and its
+column heights are settled on the printed parts, and the bottom that
+`COLUMN_SLACK` asked for has been reprinted and fits.
 
-One plate spans all three boards, which is why they are one field and not
-three pockets: `KEY_FIELD_W` is `2 × 19.05 + 76.20 = 114.30`, the boards
-are the same 21.59 deep and the same 1.570 thick, and the switch pitch
-carries straight across the seams with nothing to tune.
+Three sections here are about the **earlier device** rather than this one
+— *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —
+kept because that device is still assembled and in use. Its two layouts
+are gone from the source, so those sections are a record rather than a
+menu: nothing in them can be rebuilt, and the STLs under `out/inline/` and
+`out/stacked/` are the only form of them left. *What the checks have
+actually caught* is that device's model too — the lessons carry, the parts
+do not, and this case's own catches are in the repository's `AGENTS.md`.
 
-**Two layouts**, from the same source, chosen with `MPAD_LAYOUT`. They
-differ only in where the QT Py goes, and that one decision moves every
-dimension in the case:
+## The earlier device: two layouts, and the `inline` one printed
+
+The device before this one was three boards — a NeoKey 1x4 on I2C and two
+single-key breakouts on GPIO — driven by a QT Py, and the case came in two
+layouts from one source, chosen with `MPAD_LAYOUT`. They differed only in
+where the QT Py went, and that one decision moved every dimension:
 
 | | `stacked` | `inline` (default) |
 |---|---|---|
@@ -26,16 +39,18 @@ dimension in the case:
 | Qwiic cable | **100 mm**, down an end bay | **50 mm**, but with 35 mm of slack to fold into a 12 mm gap |
 | handedness | either end takes the cable | **right-handed**: the cable can only come off the right socket |
 
-`stacked` is the compact one and `inline` is the low one. Neither is
+One plate spans all three boards, which is why they are one field and not
+three pockets: `KEY_FIELD_W` is `2 × 19.05 + 76.20 = 114.30`, the boards
+are the same 21.59 deep and the same 1.570 thick, and the switch pitch
+carries straight across the seams with nothing to tune.
+
+`stacked` was the compact one and `inline` the low one. Neither was
 strictly better — a shorter pad sits closer to keyboard height, a smaller
 one takes less desk.
-
-## The `inline` case, printed
 
 ![The four-key inline case, closed with keycaps on, and open with the
 NeoKey and the QT Py seated in the shell above the bottom
 plate](images/inline-built.jpg)
-
 `inline` is the layout that exists as a physical object, and it has been
 printed twice: **the four-key case in the photograph, and the six-key one
 that replaced it** — printed, wired, closing, and the pad in use. The
@@ -112,19 +127,24 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-There are two, and the small one exists so that re-asking one question
+There are four, and the small ones exist so that re-asking one question
 does not cost a reprint of the answers already settled:
-`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own.
-
+`out/<layout>/coupon-stem.stl` is the keycap mount's slot sweep, which
+*Dummy keycaps* covers;
+`out/<layout>/coupon-clear.stl` is the clearance-hole row on its own and
+`out/<layout>/coupon-hole.stl` is the switch-hole row, three diameters
+engraved, on a plate at the real `PLATE_T` -- a Choc v2 clips into that
+thickness, so a thicker test piece would answer neither half.
 `out/<layout>/coupon.stl` is 68 × 46 mm and takes about twenty minutes.
 It exists because a few numbers in `params.py` are things only a printer
 can settle, and getting them wrong costs a two-hour reprint:
 
 | Test | What it settles | Status |
 |---|---|---|
-| switch into the 14.15 square hole | `SWITCH_HOLE` | **settled** — a Durock Ice King seats correctly on an A1 mini in PLA Basic |
+| switch into the square hole | `SWITCH_HOLE` | **settled at 14.00 on a Choc v2** — all three swept holes take the switch and 14.00 is the one that grips. It won at the bottom of the sweep, so tighter was never printed; the direction of better is tighter and a hole that grips is the whole requirement. `out/<layout>/coupon-hole.stl` asks this on its own, at the real `PLATE_T`, since the plate's thickness has to hold the clips too. The 14.15 above it is the **MX** answer from the three-board case and does not carry over: 13.95 nominal plus this machine's 0.15 hole shrink predicted 14.10, and 14.00 is what grips, so the shrink is not one number across features |
 | M3 self-tapper into four pilots, Ø2.50 to Ø2.95 | `PILOT_DIA` | **settled** — 2.95 bites without a fight; 2.50 is the tight one the built case has |
 | M3 dropped through four clearance holes, Ø3.40 to Ø3.85, over two transitions | `SCREW_CLEAR_DIA`, `CLEAR_CHAMFER` | **settled, and confirmed on a printed plate** — 3.70 with a 0.60 chamfer is the smallest that comes out clean and falls through |
+| a printed cross socket onto a real stem | `STEM_CLEAR` | **settled at 0.00**, across two sweeps and then on the caps themselves. `out/<layout>/coupon-stem.stl` asks it alone, four tokens at 0.00 to 0.10; what the number is really against is the arm's retention ribs, and *Dummy keycaps* carries why 0.00 is a floor rather than an untested edge |
 | standoff + peg against a real NeoKey hole | `PEG_DIA`, standoff height | **settled** — the built `inline` case seats the board flat on Ø2.30 pegs |
 
 `PILOT_DIA` was the last one open, and the only one the coupon could
@@ -215,7 +235,144 @@ thing. The coupon carries the real features at their real sizes — the
 plate is 1.6 mm and the post is whatever that layout's post is, 9.3 mm
 inline and 13.5 mm stacked — so a fit that works here works in the case.
 
+## Dummy keycaps
+
+The wrk. MX Pure set is ordered and is not here, so `out/choc/keycap.stl`
+is a blank 1U to press in the meantime — 0.65 cm³ each, about 0.8 g in
+PLA, and six are printed and on the switches.
+It carries the photographed cap's envelope, 18.40 square on a 4.20
+corner, so the swap when the real ones land changes the plastic and
+nothing else.
+
+**The mount is measured rather than looked up.** Choc v2 is sold as
+MX-compatible and its stem is not a bare cross: it is an MX cross
+standing *inside* a ring, and the cross does not stand proud of it, so
+the only way onto it is a boss that goes down the bore. Every number
+below was read off `ref/choc-v2.step` with a boolean probe, and
+`build.py` reads all twelve back out of that file on every run — a
+re-exported or swapped switch model goes red there instead of quietly
+redefining what the cap mounts on.
+
+That dependency is **hard**: `build.py` exits if `ref/choc-v2.step` is
+not there rather than falling back to the constants, so a fresh clone
+runs `sh ref/fetch.sh` before it can build anything. `product.py` has
+always needed the same file, but only for a picture — the difference now
+is that a missing reference is a case that will not build.
+
+| | size | switch-local z, 0 at the PCB top |
+|---|---|---|
+| cross, tip to tip | 4.00 | 0.20 → 8.60 |
+| cross arm, body | 1.20 thick | the top 0.10 is chamfered off |
+| eight retention ribs | 1.30 over them | 4.10 → 8.39, at 1.20 out the arm |
+| ring | Ø6.50 outer, Ø5.50 bore | 3.60 → 8.60 |
+| fixed housing, top face | — | 5.30 |
+| mouth the ring travels through | Ø6.60 | at 5.30 |
+
+Two things follow from the cross tip and the ring rim being the **same
+plane**. The cap seats on the *ring*: a Ø6.50 rim resists rocking that
+8.6 mm² of cross tip cannot, so the bore is sunk `CAP_SOCKET_OVER` 0.10
+past that plane and the cross never carries the press. And the pad that
+lands on it has 1.10 of window to live in — wider than the ring's bore
+so it bears on something, narrower than the housing's mouth so it can
+never come down on the lip. Ø6.00 leaves 0.25 and 0.30, and neither
+clears the 0.25 the margin table asks of everything else, so that pair
+is checked on its own terms rather than by loosening the table.
+
+**The arms are not 1.20 and that is the whole fit.** Each carries a rib
+on each flat — eight of them, 0.05 proud, about 0.10 wide, running
+nearly the stem's full height — so what a slot actually meets is 1.30.
+They were found by a boolean and not by reading: every probe of the arm
+returned 1.200, because a 0.10-wide feature fits between probes, and the
+first version of the cap fouled the switch by 0.075 mm³ with no
+explanation until the eight pieces of that interference were listed
+individually.
+
+`STEM_CLEAR` is measured from the arm **body**, so the number doubles as
+how much rib is left alone: 1.20 + `STEM_CLEAR` against 1.30 is the
+squeeze, 0.05 per side at 0.00 and none at 0.10.
+
+**Settled at 0.00, on two printed sweeps and then on the caps
+themselves** — six printed at 0.00 go onto the switches and fit really
+well, which is the claim the tokens could only stand in for.
+
+The sweeps that got there. The first — 0.10, 0.15, 0.20, 0.25 — came
+back *0.10 grips, the other three are loose*, and that
+is the ribs answering: 0.10 puts the slot exactly on them and every
+looser entry clears them by 0.025 or more, which is a cap held by
+nothing. So that whole sweep sat at or above the ribs and could only
+find the top of its range. The second ran downward — 0.00, 0.04, 0.07,
+0.10, the last kept in as the control, because a feel only separates
+from another feel side by side, same plastic, minutes apart — and 0.00
+is tight enough.
+
+That is the fourth number in this case to win at the **bottom** of what
+was printed, after `SWITCH_HOLE`, `PILOT_DIA` and its own first sweep,
+**and it is the first one where the bottom is not an untested edge.**
+Those three ran off the end of what had been printed, and each carries a
+note saying re-run downward from here if it ever disappoints. This one
+has a mechanism under it: 0.00 puts the slot on the arm body, so it
+squeezes the ribs flat and nothing else, and below it the bore stops
+squeezing ribs and starts eating the arm — a different thing to be
+doing, and one `build.py` refuses. There is no third sweep to run.
+
+Print shrink sits underneath all of it — this machine pulls a hole in by
+0.05 to 0.15 — so the slot arrives narrower than 1.20 and the ribs give
+the difference. That is also the failure mode left: a cap that comes
+loose after a few pulls means the ribs were shaved rather than
+deflected, and the answer is to come **up** from 0.00, because down is
+not available.
+
+`out/choc/coupon-stem.stl` is four tokens, engraved, each with the pad
+and boss at the heights the cap has them so the slot prints in the same
+air. It stays in the tree for the next filament or nozzle: press each
+onto a switch, keep the one that grips, set `STEM_CLEAR`, rebuild. They
+are four separate tokens on purpose — at 19.05 a single bar would engage
+every switch it spans at once, and the question is one slot on one
+stem.
+
+**So the interference check had to be split**, because "the bore must
+not touch the stem" stopped being true the moment the ribs were known —
+the bore is *supposed* to squeeze them. The arm body is a wall and is
+checked at 0.000; the squeeze is printed as a **reading rather than a
+guard**, since no value of it is wrong in the model and only a pressed
+token can say. The envelope that separates the two is built from
+the ribs' own measured extent, and what keeps it *on* them is the
+read-back, not the envelope: moved 0.50 out the arm it still caught
+0.174 mm³ of the cross's flare and looked healthy, the squeeze silently
+read 0.000, and the only thing that went red was `arm over a retention
+rib` at 1.200 against 1.300. An envelope that misses reads exactly like
+a slot that clears.
+
+The cavity's corner radius is **2.00 and deliberately not**
+`CAP_R - CAP_WALL`. Rounding a corner pulls the boundary inward along
+the diagonal, and the diagonal is where the switch is widest — its
+15 × 15 base stands 1.50 proud of the plate, so the skirt passes it at
+bottom-out. At 3.00 the cavity reached 10.071 against the base's
+measured 10.200 and the two fouled by 0.082 mm³; 2.00 reaches 10.485.
+The cost is a corner wall of 0.79 instead of 1.20, which is two
+perimeters on a blank.
+
+Watched failing, because a guard nobody has seen go red is not a guard:
+the bore against the real cross 3.032 mm³ at `STEM_CLEAR` −0.20, the cap
+into the shell 70.851 mm³ with the ride cut to 2.20, into its neighbour
+22.725 mm³ at `CAP_XY` 19.50, into the housing the 0.082 above, the
+missing seat 0.532 mm³ with the pad at Ø5.00, the bore itself 7.474 of a
+wanted 31.409 mm³ when it was cut in the wrong direction — that one was
+a real bug, and the volume is what found it — the sweep's four tokens
+identical, and the STEP read-back at `STEM_TOP` 8.50.
+
+It prints top face **down**, like the shell: the cavity opens upward,
+the pad and boss stand up out of it, the bore opens up, and there is no
+overhang anywhere in it. No supports, and the bed face is the visible
+top.
+
 ## Cable, per layout
+
+**The earlier device.** Both layouts here are gone from the source, and
+this case has no Qwiic cable at all — one board, with the keys, the
+pixels and the MCU on it — so nothing below applies to it. The whole
+question went away with the boards rather than being answered somewhere
+else.
 
 **`inline` uses the 50 mm cable you already have.** The two sockets end up
 facing each other 12 mm apart, so the run is trivial — but 50 mm is the
@@ -239,27 +396,27 @@ gone either way. The six-key field needs five soldered wires, and the
 
     uv venv --python 3.12 .venv
     uv pip install --python .venv/bin/python build123d trimesh matplotlib
-    .venv/bin/python build.py                       # inline, the default
-    MPAD_LAYOUT=stacked .venv/bin/python build.py   # stacked
-
-Each writes into `out/<layout>/`, so both sets of STLs exist side by side.
-The other scripts take the same variable.
+    .venv/bin/python build.py      # must end in "all checks passed"
+There is **one layout now**, `choc`, and it writes into `out/choc/`.
+`MPAD_LAYOUT` is gone with the two it used to select: `params.OUT_NAME` is
+the name, and it is not a switch. The `inline` and `stacked` directories
+under `out/` are the older device's, kept because they are the only
+remaining form of a case that is physically in use — the source that
+produced them was removed with the layouts.
 
     .venv/bin/python section.py    # sections.png -- cut through the stack
     .venv/bin/python render.py     # *.png -- shaded views
     .venv/bin/python product.py    # product.png -- assembled and exploded
 
-    .venv/bin/python webgl.py dump                     # per layout, then once:
-    MPAD_LAYOUT=stacked .venv/bin/python webgl.py dump
-    .venv/bin/python webgl.py page                     # -> out/viewer.html
+    .venv/bin/python webgl.py dump
+    .venv/bin/python webgl.py page                    # -> out/viewer.html
 
-**Run all five, both layouts, after every geometry change.** `build.py`
+**Run all five after every geometry change.** `build.py`
 rewrites only the STLs and STEPs, so a partial sweep leaves the renders
 and the viewer describing the previous shape, which reads as verified
 rather than stale. Note that the shell's exports come out byte-different
 on every run even when nothing changed — see `AGENTS.md`; compare the
 geometry, not the bytes.
-
 **The viewer is live at <https://saqoosha.github.io/Canopy-MacroPad/>**,
 served off the `gh-pages` branch, which holds nothing but this one file
 as `index.html` plus an empty `.nojekyll`. It is a copy, so it goes stale
@@ -353,6 +510,14 @@ plate-face down. Do not rotate them.
 
 ## What the checks have actually caught
 
+Every one of these is from the **earlier device's** model — the QT Py, the
+NeoKey and the two breakouts — because that is where the checks were built
+and where they earned their keep. The parts are gone; the lessons are the
+reason the checks exist at all, and they are why this case's stand-ins
+model mated plugs and real component faces rather than boxes. What this
+case's own checks have caught since is recorded in the repository's
+`AGENTS.md`, under "Editing the case".
+
 Not a hypothetical list. Every one of these was in the model and none was
 visible in a render. Three of them are the *same* mistake in three
 different places — a wall that fits the board and seals off the socket
@@ -436,6 +601,10 @@ where it was credited.
 
 ## Stack, in `stacked`
 
+**The earlier device.** This layout is gone from the source; the numbers
+below describe a case that can no longer be rebuilt. Kept because the Z
+argument is the same argument this case has, one board fewer.
+
 This one is the `stacked` layout, which is where the Z fight is —
 `inline` puts the QT Py beside the keys instead of under them and comes
 out 13.33 tall against 17.49. Z is measured from the outside of the bottom
@@ -488,9 +657,68 @@ A cantilever that deflects 0.40 within 2% wants about 5 mm of length and
 this plate is 2.40 thick, so no hook in this geometry can work. A third
 screw at mid-span is out for a different reason: the boards fill the case
 wall to wall there, 0.200 between the field and the cavity against the
-5.60 a post needs. **If the centre ever lifts, the next thing to try is
-a magnet pair under the boards, not a plastic spring.**
+5.60 a post needs. **If the
+centre ever lifts, the next thing to try is a magnet pair under the
+boards, not a plastic spring.**
 
+**And the far end is hooked.** Both screws sit in the left bay, so 145.50
+of a 151.00 case had nothing on it. At the right end the seam climbs to
+`END_HOOK_SEAM_Z`, the plate's wall carries on up inside the shell's, and
+a horizontal boss off that wall drops into a slot cut right through. It
+is not friction: the boss is captured, so that end cannot lift. **Ends
+only, and the reason is the assembly motion rather than strength** -- the
+boss is engaged by moving the plate along x, right end in and left end
+swung down, and on a long side the same boss would need the plate to move
+in y at the same time, which the other end forbids.
+
+The slot goes through the outer face on purpose. A blind pocket had to
+share the skirt's 1.00 with the skin outside it and burst through anyway,
+and through you can see from outside whether the hook engaged -- which is
+otherwise unknowable once the case is shut.
+
+`END_HOOK_FIT` is 0.40, from the coupon. The full 151 mm plate at that
+number still had to be forced -- the boss would not go fully in, and
+forcing it bowed the plate.
+**`END_HOOK_BACK` is 1.60**, the square on the back of the C -- under
+the boss, above the notch -- and it runs the **whole depth**, not just
+the 3.00 hook bands. A band-only cut left the slab standing between the
+bosses; the shell hits that and the boss never seats. That includes
+under the USB opening. The outer lip below the seam stays; looking into
+the port you see the C, not a second slit through the bottom.
+**`END_HOOK_RIB` is 1.60** inboard, so the boss is still held.
+
+**`COLUMN_SLACK` is 0.40.** The first bottom with the C seated closed
+with a hair under 1 mm of seam until you pressed: the columns ran to
+the board and the shell's 0.20 slack sits above it, which does not
+help. The reprint at 0.40 closes, and on the seam Saqoosha's words are
+*"i still can see tiny gaps but its ok"* — gaps, plural, visible, no
+number given and none invented here, and **acceptable**, which is what
+settles 0.40 rather than leaving it open. Reasoning rather than report,
+and worth separating: that says 0.40 fixed the *failure* — the ~1 mm
+that needed pressing — and did not close the seam to invisible. If an
+invisible seam is ever wanted, this record says 0.40 is not the number
+that gets there, and it is a different question from the one that was
+being asked.
+`out/<layout>/coupon-hook.stl` is the sweep that asked the fit (0.10 to
+0.40, four pairs of whole case ends so both hooks have to find both
+slots at once).
+
+**Open: a fillet where that wall meets the plate.** The first coupon
+printed and broke in the hand -- 1.00 thick, 2.00 tall, with a 0.90 boss
+on the far side, a cantilever loaded at the tip, and nothing in the model
+had an opinion about that. The coupon's wall was widened to survive
+handling; the case's is still `END_HOOK_L` long. A fillet can only go
+inboard: outboard the shell's skirt fills the root to 2.40 and its own
+material carries on to the slot at 2.60, so there is 0.20 there and the
+shell is in it. Inboard is empty cavity, with the board's edge stopping
+at 73.30 and its underside at 5.70. Ø1.00 takes the root section from
+1.00 to 3.00 mm2.
+
+**Deliberately after the fit, not before.** The fillet is inboard of the
+wall and the fit is a clearance between boss and slot, so the two do not
+touch -- but changing the case mid-sweep would mean the coupon and the
+part had stopped being the same thing, which is the one property that
+makes this coupon worth more than a drawn one.
 **The wires have a trench, and the case grew for them.** Five have to
 cross the whole field, and the first wired unit would not lie down: the
 space under the boards was 3.36 mm, of which a hot-swap socket took 1.83

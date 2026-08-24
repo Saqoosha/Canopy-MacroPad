@@ -19,4 +19,8 @@ curl -fsSL -o neokey-1x4.step  "$base/4980%20NeoKey%201x4%20QT/4980%20NeoKey%201
 # hot-swap socket, which is why BREAKOUT_T and the socket footprint could
 # be measured rather than assumed.
 curl -fsSL -o neokey-breakout.step "$base/4978%20NeoKey%20Breakout/4978%20NeoKey%20Breakout.step"
+# koktoh/keyswitch_model, CC BY-NC-SA 4.0. KiCad frame: z=0 is the PCB
+# top. product.py loads this for the viewer; the build does not.
+curl -fsSL -o choc-v2.step \
+    https://raw.githubusercontent.com/koktoh/keyswitch_model/master/choc/v2/step/red.step
 ls -la ./*.step

@@ -348,16 +348,30 @@ def load(path):
     """Hold every key at full white, which is what a rail is measured under.
 
     Idle is the flattering case and it is not the case that browns out.
-    The pixels on both board kinds hang off the incoming Qwiic rail rather
-    than off the regulated 3.3 V behind it -- see README "Hardware" -- so
-    what the LEDs see is the QT Py's rail minus whatever 50 mm of thin
-    Qwiic conductor drops under load, and that drop only exists when there
-    is load.
+    Where to put the probe depends on which board this is, because the two
+    load the rail through entirely different paths.
 
-    Probe at the LED end, not at the QT Py: the two differ by exactly the
-    thing being measured. Take the reading at four keys before the
-    breakouts land and again at six afterwards -- one number cannot
-    separate cable drop from a regulator giving up, and two can.
+    On the **QT Py** build the pixels hang off the incoming Qwiic rail
+    rather than off the regulated 3.3 V behind it -- see README
+    "Hardware" -- so what the LEDs see is the QT Py's rail minus whatever
+    50 mm of thin Qwiic conductor drops under load, and that drop only
+    exists when there is load. Probe at the LED end, not at the QT Py: the
+    two differ by exactly the thing being measured. Take the reading at
+    four keys before the breakouts land and again at six afterwards -- one
+    number cannot separate cable drop from a regulator giving up, and two
+    can.
+
+    On the **custom PCB** there is no cable to separate out and nothing
+    hangs off an unregulated rail: every pixel's VDD and the RP2040 both
+    sit on the 3V3 net behind U4, one XC6206 in SOT-23-3. So the reading
+    that matters is U4's output, and the question is different too --
+    supply and dissipation rather than cable drop. Measured there: six
+    pixels at full white and brightness 100 caused no reset at any step
+    of a 10/25/50/75/100 ramp, and an A/B of one pixel against six showed
+    no colour shift in the one that was lit in both, which is the
+    sensitive test because blue and green starve first. Sustained load was
+    deliberately not measured: 1.7 V times the board's draw in that
+    package has little thermal room, and no host holds full white.
     """
     fd = open_raw(path)
     reader = LineReader(fd)
