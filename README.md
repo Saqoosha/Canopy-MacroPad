@@ -4,20 +4,28 @@ Six keys next to the keyboard. Each key mirrors one Canopy pane: its
 LED shows what that pane's Claude session is doing, and pressing it
 focuses that pane and brings Canopy forward.
 
-The six are not one board. Keys 2-5 are a NeoKey 1x4 on I2C, keys 0-1
-are two single-key breakouts read straight off GPIO, and they butt
-together into one 19.05 mm pitch because the breakout happens to be
-exactly one pitch wide with its switch centred in it. Which board a key
-sits on is invisible to the host: the protocol has one index space and
-the device reports its size.
+**There are two of these, and one firmware runs both.** The first is
+three boards butted together: keys 2-5 a NeoKey 1x4 on I2C, keys 0-1 two
+single-key breakouts read straight off GPIO, landing on one 19.05 mm
+pitch because the breakout happens to be exactly one pitch wide with its
+switch centred in it. The second is a **custom PCB** that is all six keys
+on one board — see [Phase 1 scope](#phase-1-scope).
+
+Which board a key sits on, and which device it is, are both invisible to
+the host: the protocol has one index space and the device reports its
+size. The firmware picks a board profile from the CircuitPython build it
+booted, so neither the wire protocol nor the key numbering moves.
 
 ![The inline case, closed with keycaps on, and open with the NeoKey and
 the QT Py seated in the shell above the bottom plate](case/images/inline-built.jpg)
 
-The enclosure is the `inline` layout, printed on a Bambu A1 mini. It is
-parametric, and it is also **[a model you can turn in a
-browser](https://saqoosha.github.io/Canopy-MacroPad/)** — both layouts,
-orbit, explode, cutaway. How it is built: [`case/README.md`](case/README.md).
+That is the **first** device, in the `inline` case, printed on a Bambu A1
+mini. The enclosure is parametric, and it is also **[a model you can turn
+in a browser](https://saqoosha.github.io/Canopy-MacroPad/)** — orbit,
+explode, cutaway. Note that the published page is a generation behind: it
+carries the `inline` and `stacked` layouts, while `case/` now builds one
+layout, `choc`, for the custom board. How it is built:
+[`case/README.md`](case/README.md).
 
 This repository holds the device half. The macOS half lives in the
 [Canopy](https://github.com/saqoosha/Canopy) repository under
@@ -611,20 +619,37 @@ the Mac before suspecting the board.
 
 ## Phase 1 scope
 
-Six keys, USB wired, status out and focus in. The enclosure was a later
-phase and arrived early: `inline` is printed and in use, `stacked` exists
-only as geometry. See [case/](case/).
+Six keys, USB wired, status out and focus in. **Built, and built twice.**
 
-The six-key half of what used to be Phase 2 is built in software and
-geometry and **has never been assembled** — the two 4978 boards are not
-bought yet, so nothing below the protocol has been seen working. The
-`inline` case in the photo above is the four-key one.
+The first device is an Adafruit QT Py RP2040 with two 4978 breakouts on
+GPIO and a NeoKey on I2C, in the printed `inline` case — the one in the
+photo above. It is assembled, Canopy drives it, and the numbers its
+assembly settled are in [case/](case/).
 
-The rest of the later phases — low-profile Choc switches, and wireless on
-a MagSafe charger — are sketched in
-[docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and are
-deliberately not built yet. The only requirement now is not to block
-them.
+The second is a **custom two-layer PCB** that replaces all of it: one
+board, six Kailh Choc hot-swap sockets on 19.05, six SK6812MINI-E, an
+RP2040 and its flash, USB-C and an LDO. Designed in EasyEDA by script
+([pcb/README.md](pcb/README.md)), fabricated by JLCPCB with partial
+assembly, and brought up with every circuit on it verified — what that
+took, in what order, and which of those steps prove less than they look
+like they prove, is [pcb/BRINGUP.md](pcb/BRINGUP.md).
+
+**One firmware runs both.** `firmware/code.py` carries a `PROFILES` table
+and picks its entry from which CircuitPython build it booted, so the two
+devices share a protocol version, a key count and every line of policy.
+The pin tables cannot be shared even though the pin *numbers* are: GPIO3
+is the breakouts' pixel line on one board and KEY0 on the other.
+
+The enclosure followed the board. `case/` is one layout now, `choc`, sized
+from `pcb/params.py` directly rather than from restated dimensions; it is
+printed, and its end hook and column heights are settled on the printed
+parts. The bottom wants one more print. The `inline` and `stacked`
+directories under `case/out/` are the older device's, from layouts the
+source no longer has.
+
+The remaining phase — wireless on a MagSafe charger — is sketched in
+[docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and is
+deliberately not built. The only requirement now is not to block it.
 
 The wireless one has since been costed properly, without anything being
 built:
