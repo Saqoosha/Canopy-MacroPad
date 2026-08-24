@@ -1,12 +1,31 @@
 # Canopy MacroPad — case
 
-A two-part printed enclosure for the NeoKey 1x4 and the QT Py that drives
-it. Parametric, in `build123d`; the way to change it is to change a number
-in `params.py` and rebuild.
+A two-part printed enclosure for the **custom MacroPad PCB** — one board,
+six Choc sockets on 19.05, its own RP2040 and USB-C. Parametric, in
+`build123d`; the way to change it is to change a number in `params.py` and
+rebuild.
 
-**Two layouts**, from the same source, chosen with `MPAD_LAYOUT`. They
-differ only in where the QT Py goes, and that one decision moves every
-dimension in the case:
+**One layout**, `choc`, and no switch to select it. `params.py` loads
+`pcb/params.py` by path, so the board's width, corner radius, switch pitch
+and pad positions are read rather than restated — the two files cannot
+drift into disagreeing. It is printed; its end hook and its column heights
+are settled on the printed parts, and the bottom wants one more print.
+
+Three sections here are about the **earlier device** rather than this one
+— *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —
+kept because that device is still assembled and in use. Its two layouts
+are gone from the source, so those sections are a record rather than a
+menu: nothing in them can be rebuilt, and the STLs under `out/inline/` and
+`out/stacked/` are the only form of them left. *What the checks have
+actually caught* is that device's model too — the lessons carry, the parts
+do not, and this case's own catches are in the repository's `AGENTS.md`.
+
+## The earlier device: two layouts, and the `inline` one printed
+
+The device before this one was three boards — a NeoKey 1x4 on I2C and two
+single-key breakouts on GPIO — driven by a QT Py, and the case came in two
+layouts from one source, chosen with `MPAD_LAYOUT`. They differed only in
+where the QT Py went, and that one decision moved every dimension:
 
 | | `stacked` (default) | `inline` |
 |---|---|---|
@@ -20,11 +39,9 @@ dimension in the case:
 | Qwiic cable | **100 mm**, down an end bay | **50 mm**, but with 35 mm of slack to fold into a 12 mm gap |
 | handedness | either end takes the cable | **right-handed**: the cable can only come off the right socket |
 
-`stacked` is the compact one and `inline` is the low one. Neither is
+`stacked` was the compact one and `inline` the low one. Neither was
 strictly better — a shorter pad sits closer to keyboard height, a smaller
 one takes less desk.
-
-## The `inline` case, printed
 
 ![The inline case, closed with keycaps on, and open with the NeoKey and
 the QT Py seated in the shell above the bottom plate](images/inline-built.jpg)
@@ -169,6 +186,12 @@ inline and 13.5 mm stacked — so a fit that works here works in the case.
 
 ## Cable, per layout
 
+**The earlier device.** Both layouts here are gone from the source, and
+this case has no Qwiic cable at all — one board, with the keys, the
+pixels and the MCU on it — so nothing below applies to it. The whole
+question went away with the boards rather than being answered somewhere
+else.
+
 **`inline` uses the 50 mm cable you already have.** The two sockets end up
 facing each other 12 mm apart, so the run is trivial — but 50 mm is the
 shortest Qwiic cable anyone sells, and the other 35 mm has to be folded
@@ -188,18 +211,20 @@ before bends. Either:
 
     uv venv --python 3.12 .venv
     uv pip install --python .venv/bin/python build123d trimesh matplotlib
-    .venv/bin/python build.py                    # stacked
-    MPAD_LAYOUT=inline .venv/bin/python build.py  # inline
+    .venv/bin/python build.py      # must end in "all checks passed"
 
-Each writes into `out/<layout>/`, so both sets of STLs exist side by side.
-The other scripts take the same variable.
+There is **one layout now**, `choc`, and it writes into `out/choc/`.
+`MPAD_LAYOUT` is gone with the two it used to select: `params.OUT_NAME` is
+the name, and it is not a switch. The `inline` and `stacked` directories
+under `out/` are the older device's, kept because they are the only
+remaining form of a case that is physically in use — the source that
+produced them was removed with the layouts.
 
     .venv/bin/python section.py    # sections.png -- cut through the stack
     .venv/bin/python render.py     # *.png -- shaded views
     .venv/bin/python product.py    # product.png -- assembled and exploded
 
-    .venv/bin/python webgl.py dump                    # per layout, then once:
-    MPAD_LAYOUT=inline .venv/bin/python webgl.py dump
+    .venv/bin/python webgl.py dump
     .venv/bin/python webgl.py page                    # -> out/viewer.html
 
 **The viewer is live at <https://saqoosha.github.io/Canopy-MacroPad/>**,
@@ -295,6 +320,14 @@ plate-face down. Do not rotate them.
 
 ## What the checks have actually caught
 
+Every one of these is from the **earlier device's** model — the QT Py, the
+NeoKey and the two breakouts — because that is where the checks were built
+and where they earned their keep. The parts are gone; the lessons are the
+reason the checks exist at all, and they are why this case's stand-ins
+model mated plugs and real component faces rather than boxes. What this
+case's own checks have caught since is recorded in the repository's
+`AGENTS.md`, under "Editing the case".
+
 Not a hypothetical list. Every one of these was in the model and none was
 visible in a render. Three of them are the *same* mistake in three
 different places — a wall that fits the board and seals off the socket
@@ -377,6 +410,10 @@ a judgement call, not a finding. Fault injection is what settled it: at
 where it was credited.
 
 ## Stack, in `stacked`
+
+**The earlier device.** This layout is gone from the source; the numbers
+below describe a case that can no longer be rebuilt. Kept because the Z
+argument is the same argument this case has, one board fewer.
 
 This one is the `stacked` layout, which is where the Z fight is —
 `inline` puts the QT Py beside the keys instead of under them and comes
