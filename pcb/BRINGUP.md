@@ -98,12 +98,35 @@ one.
 | KEY0-5 | GPIO 3, 4, 6, 20, 5, 24 — measured in order, no swaps, no shorts |
 | PIXEL | GPIO25 |
 | Debounce that holds | 3 samples at 5 ms; every press of a real Choc measured 142 ms or longer |
+| Flash write, host over USB MSC | 53 kB/s — 7,086,080 bytes took 131 s |
+| Flash read, device side | 1231 kB/s — the same bytes back in 5.8 s |
+
+That 23x asymmetry is the number to remember when a deploy feels slow:
+it is the flash's erase-and-program cost plus the mass-storage layer, not
+a fault. Copying `code.py` is ~50 kB and lands inside a second; copying
+something megabyte-sized will take minutes.
 
 **7 MB means the flash *reported* 8 MB.** CircuitPython reads the JEDEC
 capacity at runtime, which is why a build compiled for a 2 MB Pico
-exposes 7 MB here. It confirms U1 is the W25Q64 and that QSPI works; it
-is not a surface test, because formatting writes structures, not every
-block.
+exposes 7 MB here. On its own that confirms U1 is the W25Q64 and that
+QSPI works — it is not a surface test, because formatting writes
+structures, not every block.
+
+**The surface test was run separately and passed**: 7,086,080 bytes
+(1730 x 4096, 98% of the free space) written from the host over USB mass
+storage, then read back **by the RP2040 out of its own flash** and
+compared block by block. Both halves of that arrangement matter. Reading
+it back on the host would let macOS's page cache answer instead of the
+flash, so the two directions deliberately take different paths. And each
+block carries its own index in its first four bytes, because a fault that
+returns the *wrong* block rather than corrupt bytes would pass a
+body-only comparison — under a uniform pattern, address aliasing reads as
+success. The body pattern is `bytes(range(256))` repeated, not zeros, so
+a stuck-at value cannot hide in it either.
+
+What that does and does not settle: the FAT-visible ~7 MB reads back what
+was written, once. It says nothing about the ~1 MB the firmware occupies,
+and nothing about retention or wear.
 
 **SK6812MINI-E runs on the 3V3 rail**, which is below its 3.7 V datasheet
 minimum. Red, green and blue all came up at full strength — and blue is
@@ -202,8 +225,6 @@ a **soft** reset — enough for `code.py`, never enough for `boot.py`. And
   estimates to 180-240 mA. Nothing has metered it, and bring-up
   deliberately never drove that state — the pad test's all-on phase is
   held at 64. This is the next number to measure, with a meter inline.
-- **The flash has not been surface tested.** Writing and reading back the
-  full 7 MB would turn "the flash reports 8 MB" into "8 MB works".
 - **`lib/neopixel.mpy` has to be on the board.** `adafruit_pixelbuf` is a
   core module on this build, so that one file is the whole dependency;
   `adafruit_neokey` is not needed, because the `pcb` profile never touches
