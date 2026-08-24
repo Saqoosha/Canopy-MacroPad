@@ -144,15 +144,25 @@ BUILD_TO_PROFILE = {
     "adafruit_qtpy_rp2040": "qtpy",
     "raspberry_pi_pico": "pcb",
 }
+# Read through `getattr` because `_build` is a private attribute, and this
+# line is at module scope where an AttributeError is the silent brick --
+# CircuitPython stops `code.py`, the port goes quiet, and from the host
+# that is indistinguishable from a board that never booted. A release that
+# renames or drops it must land in the failure this file already has a
+# path for: no profile, `ERR board`, and a device that still talks.
+# `os.getenv` is not wrapped, deliberately -- it is public API, and
+# guarding everything that could theoretically move is how a guard stops
+# meaning anything.
+_build = getattr(sys.implementation, "_build", None)
 _forced = os.getenv("MPAD_BOARD")
-BOARD_PROFILE = _forced or BUILD_TO_PROFILE.get(sys.implementation._build)
+BOARD_PROFILE = _forced or BUILD_TO_PROFILE.get(_build)
 if BOARD_PROFILE in PROFILES:
     board_error = None
     _profile = PROFILES[BOARD_PROFILE]
 else:
     board_error = "{} {!r} is not one of {}".format(
         "MPAD_BOARD" if _forced else "build",
-        _forced or sys.implementation._build,
+        _forced or _build,
         "/".join(sorted(PROFILES)))
     _profile = {"gpio_keys": (), "gpio_pixel": None, "pad_addresses": ()}
 
