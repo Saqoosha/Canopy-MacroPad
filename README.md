@@ -736,11 +736,14 @@ The pin tables cannot be shared even though the pin *numbers* are: GPIO3
 is the breakouts' pixel line on one board and KEY0 on the other.
 
 The enclosure followed the board. `case/` is one layout now, `choc`, sized
-from `pcb/params.py` directly rather than from restated dimensions; it is
-printed, and its end hook and column heights are settled on the printed
-parts. The bottom wants one more print. The `inline` and `stacked`
-directories under `case/out/` are the older device's, from layouts the
-source no longer has.
+from `pcb/params.py` directly rather than from restated dimensions. Both
+halves are printed and both fit: the end hook seats through the C's whole
+depth, and `COLUMN_SLACK` at 0.40 stopped the board support columns
+holding the seam open — the reprinted bottom closes. The `inline` and
+`stacked` directories under `case/out/` are the older device's, from
+layouts the source no longer has.
+
+The one part not yet in hand is the keycaps.
 
 The remaining phase — wireless on a MagSafe charger — is sketched in
 [docs/canopy-macropad-handoff.md](docs/canopy-macropad-handoff.md) and is
