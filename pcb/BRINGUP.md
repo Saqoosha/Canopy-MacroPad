@@ -171,7 +171,11 @@ That PID is **not** the one the root `README.md` records, and neither
 reading is wrong: `boot.py` sets only the manufacturer and product
 strings, so the VID and PID come from the CircuitPython build. The QT Py
 build answers `0x80F8`, the stock Pico build this board runs answers
-`0x80F4`. Match on `Canopy MacroPad`, never on the PID.
+`0x80F4`. Match on `Canopy MacroPad`, never on the PID — which is what
+both halves already do. `tools/mpad.py` never looks at it, and Canopy's
+`MacroPadDevice.swift` leaves it out of the match on purpose, because
+pinning a number that belongs to the build would fail closed and look
+like a bad cable. So this board needs nothing on the host side.
 
 Before `boot.py` is on the board there is one console port only, and
 `code.py` falls back to it — `HELLO`, `PONG` and `K` lines arrive mixed in
@@ -200,10 +204,6 @@ a **soft** reset — enough for `code.py`, never enough for `boot.py`. And
   held at 64. This is the next number to measure, with a meter inline.
 - **The flash has not been surface tested.** Writing and reading back the
   full 7 MB would turn "the flash reports 8 MB" into "8 MB works".
-- **A host that matches on the PID will not find this board.** Whether
-  Canopy.app does is a question for the `Canopy` repo, not this one.
-  Setting a fixed VID/PID in `boot.py` would settle it, and is not done on
-  a guess.
 - **`lib/neopixel.mpy` has to be on the board.** `adafruit_pixelbuf` is a
   core module on this build, so that one file is the whole dependency;
   `adafruit_neokey` is not needed, because the `pcb` profile never touches

@@ -556,9 +556,14 @@ and the product string and never looks at the PID, which is why it found
 the PCB unchanged. A host that matches on the PID will not.
 
 Setting a fixed VID/PID in `boot.py` would make the identity independent
-of the build, and is deliberately not done: it is an outward-facing change
-to how the device presents itself on the bus, and nothing has yet shown a
-host that needs it.
+of the build, and is deliberately not done — **and the host agrees.**
+Canopy matches on the product string plus the vendor id (accepting a
+missing vendor), and `MacroPadDevice.swift` says why the product id is
+left out: it belongs to the board and the CircuitPython build rather than
+to this project, so pinning it would *fail closed*, and a device that
+never connects looks exactly like a bad cable. So the PCB's `0x80F4` costs
+nothing on that side, and pinning a PID here would only reintroduce the
+coupling both halves went out of their way to avoid.
 
 ### When the keypad is missing
 
