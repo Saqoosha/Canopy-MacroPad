@@ -22,10 +22,10 @@ the QT Py seated in the shell above the bottom plate](case/images/inline-built.j
 That is the **first** device, in the `inline` case, printed on a Bambu A1
 mini. The enclosure is parametric, and it is also **[a model you can turn
 in a browser](https://saqoosha.github.io/Canopy-MacroPad/)** — orbit,
-explode, cutaway. Note that the published page is a generation behind: it
-carries the `inline` and `stacked` layouts, while `case/` now builds one
-layout, `choc`, for the custom board. How it is built:
-[`case/README.md`](case/README.md).
+explode, cutaway. The published page is the `choc` case, for the custom
+board, so it is **not** the case in the photo above. It is a copy rather
+than a build, so it goes stale on its own; `case/README.md` carries the
+five lines that republish it. How the case is built is there too.
 
 This repository holds the device half. The macOS half lives in the
 [Canopy](https://github.com/saqoosha/Canopy) repository under
