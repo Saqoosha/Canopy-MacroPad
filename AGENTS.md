@@ -196,6 +196,19 @@ one, not necessarily the only one.
   anything (watched failing at 0.200 with `FOOT_RECESS` doubled).
   Reaching for the shiny new check because it worked last time is the
   same disease as trusting the arithmetic one, moved up a level.
+
+  **All of it is one animal: a probe whose question is well formed and
+  whose sampling silently misses.** The boolean's sampling misses a cut,
+  the required-volume probe's misses thinness, and a *grid* misses
+  anything narrower than its step -- the Choc v2 stem's retention ribs
+  are 0.10 wide and every probe of that arm returned 1.200, correctly,
+  by landing either side of them. The tell is the same each time and it
+  is not an error message: **a small residual nobody can attribute.**
+  0.075 mm³ of interference with no explanation was the ribs. What turns
+  a residual into a cause is refusing to sum it -- eight pieces listed
+  individually said 8 x 0.00936 at x 1.15..1.25, y 0.60..0.65, which is
+  a rib; the total said nothing. A sum hides the structure that names
+  the cause, and `.solids()` is one call away.
 - **A case-space constant describes one layout.** `WIRE_LANE_Y` was
   written as a pair of case-space numbers off an `inline` scan. `stacked`
   seats the field 0.805 further back, so the same trench went 0.400 into
@@ -279,6 +292,20 @@ one, not necessarily the only one.
   that is really 0.44 inside it. Whenever a constant stops being the only
   one of its kind, grep the checks for it. Same disease as the standoff
   story, caught one step earlier.
+
+  Three: **the check stood still and the model gained detail under it.**
+  "The bore must not touch the stem" was correct, was watched red, and
+  stopped being true the moment the Choc v2's retention ribs were
+  measured -- the bore is *supposed* to squeeze those, so contact became
+  the intended behaviour and nothing about the check had changed. This
+  one is the opposite direction from the first two and grepping cannot
+  find it: there is no constant to follow, only a premise that quietly
+  stopped holding. **When the geometry a check guards gets more
+  detailed, re-read what the check assumes**, not just what it measures.
+  What that check is now: the arm body is a wall and is checked at
+  0.000, the squeeze on the ribs is printed as a reading with no
+  pass/fail, because no value of it is wrong in the model and only a
+  pressed token can say.
 - **The standoff story is the reason for "prove a check fires".** Named
   rather than pointed at: this bullet used to say "the rule above", and
   the list has grown three times since, each insertion quietly moving
@@ -287,6 +314,13 @@ one, not necessarily the only one.
   the plate-hole corner instead. A check nobody has watched fail proves
   nothing, and a *credited* catch that never happened is worse, because
   it launders the reasoning that came with it.
+
+  And *firing* is not enough either, which is the sharpest version of
+  this so far: the guard on the rib envelope was moved 0.50 out the arm,
+  caught 0.174 mm³ of the cross's flare down at the ring, and passed --
+  green, on material that was not what it was named for. Only the
+  injection separated the two. **Watch what a check fires on, not just
+  that it fires.**
 - **A diff cannot show a contradiction**, because a contradiction is a
   relationship between two places and a diff only ever shows one of them.
   This section introduced the pilot mouth as derived from
@@ -315,6 +349,56 @@ one, not necessarily the only one.
   support columns dodge is measured now instead of carried over. The
   guess was right to three decimals, which is exactly why it survived:
   nothing downstream ever disagreed with it.
+- **An observation with no timestamp on it gets quoted as a fact.** A
+  peer was told its `pcb/` files were uncommitted, on a `git status` that
+  was real when it ran and an hour stale when it was repeated -- the
+  files had been committed in between. Same shape as the worktree cwd
+  mistakes: the measurement was true, and what was missing was *when* and
+  *where* it came from. Re-measure before asserting somebody else's tree,
+  and say when you measured. It cost a round to settle something both
+  sides could have checked in one command.
+
+- **The dummy caps mount on a ring, not on a cross.**
+  `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure
+  set is in the post, and its mount is **read off `ref/choc-v2.step` by
+  `build.py` on every run** rather than taken from an MX table: Choc v2's
+  stem is a cross standing *inside* a Ø6.50/Ø5.50 ring, both topping out
+  on the same plane, so the cap seats on the rim and the bore clears the
+  cross tip by 0.10. `STEM_CLEAR` is the only number here a printer owns
+  and it is **settled at 0.00 on two printed sweeps**: 0.10, 0.15, 0.20,
+  0.25 said 0.10 grips and the rest are loose, and the downward sweep
+  that followed -- 0.00, 0.04, 0.07, 0.10, the last kept as the control
+  -- said 0.00 is tight enough. Unlike this case's other bottom-of-range
+  answers it is a floor with a mechanism, not an untested edge: 0.00 is
+  the slot on the arm body, and past it the bore eats the arm rather
+  than the ribs. The reasoning is `case/README.md`'s *Dummy keycaps*.
+
+  **The arm is 1.20 and the fit is 1.30**, because eight retention ribs
+  stand 0.05 proud of the arm flats, ~0.10 wide, running z 4.10 to 8.39.
+  They are what holds a cap on, so a slot sized on the arm body is sized
+  on the wrong number -- and the printed result is exactly the geometry:
+  0.10 lands the slot flush on the ribs, every looser entry clears them
+  by 0.025 or more. `STEM_CLEAR` is measured from the body, so it doubles
+  as how much rib is left alone, and 0.00 is a floor rather than a round
+  number -- past it the bore is into the arm.
+
+  Finding them and re-checking around them are two general lessons
+  rather than keycap ones, and they live with their own kind: the probe
+  that missed a 0.10 feature is under *a boolean cannot see a trench*,
+  and the check whose premise expired when contact became intended is
+  the third shape under *a check drifts away from the geometry it was
+  written for*.
+
+  Two of this file's older rules earned another instance while it was
+  built. The bore was cut in the **wrong direction** for a round: a valid
+  cap, every interference check green, and the feature simply not in the
+  part -- found only by the volume the cut was supposed to remove
+  (7.474 of a wanted 31.409 mm³). And the check written to prove the seat
+  exists put +0.40 on a *radius* where 0.40 of diameter was meant, so it
+  reported 0.580 mm³ missing from a cap that was fine: **a check
+  measuring its own arithmetic**, the same disease as one positioned from
+  the thing it measures, wearing the other face.
+
 - **A part added to `mock.everything()` reaches four files, and three of
   them fail loudly only if you run them.** `build.py` picks the new part
   up on its own; `section.py` has its own colour table keyed by the mock's

@@ -405,3 +405,110 @@ _POST_X = (
     -CASE_W / 2 + WALL + END_BAY / 2,
 )
 POST_XY = [(x, y) for x in _POST_X for y in _POST_Y]
+
+
+# --- Dummy keycap -------------------------------------------------------
+# Placeholder caps, printed, until the wrk. MX Pure set arrives. The
+# mount is **measured off `ref/choc-v2.step`**, not taken from an MX
+# table, because the Choc v2's mount is not a bare cross: it is an MX
+# cross standing inside a ring, and the cross does not stand proud of
+# it. Every number here was read with a boolean probe against the STEP
+# (`build.py` re-reads them, so a different STEP goes red rather than
+# quiet). Switch-local z, where 0 is the PCB top face:
+STEM_TOP = 8.60           # cross tip and ring rim, the same plane
+STEM_CROSS_L = 4.00       # tip to tip, both arms
+STEM_CROSS_W = 1.20       # arm *body* thickness -- not what the slot meets
+# **The arms carry eight retention ribs and they are the whole fit.** One
+# on each flat of each arm, standing 0.05 proud of the body, ~0.10 wide
+# along the arm and running nearly the stem's full height. A slot sized
+# on STEM_CROSS_W alone would be sized on the wrong number: what a cap
+# grips is 1.30, and everything between 1.20 and 1.30 is rib to squeeze.
+# Found by a boolean, not by reading -- the arm probes all said 1.200
+# because they landed either side of a 0.10-wide feature.
+STEM_RIB_W = 1.30         # across the arm, over the ribs
+STEM_RIB_AT = 1.20        # rib centre, out along the arm from the axis
+# The rib's top is rounded, so how high it reads depends on the band it
+# is read in. This pair and `build.py`'s probe name the same band --
+# 0.03 deep, starting 0.01 inside STEM_RIB_W -- and the number is what
+# that probe returns, not an independent measurement of the plastic.
+STEM_RIB_Z = (4.10, 8.39)
+STEM_RING_OD = 6.50
+STEM_RING_ID = 5.50
+STEM_RING_BOTTOM = 3.60
+HOUSING_TOP = 5.30        # the fixed housing's top face
+HOUSING_MOUTH_DIA = 6.60  # the hole the ring travels through
+CHOC_TRAVEL = 3.20        # Kailh CPG1353
+
+# The cap seats on the **ring**, not on the cross tip: both top out at
+# STEM_TOP, and a Ø6.50 rim resists rocking that 8.6 mm² of cross tip
+# cannot. So the bore is sunk CAP_SOCKET_OVER past that plane and the
+# cross never carries the press.
+CAP_BEAR_DIA = 6.00       # flat that lands on the ring, inside the mouth
+CAP_BOSS_DIA = 4.90       # into the ring bore (ID 5.50), cross does the aligning
+CAP_ENGAGE = 3.00         # how much of the cross the bore holds
+CAP_SOCKET_OVER = 0.10
+CAP_CEIL_RELIEF = 0.50    # ceiling stepped up off the bearing pad
+
+# The slot, measured from the arm **body**, so the number is also how
+# much rib is left alone: `STEM_CROSS_W + STEM_CLEAR` against
+# STEM_RIB_W's 1.30 is the squeeze, 0.05 per side at 0.00 and none at
+# 0.10.
+#
+# **Settled at 0.00**, on two printed sweeps and then on six printed
+# caps, which go onto the switches and fit really well. The first sweep
+# -- 0.10, 0.15,
+# 0.20, 0.25 -- came back 0.10 grips and the rest are loose, which is
+# the ribs answering: 0.10 lands the slot exactly on them and every
+# looser entry clears them by 0.025 or more, so that whole sweep sat at
+# or above the ribs and could only find the top of the range. The second
+# ran downward with 0.10 kept in as the control, and 0.00 is tight
+# enough.
+#
+# So it won at the bottom for the fourth time in this case, after
+# SWITCH_HOLE, PILOT_DIA and its own first sweep -- **and this bottom is
+# different from those, which is the whole reason to write it down.**
+# Theirs were untested edges: the direction of better ran off the end of
+# what had been printed, and the note each carries is "re-run downward
+# from here". This one is a floor with a mechanism under it. 0.00 puts
+# the slot on the arm body, so it squeezes the ribs flat and nothing
+# else; below it the bore stops squeezing ribs and starts eating the
+# arm, which is a different thing to be doing and which `build.py`
+# refuses. There is no third sweep to run.
+#
+# Print shrink sits under all of it -- this machine pulls a hole in by
+# 0.05 to 0.15 -- so the printed slot is narrower than 1.20 and the ribs
+# give the difference. That is the fit, and it is also the failure mode
+# left: if a cap ever comes loose after a few pulls, the ribs have been
+# shaved rather than deflected, and the answer is to come **up** from
+# 0.00. Down is not available.
+STEM_CLEAR = 0.00
+STEM_CLEAR_SWEEP = (0.00, 0.04, 0.07, 0.10)
+STEM_LEN_CLEAR = 0.30     # on the arm length; the flats are what grips
+STEM_MOUTH = 0.30         # a wider first 0.40 of bore, to start it
+
+# Outer shape: the wrk. MX Pure's envelope, so the swap changes nothing
+# but the plastic. Read off the product photo in `product.py` and not
+# from a caliper -- it decides how the pad looks, and nothing else.
+CAP_XY = 18.40
+CAP_R = 4.20
+CAP_WALL = 1.20           # 3 x 0.4
+# The cavity's corner is **squarer than the outer one on purpose**, and
+# is not CAP_R - CAP_WALL. Rounding a corner pulls the boundary *in*
+# along the diagonal, and the diagonal is exactly where the switch is
+# widest: its 15 x 15 base stands 1.50 proud of the plate, so the skirt
+# passes it at bottom-out. At 3.00 the cavity reached 10.071 against the
+# base's measured 10.200 and the two fouled by 0.082 mm3; at 2.00 it
+# reaches 10.485, which is 0.285 clear. The cost is a corner wall of
+# 0.79 rather than CAP_WALL -- two perimeters, on a blank.
+CAP_CAVITY_R = 2.00
+CAP_TOP_T = 1.20
+CAP_TOP_CHAMFER = 0.60
+# Skirt above the plate at rest. CHOC_TRAVEL of that is spent pressing,
+# so what is left is the clearance at bottom-out.
+CAP_RIDE = CHOC_TRAVEL + 0.50
+
+# One test token per sweep entry, printed the way the cap is.
+TOKEN_W = 16.0
+TOKEN_D = 20.0
+TOKEN_T = 1.20
+TOKEN_GAP = 4.0

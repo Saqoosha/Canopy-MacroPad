@@ -11,13 +11,67 @@ import re
 import sys
 from pathlib import Path
 
-from build123d import Box, Cylinder, Pos, Rotation, export_step, export_stl
+from build123d import (Box, Cylinder, Pos, Rotation, export_step,
+                       export_stl, import_step)
 
 import mock
 import params as P
 import parts
 
 OUT = Path(__file__).parent / "out" / P.OUT_NAME
+CHOC_STEP = Path(__file__).parent / "ref" / "choc-v2.step"
+_CHOC = None
+
+
+def _choc():
+    """The real switch out of the STEP, in case space, on a switch at
+    the origin. Returns (stem, housing): the stem is everything that
+    travels with the cap, the housing everything that stays put.
+
+    Read rather than trusted. The cap's mount is the one feature of this
+    case fitted to somebody else's plastic, so the constants in
+    `params.py` are checked back against the file they came from -- a
+    swapped or re-exported STEP goes red here instead of quietly
+    redefining what the cap mounts on.
+    """
+    global _CHOC
+    if _CHOC is None:
+        if not CHOC_STEP.exists():
+            raise SystemExit(f"missing {CHOC_STEP} -- run: sh ref/fetch.sh")
+        solids = [s for s in import_step(str(CHOC_STEP)).solids()
+                  if s.volume > 10]
+        assert len(solids) == 3, \
+            f"{CHOC_STEP} plastic parts: expected 3, got {len(solids)}"
+        stem = max(solids, key=lambda so: so.bounding_box().max.Z)
+        housing = None
+        for so in solids:
+            if so is not stem:
+                housing = so if housing is None else housing + so
+        lift = Pos(0, 0, P.Z_BOARD_TOP)
+        _CHOC = (lift * stem, lift * housing)
+    return _CHOC
+
+
+def _shared(a, b):
+    """Volume two solids share, 0.0 when they share nothing.
+
+    `&` raises `Cannot intersect shape with empty compound` rather than
+    returning an empty result, so every clearance check written as a
+    bare `&` is one clean part away from dying instead of passing.
+    """
+    try:
+        hit = a & b
+    except ValueError:
+        return 0.0
+    return 0.0 if hit is None else hit.volume
+
+
+def _probe(solid, cx, cy, cz, w, d, h):
+    """Bounding box of what `solid` has inside a thin box, or None."""
+    hit = solid & (Pos(cx, cy, cz) * Box(w, d, h))
+    if hit is None or hit.volume < 1e-9:
+        return None
+    return hit.bounding_box()
 
 
 def export_step_stable(part, path):
@@ -60,12 +114,14 @@ def main():
         "coupon-hole": parts.hole_coupon(),
         "coupon-hook": parts.hook_coupon(),
         "end-test": parts.end_test(),
+        "keycap": parts.dummy_cap(),
+        "coupon-stem": parts.stem_coupon(),
     }
 
     print("exported")
     for name, part in built.items():
         printable = part
-        if name == "shell":
+        if name in ("shell", "keycap"):
             printable = Rotation(180, 0, 0) * part
             printable = Pos(0, 0, -printable.bounding_box().min.Z) * printable
         export_stl(
@@ -264,6 +320,21 @@ def main():
         "USB plug overmold above the desk": (
             (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2 - 3.25
         ),
+        # --- the dummy cap. CHOC_TRAVEL of the ride is spent pressing.
+        "cap skirt above the plate, pressed": P.CAP_RIDE - P.CHOC_TRAVEL,
+        "cap ceiling above the housing, pressed": (
+            P.CAP_CEIL_RELIEF + (P.STEM_TOP - P.CHOC_TRAVEL - P.HOUSING_TOP)
+        ),
+        "cap boss inside the ring bore": (
+            (P.STEM_RING_ID - P.CAP_BOSS_DIA) / 2
+        ),
+        "boss wall beside the bore": (
+            (P.CAP_BOSS_DIA - (P.STEM_CROSS_L + P.STEM_LEN_CLEAR)) / 2
+        ),
+        "cap left above the bore": (
+            P.CAP_CEIL_RELIEF + P.CAP_TOP_T - P.CAP_SOCKET_OVER
+        ),
+        "cap to its neighbour": (P.SWITCH_PITCH - P.CAP_XY) / 2,
     }
     print("\nmargins")
     for label, v in margins.items():
@@ -542,6 +613,164 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'column':<7} short of the board "
           f"{leftover:9.3f} mm3 leftover, {present:9.3f} mm3 still there")
+
+    # --- the dummy caps -------------------------------------------------
+    # Everything the cap mounts on belongs to somebody else's plastic, so
+    # the constants in params.py are read back out of the STEP they came
+    # from rather than trusted. A re-exported or swapped switch model
+    # goes red here instead of quietly redefining the mount.
+    stem, housing = _choc()
+    z_ring = P.Z_BOARD_TOP + (P.STEM_TOP + P.STEM_RING_BOTTOM) / 2
+    z_lid = P.Z_BOARD_TOP + P.HOUSING_TOP - 0.02
+    arm = _probe(stem, 0, 0, z_ring, P.STEM_RING_ID - 0.2, 0.02, 0.02)
+    # 2.0 deep, not 4.8: a strip that long crosses the ring wall either
+    # side of the arm and the bounding box then spans all three.
+    web = _probe(stem, P.STEM_CROSS_L * 0.4, 0, z_ring, 0.02, 2.0, 0.02)
+    ring_in = _probe(stem, (P.STEM_CROSS_L / 2 + P.STEM_RING_OD / 2) / 2, 0,
+                     z_ring, P.STEM_RING_OD / 2 - P.STEM_CROSS_L / 2, 0.02, 0.02)
+    wall = _probe(stem, (P.STEM_RING_OD + P.STEM_RING_ID) / 4, 0,
+                  P.Z_BOARD_TOP + P.STEM_TOP - 0.1, 0.02, 0.02, 20.0)
+    mouth = _probe(housing, P.STEM_RING_OD / 2, 0, z_lid,
+                   P.STEM_RING_OD, 0.02, 0.02)
+    # The ribs. Probed one at a time: a strip long enough to hold two
+    # features reports a bounding box spanning both, which read as a
+    # 4.80 arm and a 3.60 rib on the way here.
+    rib = _probe(stem, P.STEM_RIB_AT, 0, z_ring, 0.02, 2.0, 0.02)
+    body = _probe(stem, P.STEM_RIB_AT + 0.15, 0, z_ring, 0.02, 2.0, 0.02)
+    rib_z = _probe(stem, P.STEM_RIB_AT, P.STEM_RIB_W / 2 - 0.01,
+                   P.Z_BOARD_TOP + 5.0, 0.06, 0.03, 20.0)
+
+    print("\nswitch, read back off ref/choc-v2.step")
+    ok += [
+        check("stem top", stem.bounding_box().max.Z - P.Z_BOARD_TOP, P.STEM_TOP),
+        check("cross arm, tip to tip", arm.size.X, P.STEM_CROSS_L),
+        check("cross arm thickness", web.size.Y, P.STEM_CROSS_W),
+        check("ring outer", 2 * abs(ring_in.max.X), P.STEM_RING_OD),
+        check("ring inner", 2 * abs(ring_in.min.X), P.STEM_RING_ID),
+        check("ring bottom", wall.min.Z - P.Z_BOARD_TOP, P.STEM_RING_BOTTOM),
+        check("housing top", housing.bounding_box().max.Z - P.Z_BOARD_TOP,
+              P.HOUSING_TOP),
+        check("housing mouth", 2 * mouth.min.X, P.HOUSING_MOUTH_DIA),
+        check("arm over a retention rib", rib.size.Y, P.STEM_RIB_W),
+        check("arm between the ribs", body.size.Y, P.STEM_CROSS_W),
+        check("rib bottom", rib_z.min.Z - P.Z_BOARD_TOP, P.STEM_RIB_Z[0]),
+        check("rib top", rib_z.max.Z - P.Z_BOARD_TOP, P.STEM_RIB_Z[1]),
+    ]
+
+    print("\nkeycap")
+    cap = built["keycap"]
+    pressed = Pos(0, 0, -P.CHOC_TRAVEL) * cap
+    # **The bore is supposed to interfere with the ribs** -- that is what
+    # holds the cap on -- so one boolean against the whole stem cannot
+    # say whether the model is right. Split it: the arm *body* is a wall
+    # and must be clear, the ribs are the fit and the squeeze is a
+    # number to read. Sized on the ribs' own measured extent, not on
+    # CAP_BOSS_DIA or STEM_CLEAR, so it cannot move with the thing it
+    # measures.
+    ribs = None
+    for sx, sy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for side in (1, -1):
+            cx, cy = P.STEM_RIB_AT * sx, P.STEM_RIB_AT * sy
+            oy = side * (P.STEM_CROSS_W / 2 + 0.12)
+            box = Pos(cx + oy * sy, cy + oy * sx,
+                      P.Z_BOARD_TOP + (P.STEM_RIB_Z[0] + P.STEM_RIB_Z[1]) / 2) * Box(
+                0.40 if sx else 0.24, 0.24 if sx else 0.40,
+                P.STEM_RIB_Z[1] - P.STEM_RIB_Z[0] + 0.6)
+            ribs = box if ribs is None else ribs + box
+    # What keeps this envelope on the ribs is the read-back above, not
+    # anything here. An assert that it "holds ribs" was written first and
+    # was worthless: moved to STEM_RIB_AT 1.70 it still caught 0.174 mm3
+    # -- the cross's flare down at the ring -- and passed, while the
+    # squeeze quietly read 0.000. `arm over a retention rib` went red on
+    # that same run, at 1.200 against 1.300.
+    rib_solid = stem & ribs
+    squeeze = _shared(cap, rib_solid)
+    # A **reading, not a guard**, and printed as one: there is no value of
+    # it the model can call wrong. Zero squeeze is a cap that falls off
+    # and full squeeze is a cap that splits, and which is which is
+    # settled by pressing a printed token onto a switch. What guards this
+    # is the line under it -- past the ribs the bore is into the arm.
+    print(f"  [ -- ] {'bore squeezing the retention ribs':<37} {squeeze:8.3f} mm3"
+          f"  ({(P.STEM_RIB_W - (P.STEM_CROSS_W + P.STEM_CLEAR)) / 2:+.3f} per side)")
+    for label, hit in (
+        ("bore vs the cross body", _shared(cap, stem - ribs)),
+        ("cap vs the housing, pressed", (pressed & housing).volume),
+        ("cap vs the shell, pressed", (pressed & built["shell"]).volume),
+        ("cap vs its neighbour",
+         (cap & (Pos(P.SWITCH_PITCH, 0, 0) * cap)).volume),
+    ):
+        good = hit < 1e-6
+        ok.append(good)
+        print(f"  [{'ok ' if good else 'BAD'}] {label:<38} {hit:8.3f} mm3")
+
+    # Interference cannot see an absent seat: a cap with no bearing pad
+    # clears the ring by CAP_CEIL_RELIEF and reports 0.000 forever. So
+    # subtract the cap from the rim it has to land on.
+    #
+    # The band is the ring's own inner edge outward, **not** the pad --
+    # a probe sized from CAP_BEAR_DIA measures whatever that constant
+    # happens to be and can never go red. Written the first way it also
+    # could not: at CAP_BEAR_DIA 5.00 the annulus came out empty, OCCT
+    # returned nothing, and the run died before the check printed.
+    # Watched failing at 0.532 mm3 with CAP_BEAR_DIA at 5.00.
+    z0 = P.Z_BOARD_TOP + P.STEM_TOP
+    # +0.15 on the *radius*. Written +0.40 the band stood 3.15 out
+    # against a pad reaching 3.00 and reported 0.580 mm3 missing on a
+    # cap that was fine -- a check measuring its own arithmetic.
+    band = (Pos(0, 0, z0 + 0.10)
+            * Cylinder(radius=P.STEM_RING_ID / 2 + 0.15, height=0.20))
+    band -= (Pos(0, 0, z0 + 0.10)
+             * Cylinder(radius=P.STEM_RING_ID / 2, height=0.30))
+    missing = (band - cap).volume
+    good = missing < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'cap missing over the ring rim':<38}"
+          f" {missing:8.3f} mm3")
+
+    # The pad has to overhang the ring's inner edge to bear on it and
+    # stay inside the housing's mouth so it can never land on the lip.
+    # Both are under the 0.25 the margin table asks for -- the window
+    # between STEM_RING_ID and HOUSING_MOUTH_DIA is 1.10 wide and no
+    # diameter clears 0.25 at both ends -- so they are checked here with
+    # the bound they can actually hold.
+    for label, got in (
+        ("pad over the ring's inner edge",
+         (P.CAP_BEAR_DIA - P.STEM_RING_ID) / 2),
+        ("pad inside the housing mouth",
+         (P.HOUSING_MOUTH_DIA - P.CAP_BEAR_DIA) / 2),
+    ):
+        good = got >= 0.20
+        ok.append(good)
+        print(f"  [{'ok ' if good else 'BAD'}] {label:<38} {got:8.3f}  "
+              f"(want 0.200)")
+
+    # The bore is a cut inside a boss, and a cut that lands in air
+    # removes nothing while every check above still passes. Measure the
+    # shape: build the cap with the cut moved away and diff the volumes.
+    real_cut = parts._socket_cut
+    parts._socket_cut = lambda *a: Pos(0, 200, 0) * Box(0.1, 0.1, 0.1)
+    solid_cap = parts.dummy_cap().volume
+    parts._socket_cut = real_cut
+    w = P.STEM_CROSS_W + P.STEM_CLEAR
+    ln = P.STEM_CROSS_L + P.STEM_LEN_CLEAR
+    mw, ml = w + P.STEM_MOUTH, ln + P.STEM_MOUTH
+    want = ((2 * w * ln - w * w) * (P.CAP_ENGAGE + P.CAP_SOCKET_OVER)
+            + ((2 * mw * ml - mw * mw) - (2 * w * ln - w * w)) * 0.40)
+    got = solid_cap - cap.volume
+    good = abs(got - want) < 0.05
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'bore removed from the boss':<38}"
+          f" {got:8.3f} mm3  (want {want:.3f})")
+
+    # A sweep whose entries come out identical tests nothing and looks
+    # exactly like one that works.
+    toks = sorted(built["coupon-stem"].solids(), key=lambda so: so.center().X)
+    vols = [so.volume for so in toks]
+    steps = [round(vols[i] - vols[i + 1], 4) for i in range(len(vols) - 1)]
+    good = (len(toks) == len(P.STEM_CLEAR_SWEEP) and min(steps) > 0.01)
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'coupon slots differ':<38} "
+          f"{len(toks)}/{len(P.STEM_CLEAR_SWEEP)}, steps {steps}")
 
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1

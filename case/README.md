@@ -8,8 +8,9 @@ rebuild.
 **One layout**, `choc`, and no switch to select it. `params.py` loads
 `pcb/params.py` by path, so the board's width, corner radius, switch pitch
 and pad positions are read rather than restated — the two files cannot
-drift into disagreeing. It is printed; its end hook and its column heights
-are settled on the printed parts, and the bottom wants one more print.
+drift into disagreeing. It is printed, both halves: its end hook and its
+column heights are settled on the printed parts, and the bottom that
+`COLUMN_SLACK` asked for has been reprinted and fits.
 
 Three sections here are about the **earlier device** rather than this one
 — *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —
@@ -78,8 +79,10 @@ supports, something changed — find out what before printing.
 
 ## Print the coupon first
 
-There are three, and the small ones exist so that re-asking one question
+There are four, and the small ones exist so that re-asking one question
 does not cost a reprint of the answers already settled:
+`out/<layout>/coupon-stem.stl` is the keycap mount's slot sweep, which
+*Dummy keycaps* covers;
 `out/<layout>/coupon-clear.stl` is the clearance-hole row on its own and
 `out/<layout>/coupon-hole.stl` is the switch-hole row, three diameters
 engraved, on a plate at the real `PLATE_T` -- a Choc v2 clips into that
@@ -183,6 +186,136 @@ numbers to the smallest ones that pass, rerun `build.py`, print the real
 thing. The coupon carries the real features at their real sizes — the
 plate is 1.6 mm and the post is whatever that layout's post is, 7.8 mm
 inline and 13.5 mm stacked — so a fit that works here works in the case.
+
+## Dummy keycaps
+
+The wrk. MX Pure set is ordered and is not here, so `out/choc/keycap.stl`
+is a blank 1U to press in the meantime — 0.64 cm³ each, six of them.
+It carries the photographed cap's envelope, 18.40 square on a 4.20
+corner, so the swap when the real ones land changes the plastic and
+nothing else.
+
+**The mount is measured rather than looked up.** Choc v2 is sold as
+MX-compatible and its stem is not a bare cross: it is an MX cross
+standing *inside* a ring, and the cross does not stand proud of it, so
+the only way onto it is a boss that goes down the bore. Every number
+below was read off `ref/choc-v2.step` with a boolean probe, and
+`build.py` reads all twelve back out of that file on every run — a
+re-exported or swapped switch model goes red there instead of quietly
+redefining what the cap mounts on.
+
+That dependency is **hard**: `build.py` exits if `ref/choc-v2.step` is
+not there rather than falling back to the constants, so a fresh clone
+runs `sh ref/fetch.sh` before it can build anything. `product.py` has
+always needed the same file, but only for a picture — the difference now
+is that a missing reference is a case that will not build.
+
+| | size | switch-local z, 0 at the PCB top |
+|---|---|---|
+| cross, tip to tip | 4.00 | 0.20 → 8.60 |
+| cross arm, body | 1.20 thick | the top 0.10 is chamfered off |
+| eight retention ribs | 1.30 over them | 4.10 → 8.39, at 1.20 out the arm |
+| ring | Ø6.50 outer, Ø5.50 bore | 3.60 → 8.60 |
+| fixed housing, top face | — | 5.30 |
+| mouth the ring travels through | Ø6.60 | at 5.30 |
+
+Two things follow from the cross tip and the ring rim being the **same
+plane**. The cap seats on the *ring*: a Ø6.50 rim resists rocking that
+8.6 mm² of cross tip cannot, so the bore is sunk `CAP_SOCKET_OVER` 0.10
+past that plane and the cross never carries the press. And the pad that
+lands on it has 1.10 of window to live in — wider than the ring's bore
+so it bears on something, narrower than the housing's mouth so it can
+never come down on the lip. Ø6.00 leaves 0.25 and 0.30, and neither
+clears the 0.25 the margin table asks of everything else, so that pair
+is checked on its own terms rather than by loosening the table.
+
+**The arms are not 1.20 and that is the whole fit.** Each carries a rib
+on each flat — eight of them, 0.05 proud, about 0.10 wide, running
+nearly the stem's full height — so what a slot actually meets is 1.30.
+They were found by a boolean and not by reading: every probe of the arm
+returned 1.200, because a 0.10-wide feature fits between probes, and the
+first version of the cap fouled the switch by 0.075 mm³ with no
+explanation until the eight pieces of that interference were listed
+individually.
+
+`STEM_CLEAR` is measured from the arm **body**, so the number doubles as
+how much rib is left alone: 1.20 + `STEM_CLEAR` against 1.30 is the
+squeeze, 0.05 per side at 0.00 and none at 0.10.
+
+**Settled at 0.00, on two printed sweeps and then on the caps
+themselves** — six printed at 0.00 go onto the switches and fit really
+well, which is the claim the tokens could only stand in for.
+
+The sweeps that got there. The first — 0.10, 0.15, 0.20, 0.25 — came
+back *0.10 grips, the other three are loose*, and that
+is the ribs answering: 0.10 puts the slot exactly on them and every
+looser entry clears them by 0.025 or more, which is a cap held by
+nothing. So that whole sweep sat at or above the ribs and could only
+find the top of its range. The second ran downward — 0.00, 0.04, 0.07,
+0.10, the last kept in as the control, because a feel only separates
+from another feel side by side, same plastic, minutes apart — and 0.00
+is tight enough.
+
+That is the fourth number in this case to win at the **bottom** of what
+was printed, after `SWITCH_HOLE`, `PILOT_DIA` and its own first sweep,
+**and it is the first one where the bottom is not an untested edge.**
+Those three ran off the end of what had been printed, and each carries a
+note saying re-run downward from here if it ever disappoints. This one
+has a mechanism under it: 0.00 puts the slot on the arm body, so it
+squeezes the ribs flat and nothing else, and below it the bore stops
+squeezing ribs and starts eating the arm — a different thing to be
+doing, and one `build.py` refuses. There is no third sweep to run.
+
+Print shrink sits underneath all of it — this machine pulls a hole in by
+0.05 to 0.15 — so the slot arrives narrower than 1.20 and the ribs give
+the difference. That is also the failure mode left: a cap that comes
+loose after a few pulls means the ribs were shaved rather than
+deflected, and the answer is to come **up** from 0.00, because down is
+not available.
+
+`out/choc/coupon-stem.stl` is four tokens, engraved, each with the pad
+and boss at the heights the cap has them so the slot prints in the same
+air. It stays in the tree for the next filament or nozzle: press each
+onto a switch, keep the one that grips, set `STEM_CLEAR`, rebuild. They
+are four separate tokens on purpose — at 19.05 a single bar would engage
+every switch it spans at once, and the question is one slot on one
+stem.
+
+**So the interference check had to be split**, because "the bore must
+not touch the stem" stopped being true the moment the ribs were known —
+the bore is *supposed* to squeeze them. The arm body is a wall and is
+checked at 0.000; the squeeze is printed as a **reading rather than a
+guard**, since no value of it is wrong in the model and only a pressed
+token can say. The envelope that separates the two is built from
+the ribs' own measured extent, and what keeps it *on* them is the
+read-back, not the envelope: moved 0.50 out the arm it still caught
+0.174 mm³ of the cross's flare and looked healthy, the squeeze silently
+read 0.000, and the only thing that went red was `arm over a retention
+rib` at 1.200 against 1.300. An envelope that misses reads exactly like
+a slot that clears.
+
+The cavity's corner radius is **2.00 and deliberately not**
+`CAP_R - CAP_WALL`. Rounding a corner pulls the boundary inward along
+the diagonal, and the diagonal is where the switch is widest — its
+15 × 15 base stands 1.50 proud of the plate, so the skirt passes it at
+bottom-out. At 3.00 the cavity reached 10.071 against the base's
+measured 10.200 and the two fouled by 0.082 mm³; 2.00 reaches 10.485.
+The cost is a corner wall of 0.79 instead of 1.20, which is two
+perimeters on a blank.
+
+Watched failing, because a guard nobody has seen go red is not a guard:
+the bore against the real cross 3.032 mm³ at `STEM_CLEAR` −0.20, the cap
+into the shell 70.851 mm³ with the ride cut to 2.20, into its neighbour
+22.725 mm³ at `CAP_XY` 19.50, into the housing the 0.082 above, the
+missing seat 0.532 mm³ with the pad at Ø5.00, the bore itself 7.474 of a
+wanted 31.409 mm³ when it was cut in the wrong direction — that one was
+a real bug, and the volume is what found it — the sweep's four tokens
+identical, and the STEP read-back at `STEM_TOP` 8.50.
+
+It prints top face **down**, like the shell: the cavity opens upward,
+the pad and boss stand up out of it, the bore opens up, and there is no
+overhang anywhere in it. No supports, and the bed face is the visible
+top.
 
 ## Cable, per layout
 
@@ -497,7 +630,15 @@ the port you see the C, not a second slit through the bottom.
 **`COLUMN_SLACK` is 0.40.** The first bottom with the C seated closed
 with a hair under 1 mm of seam until you pressed: the columns ran to
 the board and the shell's 0.20 slack sits above it, which does not
-help. Reprint the bottom.
+help. The reprint at 0.40 closes, and on the seam Saqoosha's words are
+*"i still can see tiny gaps but its ok"* — gaps, plural, visible, no
+number given and none invented here, and **acceptable**, which is what
+settles 0.40 rather than leaving it open. Reasoning rather than report,
+and worth separating: that says 0.40 fixed the *failure* — the ~1 mm
+that needed pressing — and did not close the seam to invisible. If an
+invisible seam is ever wanted, this record says 0.40 is not the number
+that gets there, and it is a different question from the one that was
+being asked.
 `out/<layout>/coupon-hook.stl` is the sweep that asked the fit (0.10 to
 0.40, four pairs of whole case ends so both hooks have to find both
 slots at once).

@@ -686,3 +686,83 @@ def clear_coupon():
             _label(f"C{row['chamfer']:.2f}", flip=True), amount=0.5
         )
     return part
+
+
+# --- dummy keycap -------------------------------------------------------
+# Prints top face DOWN on the bed, like the shell: the cavity opens
+# upward, the bearing pad and the boss stand up out of it, and the bore
+# opens up. Nothing overhangs, so there is no support anywhere in it.
+def _cross(w, length, z0, z1):
+    """An MX cross, centred on the origin."""
+    return (_block(-length / 2, length / 2, -w / 2, w / 2, z0, z1)
+            + _block(-w / 2, w / 2, -length / 2, length / 2, z0, z1))
+
+
+def _socket_cut(z_mouth, sign, clear):
+    """The bore, as a solid to subtract.
+
+    `z_mouth` is the boss's free end and `sign` says which way the bore
+    runs into the part from it: +1 up (the cap, drawn the way it is
+    used, so its mouth faces down) and -1 down (the coupon, drawn the
+    way it prints, mouth up). The
+    first STEM_MOUTH of it is wider so the cross can find its way in --
+    a step rather than a taper, because a cross-shaped taper is four
+    more faces to get wrong and this one is 0.40 tall.
+    """
+    depth = P.CAP_ENGAGE + P.CAP_SOCKET_OVER
+    w = P.STEM_CROSS_W + clear
+    length = P.STEM_CROSS_L + P.STEM_LEN_CLEAR
+    over = 0.6                       # past the mouth, into air
+    z0, z1 = sorted((z_mouth - sign * over, z_mouth + sign * depth))
+    cut = _cross(w, length, z0, z1)
+    m0, m1 = sorted((z_mouth - sign * over, z_mouth + sign * 0.40))
+    return cut + _cross(w + P.STEM_MOUTH, length + P.STEM_MOUTH, m0, m1)
+
+
+def dummy_cap():
+    """One blank 1U cap. Case space, on a switch at the origin, at rest.
+
+    The seat is the ring's rim, not the cross tip -- CAP_SOCKET_OVER of
+    empty bore above the cross keeps the press off it.
+    """
+    z_seat = P.Z_BOARD_TOP + P.STEM_TOP
+    z_ceil = z_seat + P.CAP_CEIL_RELIEF
+    z_top = z_ceil + P.CAP_TOP_T
+    z_skirt = P.Z_PLATE_TOP + P.CAP_RIDE
+
+    part = _slab(P.CAP_XY, P.CAP_XY, P.CAP_R, z_skirt, z_top)
+    part = _bed_chamfer(part, z_top, P.CAP_TOP_CHAMFER)
+    inner = P.CAP_XY - 2 * P.CAP_WALL
+    part -= _slab(inner, inner, P.CAP_CAVITY_R, z_skirt - 0.1, z_ceil)
+    part += _tube(0, 0, z_seat, z_ceil, P.CAP_BEAR_DIA)
+    part += _tube(0, 0, z_seat - P.CAP_ENGAGE, z_seat, P.CAP_BOSS_DIA)
+    part -= _socket_cut(z_seat - P.CAP_ENGAGE, +1, P.STEM_CLEAR)
+    return part
+
+
+def stem_coupon():
+    """One token per STEM_CLEAR_SWEEP entry, pressed onto a real switch.
+
+    The mount only -- pad, boss, bore -- at the heights the cap has
+    them, so the slot prints in the same air the cap's does. Separate
+    tokens rather than one bar: at SWITCH_PITCH a bar would engage every
+    switch it spans at once, and the answer wanted here is one slot on
+    one stem.
+    """
+    pitch = P.TOKEN_W + P.TOKEN_GAP
+    n = len(P.STEM_CLEAR_SWEEP)
+    z_seat = P.TOKEN_T + P.CAP_CEIL_RELIEF
+    z_free = z_seat + P.CAP_ENGAGE
+    part = None
+    for i, clear in enumerate(P.STEM_CLEAR_SWEEP):
+        x = (i - (n - 1) / 2) * pitch
+        one = Pos(x, 0, 0) * extrude(
+            RectangleRounded(P.TOKEN_W, P.TOKEN_D, 2.0), amount=P.TOKEN_T)
+        one += _tube(x, 2.0, P.TOKEN_T, z_seat, P.CAP_BEAR_DIA)
+        one += _tube(x, 2.0, z_seat, z_free, P.CAP_BOSS_DIA)
+        one -= Pos(x, 2.0, 0) * _socket_cut(z_free, -1, clear)
+        one -= Pos(x, -P.TOKEN_D / 2 + 4.0, -0.1) * extrude(
+            _label(f"{clear:.2f}", flip=True), amount=0.6
+        )
+        part = one if part is None else part + one
+    return part
