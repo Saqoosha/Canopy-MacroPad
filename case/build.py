@@ -206,7 +206,7 @@ def main():
         # boss's nose for the shell. What has to be left is the flat
         # between them.
         "flat left across the hook's top": (
-            P.WALL - P.SEAM_STEP_W + P.END_HOOK_REACH
+            P.END_HOOK_WALL_T + P.END_HOOK_RIB + P.END_HOOK_REACH
             - P.END_HOOK_CHAMFER_IN - P.END_HOOK_NOSE
         ),
         # The nose cannot eat the whole boss.
@@ -214,6 +214,10 @@ def main():
         "boss left behind its nose": (P.END_HOOK_REACH - P.END_HOOK_NOSE),
         "hook band clear of the corner radius": (
             P.CASE_D / 2 - P.OUTER_CORNER_R - P.END_HOOK_Y0 - P.END_HOOK_L
+        ),
+        "hook rib still under the USB tab": (
+            (P.CASE_W / 2 - P.SEAM_STEP_W - P.END_HOOK_WALL_T - P.END_HOOK_RIB)
+            - (P.BOARD_ORIGIN[0] + P.BOARD_W - P.USB_TAB_W)
         ),
         "screw post bite depth": (
             P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
@@ -368,17 +372,11 @@ def main():
     print(f"  [{'ok ' if good else 'BAD'}] {'end':<7} test wall is the case's "
           f"{wall_len:5.2f} / {want:.2f} mm")
 
-    # The port must have exactly one opening. Below the throat there was
-    # a second, thin one: the relief cuts through the shell's 1.00 skirt
-    # and the plate's receptacle pocket had removed the tongue behind it,
-    # two unrelated cuts lining up. Neither an interference check nor any
-    # margin can see that -- it is a hole, and a hole is what both of
-    # them are blind to. So walk in from the outer face and require the
-    # wall to stop you.
-    zc = (P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
-    rh = P.USB_PLUG_H + P.USB_PLUG_CLEAR
-    th = rh - 2 * P.USB_LEDGE
-    band = [zc - rh / 2 + 0.10, zc - (rh / 2 + th / 2) / 2, zc - th / 2 - 0.10]
+    # The C-back cut opens the inner slab under the USB opening on
+    # purpose -- that leftover was what the shell hit. The outer lip
+    # below the seam still has to stop you. Watched failing at 12 leaks
+    # with the C cut dropped to z 0 and run out to the outer face.
+    band = [0.20, 0.60, 1.00]
     leaks = 0
     for z in band:
         for y in (0.0, 2.0, 4.0, 5.0):
@@ -393,8 +391,8 @@ def main():
             leaks += through
     good = leaks == 0
     ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening under the "
-          f"throat {leaks:5d} leaks / {len(band) * 4} probed")
+    print(f"  [{'ok ' if good else 'BAD'}] {'port':<7} second opening through the "
+          f"lip {leaks:5d} leaks / {len(band) * 4} probed")
 
     # The hole coupon asks two things at once and the plate's thickness
     # is the second: a Choc v2 clips into it, so a test plate at anything
@@ -433,16 +431,17 @@ def main():
             # it stopped 0.05 short of a 3.00 wall's far face, never
             # found a void, and left the sentinel -- reporting 99.00
             # forever and passing at any thickness.
-            for i in range(int((P.END_HOOK_WALL_T + 2.0) / 0.05)):
+            for i in range(int((P.END_HOOK_WALL_T + P.END_HOOK_RIB + 2.0) / 0.05)):
                 x = x_seam - i * 0.05
                 pr = Pos(x, cy, z) * Box(0.04, 0.04, 0.04)
                 if (pr & built["bottom"]).volume < 1e-12:
                     thin = min(thin, x_seam - x)
                     break
-    good = thin >= P.END_HOOK_WALL_T - 0.10
+    want_thin = P.END_HOOK_WALL_T + P.END_HOOK_RIB
+    good = thin >= want_thin - 0.10
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} wall thinnest section "
-          f"{thin:8.2f} / {P.END_HOOK_WALL_T:.2f} mm")
+          f"{thin:8.2f} / {want_thin:.2f} mm")
 
     # The bed chamfers, measured as an inset rather than believed from
     # the source. Each half prints on a different face and a chamfer is
@@ -487,6 +486,62 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} boss on the plate "
           f"{bosses}/{want}, pocket in the shell {voids}/{want}")
+
+    # The cut has to run the whole depth, not just the hook bands.
+    # Material between the bosses is what the shell hits. Probe sits
+    # in y between the USB throat and the hook. Watched failing at
+    # 0.512 mm³ with the cut limited to _end_hook_bands().
+    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
+    x_back = x_seam - P.END_HOOK_BACK / 2
+    z_back = (
+        (P.BOTTOM_T - P.SEAM_STEP_H)
+        + (P.END_HOOK_SEAM_Z - P.END_HOOK_H)
+    ) / 2
+    throat = (P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2
+    y_mid = (throat + P.END_HOOK_Y0) / 2
+    leftover = 0.0
+    for y in (y_mid, -y_mid):
+        pr = Pos(x_back, y, z_back) * Box(
+            P.END_HOOK_BACK * 0.5, 0.40, 0.80)
+        leftover += (pr & built["bottom"]).volume
+    good = leftover < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} back-cut through the depth "
+          f"{leftover:9.3f} mm3")
+
+    # The rib is a feature. Empty here means it never grew. Probe is
+    # above the through-cut, inboard of WALL_T, pinned not sized from
+    # RIB. Watched failing at 0.000 mm³ with END_HOOK_RIB at 0.
+    x_rib = x_seam - P.END_HOOK_WALL_T - 0.80
+    z_rib = (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2
+    got = 0.0
+    for y0, y1 in parts._end_hook_bands():
+        cy = (y0 + y1) / 2
+        pr = Pos(x_rib, cy, z_rib) * Box(0.80, P.END_HOOK_L * 0.5, 0.80)
+        got += (pr & built["bottom"]).volume
+    good = got > 0.5
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} rib present "
+          f"{got:9.3f} mm3")
+
+    # Columns that run to the board hold the seam open: they push the
+    # board into the switches, which hold the shell. Probe sits at the
+    # board's underside, on a column. Watched failing at 0.731 mm³
+    # with COLUMN_SLACK at 0.
+    leftover = 0.0
+    present = 0.0
+    for (x, y), dia in (
+        (P.PRESS_XY[0], P.COLUMN_DIA),
+        (P.BACK_PRESS_XY[0], P.BACK_COLUMN_DIA),
+    ):
+        pr = Pos(x, y, P.Z_BOARD_BOTTOM) * Box(dia * 0.5, dia * 0.5, 0.20)
+        leftover += (pr & built["bottom"]).volume
+        pr = Pos(x, y, P.Z_COLUMN_TOP - 0.15) * Box(dia * 0.5, dia * 0.5, 0.20)
+        present += (pr & built["bottom"]).volume
+    good = leftover < 1e-6 and present > 0.5
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'column':<7} short of the board "
+          f"{leftover:9.3f} mm3 leftover, {present:9.3f} mm3 still there")
 
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1

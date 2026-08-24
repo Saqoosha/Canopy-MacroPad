@@ -154,6 +154,11 @@ def _hook_boss(x0, x1, y0, y1, z0, z1, nose):
     return chamfer(lead, length=nose)
 
 
+def _hook_x0(x_seam):
+    """Inboard face of the raised wall, rib included."""
+    return x_seam - P.END_HOOK_WALL_T - P.END_HOOK_RIB
+
+
 def _end_hook_bands():
     """(y0, y1) for each hook, at the right wall, both sides of the port.
 
@@ -222,7 +227,8 @@ def shell():
         part -= _block(
             x_seam - 0.1, P.CASE_W / 2 + 0.1,
             lo - f / 2, hi + f / 2,
-            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f, P.END_HOOK_SEAM_Z,
+            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f,
+            P.END_HOOK_SEAM_Z,
         )
 
     # Standoffs that set the board height. No pegs -- the switch locates.
@@ -282,7 +288,7 @@ def bottom():
     x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
     for y0, y1 in _end_hook_bands():
         lo, hi = sorted((y0, y1))
-        part += _hook_wall(x_seam - P.END_HOOK_WALL_T, x_seam, lo, hi, P.BOTTOM_T,
+        part += _hook_wall(_hook_x0(x_seam), x_seam, lo, hi, P.BOTTOM_T,
                            P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
         part += _hook_boss(
             x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
@@ -290,11 +296,23 @@ def bottom():
             P.END_HOOK_NOSE,
         )
 
+    # The C-back cut, through the whole depth. Band-only left the slab
+    # standing between the bosses; the shell hits that and the boss
+    # never seats. Boss stays, notch stays.
+    part -= _block(
+        x_seam - P.END_HOOK_BACK, x_seam + 0.1,
+        -P.CASE_D / 2 - 0.1, P.CASE_D / 2 + 0.1,
+        P.BOTTOM_T - P.SEAM_STEP_H,
+        P.END_HOOK_SEAM_Z - P.END_HOOK_H,
+    )
+
     # Columns under the press points, so the clamp is a sandwich.
+    # They stop COLUMN_SLACK short of the board -- exact height is what
+    # held the printed seam open.
     for x, y in P.PRESS_XY:
-        part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.COLUMN_DIA)
+        part += _tube(x, y, P.BOTTOM_T, P.Z_COLUMN_TOP, P.COLUMN_DIA)
     for x, y in P.BACK_PRESS_XY:
-        part += _tube(x, y, P.BOTTOM_T, P.Z_BOARD_BOTTOM, P.BACK_COLUMN_DIA)
+        part += _tube(x, y, P.BOTTOM_T, P.Z_COLUMN_TOP, P.BACK_COLUMN_DIA)
 
     # Clearance under the receptacle, cut with the **port's own profile**
     # rather than a box. It was a rectangle, and a rectangle is what you
@@ -562,7 +580,7 @@ def hook_coupon():
 
     plate_piece = bottom() & plate_box
     for wy0, wy1 in _coupon_wall_runs():
-        plate_piece += _hook_wall(x_seam - P.END_HOOK_WALL_T, x_seam, wy0, wy1, P.BOTTOM_T,
+        plate_piece += _hook_wall(_hook_x0(x_seam), x_seam, wy0, wy1, P.BOTTOM_T,
                                   P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
 
     was = P.END_HOOK_FIT

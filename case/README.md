@@ -446,11 +446,24 @@ share the skirt's 1.00 with the skin outside it and burst through anyway,
 and through you can see from outside whether the hook engaged -- which is
 otherwise unknowable once the case is shut.
 
-`END_HOOK_FIT` is the one number in it not settled on a part.
-`out/<layout>/coupon-hook.stl` asks it: four pairs of whole case ends, so
-that both hooks have to find both slots at once. One hook answers whether
-a boss fits a slot; two, 24 mm apart with the port between them, answer
-whether the end goes together.
+`END_HOOK_FIT` is 0.40, from the coupon. The full 151 mm plate at that
+number still had to be forced -- the boss would not go fully in, and
+forcing it bowed the plate.
+**`END_HOOK_BACK` is 1.60**, the square on the back of the C -- under
+the boss, above the notch -- and it runs the **whole depth**, not just
+the 3.00 hook bands. A band-only cut left the slab standing between the
+bosses; the shell hits that and the boss never seats. That includes
+under the USB opening. The outer lip below the seam stays; looking into
+the port you see the C, not a second slit through the bottom.
+**`END_HOOK_RIB` is 1.60** inboard, so the boss is still held.
+
+**`COLUMN_SLACK` is 0.40.** The first bottom with the C seated closed
+with a hair under 1 mm of seam until you pressed: the columns ran to
+the board and the shell's 0.20 slack sits above it, which does not
+help. Reprint the bottom.
+`out/<layout>/coupon-hook.stl` is the sweep that asked the fit (0.10 to
+0.40, four pairs of whole case ends so both hooks have to find both
+slots at once).
 
 **Open: a fillet where that wall meets the plate.** The first coupon
 printed and broke in the hand -- 1.00 thick, 2.00 tall, with a 0.90 boss

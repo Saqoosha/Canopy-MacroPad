@@ -107,7 +107,14 @@ PCB_SLOP = 0.40
 # How much shorter the shell's standoffs are than the space they sit in.
 # Without it the stack adds up exactly and the boards hold the halves
 # apart. Same number, same reason as on the wired pad.
+#
+# It does not help the other side of the sandwich. The standoffs sit
+# *above* the board; too-tall columns push the board into the switches,
+# and the switches hold the shell up. The printed bottom closed with a
+# hair under 1 mm of seam until you pressed. Columns stop this short of
+# the board now.
 BOARD_CLAMP_SLACK = 0.20
+COLUMN_SLACK = 0.40
 
 # Room past the left board end for an M3 post. The USB tab on the right
 # sits against the wall (with PCB_SLOP), so there is no matching bay there
@@ -213,17 +220,15 @@ END_HOOK_SEAM_Z = 4.40                   # how high the seam climbs here
 # than proud -- a bump would be felt, a shadow line will not.
 END_HOOK_REACH = SEAM_STEP_W - 0.10
 
-# Clearance in y and z, so the boss can drop into the slot. This is the
-# unknown now that the reach is settled by the wall: too tight and the
-# end will not go together, too loose and the end lifts by exactly this
-# before the boss catches. Not a press fit -- the boss is held by the
-# shell's material above it, not gripped by its flanks.
+# Clearance in y and z, so the boss can drop into the slot. Too tight
+# and the end will not go together; too loose and the end lifts by
+# exactly this before the boss catches. Not a press fit -- the boss is
+# held by the shell's material above it, not gripped by its flanks.
 END_HOOK_FIT_SWEEP = (0.10, 0.20, 0.30, 0.40)
 # Settled on the coupon: 0.10, 0.20 and 0.30 would not go on and 0.40
-# did. That is the top of the sweep, so where it stops being tight was
-# never found -- but the direction of better here is *tighter*, and
-# tighter is what did not fit, so 0.40 is the best value available rather
-# than merely the surviving one.
+# did. The full 151 mm plate at 0.40 still had to be forced -- that is
+# END_HOOK_BACK, a recess into the C's back wall, not a shorter boss
+# and not a deeper slot in the shell.
 #
 # The reason three of four failed is this machine's hole shrink, the same
 # ~0.15 the constant SWITCH_HOLE measures. The slot is a hole and arrives
@@ -274,6 +279,22 @@ END_HOOK_CHAMFER_IN = 0.30
 # band's 6.50.
 END_HOOK_WALL_T = 3.00
 
+# The inner slab grown up the inboard face to the boss. Same height as
+# the C opening, so from the side it reads as the green rectangle
+# extended to the boss.
+END_HOOK_RIB = (
+    (END_HOOK_SEAM_Z - END_HOOK_H) - (BOTTOM_T - SEAM_STEP_H)
+)
+
+# The square painted on the back of the C: under the boss, above the
+# notch, 1.60 into the wall. It has to run the **whole depth** of the
+# case, not just the 3.00 hook bands -- a band-only cut leaves the slab
+# standing between the bosses, which is what the shell hits, so the
+# boss never seats.
+END_HOOK_BACK = (
+    (END_HOOK_SEAM_Z - END_HOOK_H) - (BOTTOM_T - SEAM_STEP_H)
+)
+
 # And a third, on the boss's leading **top** edge.
 #
 # It was on the bottom edge first, and the reasoning was about the wrong
@@ -302,6 +323,7 @@ FOOT_RECESS = 0.50
 Z_FLOOR = BOTTOM_T
 Z_BOARD_BOTTOM = Z_FLOOR + SOCKET_CLEARANCE
 Z_BOARD_TOP = Z_BOARD_BOTTOM + BOARD_T
+Z_COLUMN_TOP = Z_BOARD_BOTTOM - COLUMN_SLACK
 Z_PLATE_BOTTOM = Z_BOARD_TOP + (PLATE_TOP_TO_PCB - PLATE_T)
 Z_PLATE_TOP = Z_PLATE_BOTTOM + PLATE_T
 CASE_H = Z_PLATE_TOP

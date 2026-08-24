@@ -178,6 +178,17 @@ one, not necessarily the only one.
   positioned relative to the boards belongs board-local with
   `FIELD_ORIGIN` applied once; the tell that it worked is the margin
   coming out identical in both layouts.
+- **The C-back cut is the case's depth, not the hook's 3 mm.**
+  `_end_hook_bands()` is where the bosses live. A cut that follows them
+  leaves the inner slab standing between them, which is what the shell
+  hits, so the boss never seats. Deepening `END_HOOK_BACK` in X does not
+  fix a Y that never went through. `END_HOOK_BACK` is the painted
+  square's X (1.60); the Y is `CASE_D`. Watched failing at 0.512 mm³
+  with the cut limited to the bands.
+- **Shell slack does not help too-tall columns.** `BOARD_CLAMP_SLACK`
+  sits above the board. Columns that run to `Z_BOARD_BOTTOM` push the
+  board into the switches, which hold the shell up. Printed: a hair
+  under 1 mm of seam, closed if you pressed. `COLUMN_SLACK` is 0.40.
 - **Prove a check fires before trusting it**, and **inject the fault by
   moving geometry, not by shrinking it to nothing.** A zero-width `Box`
   makes OCCT throw, so the build dies before the check ever runs and the
@@ -189,8 +200,10 @@ one, not necessarily the only one.
   button 68.9 mm³, standoff at Ø6.0 1.016 mm³, USB opening narrowed
   3.8 mm³, a breakout support column moved back onto its second
   mounting hole 5.675 mm³, the seam standoffs shifted half a pitch onto
-  the switches 26.260 mm³, and the breakout pegs grown from PEG_DIA to
-  COLUMN_DIA 64.796 mm³.
+  the switches 26.260 mm³, the breakout pegs grown from PEG_DIA to
+  COLUMN_DIA 64.796 mm³, and the C-back leftover between the bosses
+  0.512 mm³ with the cut limited to `_end_hook_bands()`, and columns
+  to the board 0.731 mm³ with `COLUMN_SLACK` at 0.
 - **A hole above a counterbore is a ring printed over air.** Ø6.10 of
   counterbore under the Ø3.55 hole of the day leaves 1.275 mm unsupported
   all the way round; it sags into the top of the bore, and the printed
