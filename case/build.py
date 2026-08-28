@@ -112,8 +112,7 @@ def main():
         "coupon": parts.coupon(),
         "coupon-clear": parts.clear_coupon(),
         "coupon-hole": parts.hole_coupon(),
-        "coupon-hook": parts.hook_coupon(),
-        "end-test": parts.end_test(),
+        "coupon-slide": parts.slide_coupon(),
         "keycap": parts.dummy_cap(),
         "coupon-stem": parts.stem_coupon(),
     }
@@ -162,13 +161,6 @@ def main():
           f"{'bottom plate fits under the shell':<38} {bh:8.3f}  "
           f"(limit {P.Z_PLATE_BOTTOM:.3f})")
 
-    recess = P.SEAM_STEP_W - P.END_HOOK_REACH
-    good = 0.05 <= recess <= 0.30
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] "
-          f"{'boss recessed behind the outer face':<38} {recess:8.3f}  "
-          f"(0.050 to 0.300)")
-
     ring = (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2 - P.CLEAR_CHAMFER
     good = 0.25 <= ring <= P.CLEAR_RING_MAX + 1e-6
     ok.append(good)
@@ -196,14 +188,59 @@ def main():
             P.CASE_W / 2 - (P.USB_CX + P.USB_OVERHANG)
         ),
         "plate web between switches": P.SWITCH_PITCH - P.SWITCH_HOLE,
-        # What is left of the shell's wall outboard of the hook pocket:
-        # the skin the boss would burst through if it reached too far.
-        # And what holds the boss down: the shell material above it.
-        "shell above the hook pocket": (
-            P.CASE_H - P.END_HOOK_SEAM_Z
+        # --- the slide latch. Arithmetic guards are worth having and are
+        # not evidence; the booleans further down watch the geometry.
+        # What carries the plate's sag: ledge under the eave, and the
+        # ledge still printable at the sweep's deepest fit.
+        "ledge under the eave": (
+            P.SLIDE_TAB_H - P.SLIDE_NOSE_H + 0.10 - P.SLIDE_FIT
         ),
-        # The hook band has to clear the plug's opening on one side and
-        # the case's corner radius on the other.
+        "ledge at the sweep's deepest fit": (
+            P.SLIDE_TAB_H - P.SLIDE_NOSE_H + 0.10 - max(P.SLIDE_FIT_SWEEP)
+        ),
+        # Both bearing faces are parallel 45-degree wedges now (the
+        # fifth print jammed on two opposed drooping flats), so the
+        # bearing is the slope pair itself and SLIDE_FIT is their
+        # vertical offset by construction -- the capture probe below
+        # is what verifies the solid agrees.
+        # The tab's only x neighbour is the pocket's own end -- the
+        # ledge runs along x, so the x-clearance class the +x nose kept
+        # losing to hole shrink has no members left. The 0.30 here is a
+        # deliberate over-travel: printed it measures 0.1..0.2 (the
+        # wedge coupon "slides a bit deep" by exactly that), the screws
+        # register home inside it, and the screwless detent will own
+        # home when it comes.
+        "tab clear of the pocket's end": 0.30,
+        "entry clear of the corner radius": (
+            (P.CASE_W / 2 - P.OUTER_CORNER_R)
+            - (max(P.SLIDE_TAB_X) + P.SLIDE_TAB_L / 2
+               + P.SLIDE_ENTRY_MAX + 0.10)
+        ),
+        "post top under the board": (
+            P.Z_BOARD_BOTTOM - (P.BOTTOM_T + P.SLIDE_TAB_H)
+        ),
+        "wall skin outboard of the pocket": P.WALL - P.SLIDE_POCKET_OUT,
+        "wall above the entry roof": (
+            P.Z_PLATE_BOTTOM
+            - (P.Z_FLOOR + P.SLIDE_TAB_H + P.SLIDE_ENTRY_HEAD)
+        ),
+        "drop window the entry accepts": (
+            P.SLIDE_ENTRY_MAX - P.SLIDE_ENTRY_MIN
+        ),
+        "trim short of the screw seats": (
+            (min(x for x, _ in P.POST_XY) - P.SCREW_HEAD_DIA / 2)
+            - P.SLIDE_TRIM_X
+        ),
+
+        # The two clearances the right end owns now that the hook is
+        # gone: the rightmost pocket to the tongue's right trim, and the
+        # trimmed tongue to the right skirt at home -- the face the
+        # hook's wall used to stop 0.10 from.
+
+        "tongue clear of the right skirt at home": (
+            (P.CASE_W / 2 - P.SEAM_STEP_W + P.SEAM_FIT / 2)
+            - P.SLIDE_RIGHT_TRIM_X
+        ),
         # The port's relief has to stay inside each half's own material,
         # or its outline runs off an edge instead of closing -- which is
         # what the printed part looked like, and neither the interference
@@ -227,53 +264,6 @@ def main():
             ((P.Z_USB_BOTTOM + P.Z_USB_TOP) / 2
              - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
             - (P.BOTTOM_T - P.SEAM_STEP_H) + 0.05
-        ),
-        # The fillet can only grow inboard, and what it must not reach is
-        # the receptacle's clearance cut, which is the nearest thing to
-        # the band in y.
-        # The probe below compares the wall against END_HOOK_WALL_T, so it
-        # confirms the geometry follows the constant and says nothing
-        # about the constant being big enough. This is the other half:
-        # the wall has to be thicker than the seam that used to set it,
-        # which is the whole point of the change.
-        "hook wall thicker than the seam": (
-            P.END_HOOK_WALL_T - P.SEAM_STEP_W
-        ),
-        "hook wall clear of the receptacle cut": (
-            P.END_HOOK_Y0
-            - (P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2
-        ),
-        # The wall's top must stay under the board rather than reaching
-        # its plane. It has 1.30 and the board never passes it -- the
-        # chamfer on its inboard top edge was justified as a lead-in for
-        # a board squeezing by, and that was wrong: the two do not share
-        # a height at all. The chamfer stays as a printing lead-in; the
-        # reason it was given does not.
-        "hook wall below the board": (
-            P.Z_BOARD_BOTTOM - P.END_HOOK_SEAM_Z
-        ),
-        "hook band clear of the plug opening": (
-            P.END_HOOK_Y0 - P.USB_PLUG_W / 2
-        ),
-        # Two chamfers meeting on a SEAM_STEP_W wall leave a knife edge,
-        # which prints as a wobble and locates nothing.
-        # The wall's top and the boss's top are one plane, chamfered at
-        # each end -- inboard by the wall for the board, outboard by the
-        # boss's nose for the shell. What has to be left is the flat
-        # between them.
-        "flat left across the hook's top": (
-            P.END_HOOK_WALL_T + P.END_HOOK_RIB + P.END_HOOK_REACH
-            - P.END_HOOK_CHAMFER_IN - P.END_HOOK_NOSE
-        ),
-        # The nose cannot eat the whole boss.
-        "boss left above its nose": (P.END_HOOK_H - P.END_HOOK_NOSE),
-        "boss left behind its nose": (P.END_HOOK_REACH - P.END_HOOK_NOSE),
-        "hook band clear of the corner radius": (
-            P.CASE_D / 2 - P.OUTER_CORNER_R - P.END_HOOK_Y0 - P.END_HOOK_L
-        ),
-        "hook rib still under the USB tab": (
-            (P.CASE_W / 2 - P.SEAM_STEP_W - P.END_HOOK_WALL_T - P.END_HOOK_RIB)
-            - (P.BOARD_ORIGIN[0] + P.BOARD_W - P.USB_TAB_W)
         ),
         "screw post bite depth": (
             P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
@@ -363,90 +353,11 @@ def main():
     print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
           f"head {missing:9.3f} mm3")
 
-    # The lead-ins, measured as volume rather than believed from the
-    # source. Three separate constructions of these cut nothing at all
-    # while every other check passed, so the arithmetic they are supposed
-    # to match is asserted here rather than trusted.
-    L = P.END_HOOK_L
-    prism = lambda c: 2 * L * c ** 2 / 2   # noqa: E731
-    real_w, real_b = parts._hook_wall, parts._hook_boss
-    parts._hook_wall = lambda *a: real_w(*a[:-1], 0.001)
-    flat_wall = parts.bottom().volume
-    parts._hook_wall = real_w
-    parts._hook_boss = lambda *a: real_b(*a[:-1], 0.001)
-    flat_boss = parts.bottom().volume
-    parts._hook_boss = real_b
-    for label, got, want in (
-        ("wall lead-in", flat_wall - built["bottom"].volume,
-         prism(P.END_HOOK_CHAMFER_IN)),
-
-        ("boss nose", flat_boss - built["bottom"].volume, prism(P.END_HOOK_NOSE)),
-    ):
-        good = abs(got - want) < 0.02
-        ok.append(good)
-        print(f"  [{'ok ' if good else 'BAD'}] {'lead-in':<7} {label:<22}"
-              f" {got:9.3f} mm3  (want {want:.3f})")
-
-    # The wall's top and the boss's top have to be the same plane. A
-    # margin can say the two constants are equal; this says the solid
-    # agrees, which is a different claim -- the notch this replaces was
-    # arithmetically fine and geometrically a V.
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    step = 0.0
-    for y0, y1 in parts._end_hook_bands():
-        lo, hi = sorted((y0, y1))
-        band = Pos(x_seam + P.END_HOOK_REACH / 2, (lo + hi) / 2,
-                   P.END_HOOK_SEAM_Z + 0.15) * Box(
-            P.END_HOOK_REACH, hi - lo, 0.30)
-        step += (band & built["bottom"]).volume
-    good = step < 1e-6
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} anything above the "
-          f"hook's top plane {step:9.3f} mm3")
-
-    # A sweep whose entries come out identical tests nothing, and looks
-    # exactly like one that works. Only the shell reads END_HOOK_FIT, so
-    # its four fragments must differ and the plate's four must not --
-    # except by the ink in their labels, which is why the plate side is
-    # asserted as a bound rather than as equality.
-    hook_solids = built["coupon-hook"].solids()
-    xs = sorted(so.center().X for so in hook_solids)
-    split = (xs[0] + xs[-1]) / 2
-    plate_v = sorted(so.volume for so in hook_solids if so.center().X < split)
-    shell_v = sorted(so.volume for so in hook_solids if so.center().X >= split)
-    want = len(P.END_HOOK_FIT_SWEEP)
-    steps = [round(shell_v[i + 1] - shell_v[i], 4) for i in range(len(shell_v) - 1)]
-    good = (len(plate_v) == want and len(shell_v) == want
-            and min(steps) > 0.01 and (plate_v[-1] - plate_v[0]) < 1.0)
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} hook fits differ "
-          f"{len(shell_v)}/{want}, steps {steps}")
-
-    # The end test has to be the case and nothing else. The coupon is
-    # deliberately not -- its wall is widened so the piece survives being
-    # pushed on -- and that is the one place the two disagree, so it is
-    # the one thing worth asserting about this piece: its wall is the
-    # case's END_HOOK_L, not the coupon's whole side.
-    x_in = P.CASE_W / 2 - P.WALL
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    z_wall = (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2
-    plate_half = min(parts.end_test().solids(), key=lambda so: so.center().X)
-    wall_len = 0.0
-    for y in [i * 0.1 for i in range(-130, 131)]:
-        pr = Pos((x_in + x_seam) / 2, y, z_wall) * Box(
-            P.SEAM_STEP_W * 0.5, 0.08, 0.5)
-        if (pr & plate_half).volume > 1e-9:
-            wall_len += 0.1
-    want = 2 * P.END_HOOK_L
-    good = abs(wall_len - want) < 0.35
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'end':<7} test wall is the case's "
-          f"{wall_len:5.2f} / {want:.2f} mm")
-
-    # The C-back cut opens the inner slab under the USB opening on
-    # purpose -- that leftover was what the shell hit. The outer lip
-    # below the seam still has to stop you. Watched failing at 12 leaks
-    # with the C cut dropped to z 0 and run out to the outer face.
+    # The outer lip below the USB opening has to stop you: nothing may
+    # read as a second slit through the bottom of the port. Written for
+    # the end hook's C-back cut and kept past its retirement -- the lip
+    # is still the only material there. Watched failing at 12 leaks with
+    # that cut dropped to z 0 and run out to the outer face.
     band = [0.20, 0.60, 1.00]
     leaks = 0
     for z in band:
@@ -489,31 +400,6 @@ def main():
     print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} hole plate {t:.2f} / "
           f"{P.PLATE_T:.2f} mm, {len(voids)} switch openings / {n_want}")
 
-    # The wall's thickness, measured on the solid. A margin can say the
-    # constant is 3.00; this says the part is. The fillet it replaces was
-    # 3.00 at the root and 1.00 at the top, so the height it is probed at
-    # is deliberately the top half.
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    thin = 99.0
-    for y0b, y1b in parts._end_hook_bands():
-        cy = (y0b + y1b) / 2
-        for z in (P.END_HOOK_SEAM_Z - 0.25, (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2):
-            # The range has to overshoot the wall. At 60 steps of 0.05
-            # it stopped 0.05 short of a 3.00 wall's far face, never
-            # found a void, and left the sentinel -- reporting 99.00
-            # forever and passing at any thickness.
-            for i in range(int((P.END_HOOK_WALL_T + P.END_HOOK_RIB + 2.0) / 0.05)):
-                x = x_seam - i * 0.05
-                pr = Pos(x, cy, z) * Box(0.04, 0.04, 0.04)
-                if (pr & built["bottom"]).volume < 1e-12:
-                    thin = min(thin, x_seam - x)
-                    break
-    want_thin = P.END_HOOK_WALL_T + P.END_HOOK_RIB
-    good = thin >= want_thin - 0.10
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} wall thinnest section "
-          f"{thin:8.2f} / {want_thin:.2f} mm")
-
     # The bed chamfers, measured as an inset rather than believed from
     # the source. Each half prints on a different face and a chamfer is
     # exactly the kind of feature that can be built and then trimmed off
@@ -531,69 +417,6 @@ def main():
         ok.append(good)
         print(f"  [{'ok ' if good else 'BAD'}] {'bed':<7} {name} outline inset at "
               f"the bed face {inset if inset is not None else float('nan'):8.2f} mm")
-
-    # The hook, measured as a shape. A feature can be absent from a
-    # perfectly valid part -- a cut placed inside a void, a boss trimmed
-    # off by a closing intersection -- and every other check still passes.
-    # So ask each band separately for a boss on the plate and a void in
-    # the shell, at the height the two are supposed to meet.
-    x_probe = P.CASE_W / 2 - P.SEAM_STEP_W + P.END_HOOK_REACH / 2
-    # Follows the boss down. A probe left at the old height reported
-    # 0/2 pockets the moment the boss moved, which is the check working
-    # -- but a probe that had happened to still land in material would
-    # have gone on reporting 2/2 about geometry that had changed.
-    z_probe = P.END_HOOK_SEAM_Z - P.END_HOOK_H / 2
-    bosses = voids = 0
-    for y0, y1 in parts._end_hook_bands():
-        cy = (y0 + y1) / 2
-        pr = Pos(x_probe, cy, z_probe) * Box(
-            P.END_HOOK_REACH * 0.5, P.END_HOOK_L * 0.5, P.END_HOOK_H * 0.5)
-        if (pr & built["bottom"]).volume > 1e-6:
-            bosses += 1
-        if (pr & built["shell"]).volume < 1e-6:
-            voids += 1
-    want = len(parts._end_hook_bands())
-    good = bosses == want and voids == want
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} boss on the plate "
-          f"{bosses}/{want}, pocket in the shell {voids}/{want}")
-
-    # The cut has to run the whole depth, not just the hook bands.
-    # Material between the bosses is what the shell hits. Probe sits
-    # in y between the USB throat and the hook. Watched failing at
-    # 0.512 mm³ with the cut limited to _end_hook_bands().
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    x_back = x_seam - P.END_HOOK_BACK / 2
-    z_back = (
-        (P.BOTTOM_T - P.SEAM_STEP_H)
-        + (P.END_HOOK_SEAM_Z - P.END_HOOK_H)
-    ) / 2
-    throat = (P.USB_PLUG_W + P.USB_PLUG_CLEAR - 2 * P.USB_LEDGE) / 2
-    y_mid = (throat + P.END_HOOK_Y0) / 2
-    leftover = 0.0
-    for y in (y_mid, -y_mid):
-        pr = Pos(x_back, y, z_back) * Box(
-            P.END_HOOK_BACK * 0.5, 0.40, 0.80)
-        leftover += (pr & built["bottom"]).volume
-    good = leftover < 1e-6
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} back-cut through the depth "
-          f"{leftover:9.3f} mm3")
-
-    # The rib is a feature. Empty here means it never grew. Probe is
-    # above the through-cut, inboard of WALL_T, pinned not sized from
-    # RIB. Watched failing at 0.000 mm³ with END_HOOK_RIB at 0.
-    x_rib = x_seam - P.END_HOOK_WALL_T - 0.80
-    z_rib = (P.BOTTOM_T + P.END_HOOK_SEAM_Z) / 2
-    got = 0.0
-    for y0, y1 in parts._end_hook_bands():
-        cy = (y0 + y1) / 2
-        pr = Pos(x_rib, cy, z_rib) * Box(0.80, P.END_HOOK_L * 0.5, 0.80)
-        got += (pr & built["bottom"]).volume
-    good = got > 0.5
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'hook':<7} rib present "
-          f"{got:9.3f} mm3")
 
     # Columns that run to the board hold the seam open: they push the
     # board into the switches, which hold the shell. Probe sits at the
@@ -613,6 +436,144 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'column':<7} short of the board "
           f"{leftover:9.3f} mm3 leftover, {present:9.3f} mm3 still there")
+
+    # --- the slide latch ------------------------------------------------
+    # The latch, measured as a shape. A feature can be absent from a
+    # perfectly valid part, so ask each position separately for a post
+    # on the plate, a channel void in the shell over the post's path,
+    # and a ledge left in the shell. Watched failing at post 8/10 with
+    # one pair moved +6.0 and at ledge 0/10 with the outboard cut run
+    # down to the underside.
+    y_in = P.CASE_D / 2 - P.WALL
+    # The post probe's band sits in the post's *outboard* half, because
+    # the back-press columns reach y 10.66 and two tab positions stand
+    # close enough in x that a wider band catches a column's edge --
+    # 0.072 mm3 of it, measured -- and a probe that finds someone
+    # else's material cannot fail. Watched: with a pair moved +6.0 the
+    # wide band still said 10/10; this band says 8/10.
+    y_post = y_in - 0.05
+    y_chan = y_in + (P.SLIDE_POST_UNDER + 0.15) / 2
+    y_ledge = y_in + (P.SLIDE_POST_UNDER + 0.15 + P.SLIDE_POCKET_OUT) / 2
+    y_bear = y_in + (P.SLIDE_POST_UNDER + 0.15
+                     + P.SLIDE_POST_UNDER + P.SLIDE_NOSE_Y) / 2
+    # 3.7 - FIT: the gallery floor's inner corner, from which both
+    # 45-degree slopes are laid out -- see _slide_pockets.
+    z_ledge = (P.Z_FLOOR + P.SLIDE_TAB_H - P.SLIDE_NOSE_H + 0.10
+               - P.SLIDE_FIT)
+    tab_spots = [(xt, side) for xt in P.SLIDE_TAB_X for side in (-1, 1)]
+    posts = channels = ledges = 0
+    for xt, side in tab_spots:
+        x_e = xt - P.SLIDE_TAB_L / 2 + P.SLIDE_CAPTURE
+        pr = Pos(xt, side * y_post, P.BOTTOM_T + P.SLIDE_TAB_H / 2) * Box(
+            P.SLIDE_TAB_L * 0.5, 0.30, P.SLIDE_TAB_H * 0.5)
+        if (pr & built["bottom"]).volume > 1e-6:
+            posts += 1
+        pr = Pos(xt, side * y_chan, P.BOTTOM_T + P.SLIDE_TAB_H / 2) * Box(
+            P.SLIDE_TAB_L * 0.5, 0.25, P.SLIDE_TAB_H * 0.5)
+        if (pr & built["shell"]).volume < 1e-6:
+            channels += 1
+        pr = Pos(x_e - 0.40, side * y_ledge,
+                 (P.Z_FLOOR + z_ledge) / 2) * Box(
+            0.50, 0.35, (z_ledge - P.Z_FLOOR) * 0.5)
+        if (pr & built["shell"]).volume > 1e-6:
+            ledges += 1
+    want = len(tab_spots)
+    good = posts == want and channels == want and ledges == want
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} post {posts}/{want}, "
+          f"channel void {channels}/{want}, ledge {ledges}/{want}")
+
+    # The right trim, measured on the solid rather than read from its
+    # constant. This class already cost a case print: a 0.1 stop is
+    # invisible to every boolean at nominal -- the parts only collide
+    # once the printer's shrink has eaten the clearance -- so the guard
+    # is that the material is *gone*, not that a formula says so.
+    # Watched failing at 25.408 mm3 with the trim skipped -- every
+    # other check green around it, which is the class demonstrating
+    # itself.
+    pr = Pos((P.SLIDE_RIGHT_TRIM_X + P.CASE_W / 2 - P.SEAM_STEP_W) / 2, 0,
+             P.BOTTOM_T - P.SEAM_STEP_H / 2) * Box(
+        (P.CASE_W / 2 - P.SEAM_STEP_W) - P.SLIDE_RIGHT_TRIM_X - 0.2,
+        P.CASE_D - 2 * P.SEAM_STEP_W - 0.2, P.SEAM_STEP_H * 0.5)
+    leftover = (pr & built["bottom"]).volume
+    good = leftover < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} tongue gone past the "
+          f"right trim {leftover:9.3f} mm3")
+
+    # The capture is a claim about a *shifted* plate, so shift it. Down
+    # by more than SLIDE_FIT every eave must be in contact with its
+    # ledge -- that is the sagging seam being held -- and down by less
+    # than SLIDE_FIT nothing may touch at all, or the fit is not a fit.
+    # The plate moving down opens every other gap in the stack, so any
+    # contact is the latch's. Watched failing both ways: catch 0/10
+    # with the ledges cut away, and free-play 0.750 mm3 (wedge faces;
+    # 0.575 on the flats they replaced) with the ledge plane raised
+    # half a fit -- the one injection that fires this check alone,
+    # which is what proves it is not measuring some other collision.
+    drop = Pos(0, 0, -(P.SLIDE_FIT + 0.15)) * built["bottom"]
+    contact = built["shell"] & drop
+    caught = 0
+    for xt, side in tab_spots:
+        x_e = xt - P.SLIDE_TAB_L / 2 + P.SLIDE_CAPTURE
+        pr = Pos(x_e - P.SLIDE_CAPTURE / 2, side * y_bear,
+                 z_ledge + 0.30) * Box(
+            P.SLIDE_CAPTURE + 0.4, 0.80, 1.00)
+        if _shared(contact, pr) > 1e-3:
+            caught += 1
+    free = (built["shell"] & (Pos(0, 0, -(P.SLIDE_FIT - 0.10))
+                              * built["bottom"])).volume
+    good = caught == want and free < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} ledges catch a "
+          f"dropped plate {caught}/{want}, free below the fit {free:9.3f} mm3")
+
+    # The assembly corridor: the plate at the deep end of the drop
+    # window, coming down, and mid-slide, against the shell and the
+    # board. dz is negative -- the plate approaches from **below** in
+    # case space (the first slide latch wrote this probe with +dz and
+    # reported 4207 mm3 of plate rammed up into the board; the probe
+    # was wrong, not the part). The board's mock is used **without the
+    # mated plug** -- nothing is plugged in while the case is open --
+    # and the switch bodies are skipped: the plate's tallest feature
+    # stops 1.5 under the board itself. The first slide latch watched
+    # a real fault here on this probe's first honest run -- 1.681 mm3
+    # of tongue corner standing in the skirt's corner arcs -- which is
+    # why both trims are the skirt's own shifted outline -- the
+    # straight right trim repeated the fault at 1.488 on the leftward
+    # flip's first run. Watched failing since: 9.080 / 9.680 / 9.438
+    # with a tab pair moved off its entries (earlier geometries:
+    # 4.855-class on the first eave, 5.7-8.8 on the nose, 26.036 with
+    # the left trim skipped, 4.784 / 6.624 with entries cut short).
+    bare_board = mock.board() - parts._block(
+        P.USB_CX + P.USB_OVERHANG, P.CASE_W / 2 + 20.0,
+        -P.CASE_D / 2, P.CASE_D / 2, 0.0, P.CASE_H)
+    deep = P.SLIDE_ENTRY_MAX - 0.05
+    for dx, dz in ((deep, -4.0), (deep, -0.5), (deep, 0.0), (1.0, 0.0)):
+        moved = Pos(dx, 0, dz) * built["bottom"]
+        hit = (moved & built["shell"]).volume + _shared(moved, bare_board)
+        good = hit < 1e-6
+        ok.append(good)
+        print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} corridor at "
+              f"dx {dx:+.2f} dz {dz:+.2f}         {hit:9.3f} mm3")
+
+    # A sweep whose entries come out identical tests nothing. Only the
+    # shell reads SLIDE_FIT -- it is the shelf's height under the nose
+    # -- so its four slices must differ and the plate's four must not,
+    # except by the ink in the labels.
+    slide_solids = built["coupon-slide"].solids()
+    sxs = sorted(so.center().X for so in slide_solids)
+    split = (sxs[0] + sxs[-1]) / 2
+    plate_v = sorted(so.volume for so in slide_solids if so.center().X < split)
+    shell_v = sorted(so.volume for so in slide_solids if so.center().X >= split)
+    want_n = len(P.SLIDE_FIT_SWEEP)
+    steps = [round(shell_v[i + 1] - shell_v[i], 4)
+             for i in range(len(shell_v) - 1)]
+    good = (len(plate_v) == want_n and len(shell_v) == want_n
+            and min(steps) > 0.01 and (plate_v[-1] - plate_v[0]) < 1.0)
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'coupon':<7} slide fits differ "
+          f"{len(shell_v)}/{want_n}, steps {steps}")
 
     # --- the dummy caps -------------------------------------------------
     # Everything the cap mounts on belongs to somebody else's plastic, so

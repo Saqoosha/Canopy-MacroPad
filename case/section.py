@@ -33,17 +33,18 @@ STYLE = {
     "switch bodies": ("#b06a1f", 0.55),
 }
 
-# The third cut exists because the first two miss the end hook entirely:
-# one runs along the key row at y = 0 and the other across the middle of
-# the case, and the hook lives in a 3.00 band at |y| 6.50..9.50 beside
-# the USB port. A feature nothing draws is a feature nobody checks.
-_HOOK_Y = P.END_HOOK_Y0 + P.END_HOOK_L / 2
+# The third cut exists because the first two miss the slide latch
+# entirely: one runs along the key row at y = 0 and the other across the
+# middle of the case, and the latch lives at the tongue's rim. It goes
+# through a nose standing over its shelf -- the x that cuts the capture,
+# not the post. A feature nothing draws is a feature nobody checks.
+_TAB_X = P.SLIDE_TAB_X[2] - P.SLIDE_TAB_L / 2 + P.SLIDE_CAPTURE / 2
 
 CUTS = [
     ("through the key row  (looking back)", (0, P.SWITCH_XY[0][1], 0), (0, 1, 0), 0, 2),
     ("through the centreline  (looking right)", (0, 0, 0), (1, 0, 0), 1, 2),
-    (f"through the end hook at y = {_HOOK_Y:.2f}  (looking back)",
-     (0, _HOOK_Y, 0), (0, 1, 0), 0, 2),
+    (f"through a latch nose at x = {_TAB_X:.2f}  (looking right)",
+     (_TAB_X, 0, 0), (1, 0, 0), 1, 2),
 ]
 
 

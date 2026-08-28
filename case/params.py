@@ -134,6 +134,178 @@ SEAM_STEP_H = 1.20
 
 SEAM_FIT = 0.20        # total clearance between skirt and tongue
 
+# --- the slide latch ----------------------------------------------------
+# Two screws hold the left bay and the end hook holds the right end, and
+# between them 145.50 mm of seam had nothing -- the printed case shows a
+# tiny gap at the middle of the plate, the parts not being flat off the
+# bed and nothing there to hold them down. The snap was killed by
+# arithmetic (the skirt is not a spring: 19% strain against PLA's 2) and
+# a third screw by the boards (0.200 of room against the 5.60 a post
+# needs).
+#
+# This is Saqoosha's slide, and the whole plate goes on like a battery
+# lid: eight small hooks along the long sides, drawn as **the end hook
+# multiplied** back when the hook still existed (the printed case has
+# since retired it -- see *where the end hook was* above). Each tab is
+# a solid **post on the tongue's top rim with an eave off its top,
+# reaching outboard** -- print-scale features, upright on the plate --
+# and the shell's wall, 2.00 thick and 5.80 tall, takes a **pocket up
+# into its underside**: a full-height entry for the drop, a channel
+# the post runs along, and a **ledge running along x** that the eave
+# rides over. The plate sagging is the eave landing on the ledge:
+# shell material *under* a plate feature, at eight points spanning
+# 116 mm. In the shell's flipped print the pockets open upward and the
+# ledge prints as a short bridge off the wall's outer skin.
+#
+# The first cut put 0.50-tall ledges inside the seam step's 1.20 and
+# Saqoosha called it -- too tiny and too thin to print -- which is why
+# the latch lives up in the wall.
+#
+# The motion: drop the plate flat at a small leftward offset (push left
+# until the trimmed tongue touches the left skirt -- the entry pockets
+# are cut to cover that touch, so the stop *is* the drop zone), then
+# slide right until the screw holes line up. At rest, in both
+# positions, nothing on either half touches the other -- the fits are
+# all clearances, and the only face contact is that transient left
+# touch.
+#
+# Why rightward and why the slide is small: the direction was chosen
+# so the end hook's boss could engage off the same translation, and it
+# outlives the hook -- every trim and entry is built on it and no
+# leftward fact argues for a re-flip. Rightward means the *left*
+# tongue end is trimmed to open the drop offset, and the trim is
+# capped by the screw heads' seat rings at x -73.05 -- it stops 0.30
+# short, which caps the drop at 1.25 and the capture at what a ~1 mm
+# slide covers.
+#
+# The columns are what make the corridor legal: they dodge the hot-swap
+# sockets in **y**, not in x (sockets case y 2.2..7.4, front columns
+# -8.29, back row 9.16 with its 0.26), so the plate can translate in x
+# with every column staying in its lane.
+# 66, not 68: the entry pockets open toward +x now and the rightmost
+# one has to stay clear of the shell's corner radius at 72.5. The
+# fifth pair at -66 is the screws' understudy: Saqoosha wants the
+# latch to carry the case alone if it proves itself, and without the
+# screws the left bay needs its own hold-down. It costs nothing while
+# they coexist. (What the screws still do that no tab does: register x
+# and stop the slide walking back open. A detent can take that over --
+# a ~0.25 bump on a ledge, riding inside SLIDE_FIT, engaged by the
+# plate's own hang, no material ever bent -- but it is a coupon
+# question for after this geometry settles, not a free rider on it.)
+SLIDE_TAB_X = (-66.0, -40.0, -8.0, 30.0, 66.0)
+
+# The post. Third print's verdict was "eave is too tiny. slide length
+# is too short", so everything here grew: the post from 3.00 x 1.80 to
+# 4.00 x 2.20, the eave from 0.65 x 0.80 to 0.90 x 1.00, the capture
+# from 0.80 to 2.00 of the eave's length -- roughly 3x the bearing.
+SLIDE_TAB_L = 4.00        # the post, along the wall
+SLIDE_TAB_H = 2.20        # above the tongue top; board underside is 3.30 up
+# **The eave points outboard (+y), not along the slide (+x), and each
+# direction change was bought by a print.** First sweep: the x nose at
+# 0.80 kept 0.10 post-to-shelf and 0.20 tip-to-end, both inside the
+# ~0.15..0.20 this machine shrinks a hole -- lengthened to 1.50. Case
+# print: at 1.50 the nose is a free cantilever on the upright plate
+# and Saqoosha saw it drooping; a drooped tip hangs below the modelled
+# 3.40, under the shelf top at 3.10, and rams the shelf's edge instead
+# of riding over it -- the slide's next 0.1..0.2 stop after the hook's.
+# Slicer support under eight bearing faces is the wrong fix (scarred
+# undersides, and these parts print support-free by contract), so the
+# geometry turned 90 degrees: an eave reaching outboard, anchored
+# along the post's whole length, riding a **ledge that runs along x**
+# in the wall's underside -- a fraction of the overhang, carried the
+# whole way, and the x-clearance class that kept failing stops
+# existing, because nothing of the tab ends near anything in x.
+SLIDE_NOSE_Y = 0.90       # eave reach outboard, past the post's face
+SLIDE_NOSE_H = 1.00       # the eave's height, top-aligned with the post
+
+# **Both bearing faces are 45-degree wedges, and the fifth print is
+# why.** The flat-bottomed eave and the flat-topped ledge are a pair
+# of opposed horizontal overhangs -- the eave droops down off the
+# upright plate, the ledge droops up off the flipped shell -- and at
+# 0.90/0.85 wide they ate the 0.30 between them from both sides:
+# every coupon of that sweep jammed ("both eaves on shell and bottom
+# are 垂れる a bit, so it cannot slide in"). So neither face is
+# horizontal any more: the eave's underside and the ledge's top are
+# parallel 45-degree slopes rising outboard, SLIDE_FIT apart measured
+# vertically. At 45 degrees both surfaces print supported in their own
+# orientation -- the eave's underside steps outboard layer by layer,
+# the ledge grows off the wall's outer skin -- so there is no free
+# overhang left anywhere in the latch, at any size. A sagging plate
+# lands slope on slope, full-face; the wedge's inboard push is met by
+# the opposite wall's wedge through the plate.
+SLIDE_WEDGE = 0.85        # the 45-degree leg on both faces
+
+# Where the post stands relative to the wall's inner face: mostly in
+# the cavity (the board is 1.1 above its top), with 0.15 tucked under
+# the wall inside a full-height channel -- shallower than it was, so
+# the ledge starts closer in and the eave bears wider.
+SLIDE_POST_IN = 0.70      # post inboard of the wall's inner face
+SLIDE_POST_UNDER = 0.15   # post under the wall; the channel clears it
+
+# Clearance between the nose's underside and the shelf's top, which is
+# also how far the seam can open before the capture catches. The shelf
+# lives in the shell, so the sweep rebuilds the shell and the plate is
+# one geometry. This machine prints holes ~0.15..0.20 small; the end
+# hook's slot measured 0.40 modelled as ~0.20 of printed lift, and the
+# same discount should be expected here.
+#
+# **Settled at 0.30, on two printed sweeps** (2026-08-25). The first
+# (nose 0.80) said 0.30 reads best and stopped ~0.1 short of home on
+# every entry -- the x fault recorded above the eave's constants. The
+# second (nose
+# 1.50) slides fully home and put a floor under the answer: 0.20 will
+# not slide in at all, 0.30 and 0.40 both go and hold. So 0.30 is the
+# smallest that works with the failure *felt* one step below it -- a
+# floor with a mechanism, not an untested edge -- and it doubles as a
+# shrink measurement: printed clearance at 0.20 is at or under zero,
+# so this pocket loses ~0.20 and the printed lift at 0.30 is ~0.10.
+# **0.30, settled with a mechanism at both bounds.** On the wedge
+# faces 0.20 slides and holds -- "good tight" -- but the shell slice
+# comes out visibly expanded: at 0.20 the printed slopes are in light
+# interference, and a 45-degree wedge converts that squeeze into an
+# outboard load on the wall. The expansion IS the interference tell,
+# so 0.20 is the felt floor, 0.40 the felt ceiling, and 0.30 the
+# answer ("its good tight but expanded.. so the best is 0.3").
+#
+# The coupon overstates the expansion on purpose of its shape: a
+# 22 mm slice has none of the case's stiffening -- no corners, no
+# board-pocket frame (which doubles the wall above z 5.7), no second
+# pocket end wall -- so if the *case* shows expansion at 0.30, that is
+# new information, and the ready answers are a thicker pocket skin
+# (0.85 -> 1.00, +63% panel stiffness, costs 0.15 of slope width) or
+# gussets at the wall-ceiling corner. Not added now: every printed
+# question so far was settled one variable at a time.
+SLIDE_FIT = 0.30
+SLIDE_FIT_SWEEP = (0.05, 0.10, 0.15, 0.20)
+
+# **The slide runs leftward now, and the fourth print is why.** The
+# rightward travel was capped at 1.25 by the left trim against the
+# screw seats, and "slide length is too short" is Saqoosha's verdict
+# on what 1.25 feels like. Leftward has no such cap: the drop offset
+# is opened by the *right* trim, which has nothing to its right but
+# the corner radius, so the travel is ~2 and the drop window ~1 --
+# a slide a hand can feel. The direction was rightward only for the
+# boss, the boss is gone, and this is the leftward fact that finally
+# argued for the re-flip. Motion: push the plate right until the
+# trimmed tongue touches the right skirt, drop flat, slide left until
+# the screw holes line up.
+#
+# SLIDE_CAPTURE is how much of the eave's length rides over the ledge
+# at home; ENTRY_MIN is the shallowest drop whose eave still clears
+# the ledge's end; the deepest offset is the right touch, and
+# SLIDE_ENTRY_MAX is derived from the right trim below so the entry
+# always covers it.
+SLIDE_CAPTURE = 2.00
+SLIDE_ENTRY_MIN = SLIDE_CAPTURE + 0.10
+SLIDE_ENTRY_HEAD = 0.60   # entry roof above the post top, for the drop
+
+# The pocket's footprint across the wall: from just inboard of the
+# wall's inner face (open to the cavity there anyway) to 1.15 outboard
+# of it, leaving 0.85 of wall skin outside. The skirt below is never
+# touched, so nothing of the latch shows on the seam.
+SLIDE_POCKET_IN = 0.10    # inboard of the wall's inner face
+SLIDE_POCKET_OUT = 1.15   # outboard of the wall's inner face
+
 # --- USB-C --------------------------------------------------------------
 # Receptacle class figure from the design spec (3.16). Overhang and plug
 # overmold are the numbers the wired pad already settled with a real
@@ -172,140 +344,36 @@ USB_PLUG_H = 5.00
 USB_PLUG_L = 8.00
 USB_R = USB_H / 2
 
-# --- the end hook -------------------------------------------------------
-# Two screws hold this case and both sit in the left bay, so 145.50 mm of
-# a 151.00 mm case has nothing on it. The step aligns the halves and hides
-# the gap; since the snap went, nothing pulls them together.
+# --- where the end hook was --------------------------------------------
+# Retired 2026-08-25, on the printed case, by the person holding it.
+# The hook was a raised wall and boss at the right end, engaged by the
+# swing-era assembly motion; the slide latch adopted its rightward
+# engagement precisely to keep it, and then the printed case ruled the
+# other way. The full case would not slide home; Saqoosha cut the boss
+# off the print and the latch held the bottom fine without it -- "boss
+# isnt required. it holds bottom well." What still stopped the slide
+# 0.1 short afterwards was the hook's remaining geometry: the raised
+# wall's outer face had 0.10 to the shell's C lip, and the tongue's
+# right corners ~0.14 diagonal to the skirt's -- clearances sized for a
+# part that came down vertically, sitting inside the ~0.15..0.20 this
+# machine shrinks a hole, and never widened the way the latch's were
+# after its first sweep. Not printing error: designed-in stops.
 #
-# Saqoosha's answer, and it is a better one than a rib: at the right end
-# the seam climbs, the plate's wall carries on up inside the shell's, and
-# a **horizontal** boss off that wall drops into a pocket in the shell.
-# It is not friction. The boss is captured, so the halves cannot lift
-# there at all.
-#
-# **Ends only, and the reason is the assembly motion.** The boss points
-# outward, so it is engaged by moving the plate along x -- put the right
-# end in, swing the left end down, then the screws. On a long side the
-# same boss would need the plate to move in y at the same time, which the
-# other end's boss forbids. That is Saqoosha's constraint, felt before it
-# was drawn: an end goes in, the middle of a long side does not.
-#
-# The band it lives in is cut from both sides: the USB plug's opening ends
-# at y 6.00 and the outer corner radius starts at 9.99, leaving 3.99 mm of
-# straight wall each side of the port. Everything below is sized inside
-# that, not chosen.
-END_HOOK_Y0 = USB_PLUG_W / 2 + 0.50      # clear of the plug opening
-END_HOOK_L = 3.00                        # along the wall, inside the 3.99
-END_HOOK_H = 1.60                        # the boss's own height
+# So the hook is gone whole -- wall, boss, C-back, the shell's band
+# reliefs and through slots -- the right wall closes up again, and the
+# tongue's right end is trimmed at SLIDE_RIGHT_TRIM_X below, corners
+# and all, so nothing at that end can touch during or after the slide.
+# Home in x is the screws' job alone (Ø3.70 over M3, ±0.35).
+# The hook's numbers, in case it is ever wanted back: wall 3.00 thick
+# plus a 1.60 rib, boss 1.60 tall reaching 0.90 into a through slot,
+# slot clearance 0.40 settled on its own coupon (0.10..0.30 would not
+# go on), seam climbed to 4.40 in two 3.00 bands beside the USB port,
+# and a 1.60 C-back recess across the plate's whole depth.
 
-# The wall's top is the boss's top. Nothing is bought by going higher:
-# the hook's grip is the shell material above the *slot*, whose roof is
-# the boss, so 4.40, 5.00 and 5.50 all leave the same 5.10 of it. What a
-# taller wall costs is the shell's own wall -- 5.10 left at 4.40, 4.00 at
-# 5.50 -- and what it buys is only more tongue before the boss engages.
-# 5.50 would also come within 0.20 of the board's underside, which is the
-# same number this design already calls too tight everywhere else.
-END_HOOK_SEAM_Z = 4.40                   # how high the seam climbs here
-
-# **The pocket goes right through the shell's wall**, which is Saqoosha's
-# call and it buys two things. The skirt is only 1.00 thick, so a blind
-# pocket had to share that with the skin left outside it -- 0.70 of reach
-# plus the fit read -0.100 and burst through anyway, which is how this
-# ended up being asked rather than assumed. Through, the reach is bounded
-# by the wall instead of by the wall minus a skin. And the second thing
-# matters more on the bench: **you can see whether the hook engaged.**
-# There is no other way to know, since the joint is buried once shut.
-#
-# The boss stops 0.10 short of the outer face so it sits recessed rather
-# than proud -- a bump would be felt, a shadow line will not.
-END_HOOK_REACH = SEAM_STEP_W - 0.10
-
-# Clearance in y and z, so the boss can drop into the slot. Too tight
-# and the end will not go together; too loose and the end lifts by
-# exactly this before the boss catches. Not a press fit -- the boss is
-# held by the shell's material above it, not gripped by its flanks.
-END_HOOK_FIT_SWEEP = (0.10, 0.20, 0.30, 0.40)
-# Settled on the coupon: 0.10, 0.20 and 0.30 would not go on and 0.40
-# did. The full 151 mm plate at 0.40 still had to be forced -- that is
-# END_HOOK_BACK, a recess into the C's back wall, not a shorter boss
-# and not a deeper slot in the shell.
-#
-# The reason three of four failed is this machine's hole shrink, the same
-# ~0.15 the constant SWITCH_HOLE measures. The slot is a hole and arrives
-# 0.15 small; the boss is an outside feature and arrives a little over.
-# So the printed clearance is roughly the modelled figure minus 0.20, and
-# **the lift is the printed one**: 0.40 modelled is about 0.20 of lift at
-# that end, not 0.40.
-END_HOOK_FIT = 0.40
-
-# Both top edges of that raised wall are chamfered, and each one is a
-# lead-in for a different thing going past it.
-#
-# **Inboard, for the board.** Its right edge sits 0.200 from the wall's
-# inner face and the wall stands 3.30 above the plate at that point, so
-# closing the case asks a 139.60 mm board to find a 0.200 slot blind. A
-# chamfer turns that into a funnel; it does not add clearance further
-# down and does not need to.
-#
-# **Outboard, for the shell.** The wall enters the shell's slot with
-# SEAM_FIT/2 = 0.100 a side, same problem one layer out.
-#
-# They are not equal because the wall is only SEAM_STEP_W wide and two
-# large chamfers would meet: at 0.50 each the top is a knife edge, which
-# prints as a wobble and locates nothing. The flat left between them is
-# checked, not assumed.
-# One chamfer on the wall, inboard, for the board. There is no outboard
-# one any more: the wall's top and the boss's top are the same plane now,
-# so an outer chamfer would cut down and the boss would return beside it
-# -- the V notch this design has already been through once. The boss's
-# nose is the lead-in on that side.
-END_HOOK_CHAMFER_IN = 0.30
-
-# **How thick the wall is.** Only the outer SEAM_STEP_W of it is in the
-# shell's relief; the rest stands in the cavity, which is empty from
-# Z_FLOOR to Z_PLATE_BOTTOM at that end. So the wall is as thick as it is
-# useful rather than as thick as the seam.
-#
-# It was 1.00 -- the seam's width, and nothing else -- and Saqoosha broke
-# the first coupon in his hand: 1.00 thick, 2.00 tall, with a 0.90 boss on
-# the far side, a cantilever loaded at the tip. A root fillet was tried
-# first and it is the wrong shape for this. A fillet is 3.00 at the very
-# root and back to 1.00 at the top, where the boss actually pulls; a
-# block is 3.00 the whole way up. Saqoosha drew a rectangle and meant one.
-#
-# 3.00 is not a limit -- the cavity would take much more. It is three
-# extrusions at a 0.4 nozzle, triples the section, and stops well clear of
-# the receptacle's clearance cut, which ends at |y| 5.50 against this
-# band's 6.50.
-END_HOOK_WALL_T = 3.00
-
-# The inner slab grown up the inboard face to the boss. Same height as
-# the C opening, so from the side it reads as the green rectangle
-# extended to the boss.
-END_HOOK_RIB = (
-    (END_HOOK_SEAM_Z - END_HOOK_H) - (BOTTOM_T - SEAM_STEP_H)
-)
-
-# The square painted on the back of the C: under the boss, above the
-# notch, 1.60 into the wall. It has to run the **whole depth** of the
-# case, not just the 3.00 hook bands -- a band-only cut leaves the slab
-# standing between the bosses, which is what the shell hits, so the
-# boss never seats.
-END_HOOK_BACK = (
-    (END_HOOK_SEAM_Z - END_HOOK_H) - (BOTTOM_T - SEAM_STEP_H)
-)
-
-# And a third, on the boss's leading **top** edge.
-#
-# It was on the bottom edge first, and the reasoning was about the wrong
-# motion. The slot is taller than the boss with both tops flush, so all
-# the play is underneath, and along a purely horizontal insertion the
-# bottom edge is the one with room to move -- true, and not how this case
-# goes together. The shell comes **down** over the plate, so the corner
-# that meets the slot's roof is the top one. Saqoosha read it off the
-# section drawing.
-END_HOOK_NOSE = 0.35
-
+# The tongue ends here on the right, before its own corner arcs begin,
+# so the slide's last millimetre has nothing to meet: the gap to the
+# right skirt at home is 2.10 where the hook's wall had 0.10.
+SLIDE_RIGHT_TRIM_X = None  # derived below, needs CASE_W
 # Elephant foot: the first layer is squashed and bulges past the outline,
 # so the edge that lands on the bed gets a chamfer to give it somewhere
 # to go. **Both halves need it and on different faces** -- the plate
@@ -342,6 +410,26 @@ Z_USB_BOTTOM = Z_BOARD_BOTTOM - USB_H
 # that ends in a USB plug.
 CASE_W = WALL + END_BAY + PCB_SLOP + BOARD_W + WALL
 CASE_D = WALL + BOARD_D + PCB_SLOP + WALL
+
+# The left trim: the tongue and the plate's top half end here on the
+# left, so the plate can shift left for the drop at all. Capped by the
+# screw heads' seat rings -- their outboard edge is POST_X + HEAD/2 at
+# x -73.05 -- with 0.30 of margin; the deepest reachable offset (the
+# trimmed face touching the left skirt) and the entry pockets' length
+# both follow from it rather than being chosen.
+SLIDE_TRIM_X = (
+    -CASE_W / 2 + WALL + END_BAY / 2 - SCREW_HEAD_DIA / 2 - 0.30
+)
+# The right trim opens the drop offset for the leftward slide (its face
+# against the right skirt IS the drop position) and still deletes the
+# tongue's corner arcs; the pocket entries stop 1.25 short of the
+# corner radius above it.
+SLIDE_RIGHT_TRIM_X = CASE_W / 2 - OUTER_CORNER_R - 0.90
+# Where the right trim face touches the right skirt's inner face: the
+# deepest drop offset a hand can reach, which the entries must cover.
+SLIDE_ENTRY_MAX = (
+    (CASE_W / 2 - SEAM_STEP_W + SEAM_FIT / 2) - SLIDE_RIGHT_TRIM_X
+)
 
 BOARD_ORIGIN = (
     -CASE_W / 2 + WALL + END_BAY + PCB_SLOP / 2,

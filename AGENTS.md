@@ -240,6 +240,17 @@ one, not necessarily the only one.
   a rib; the total said nothing. A sum hides the structure that names
   the cause, and `.solids()` is one call away.
 
+  **The animal has an inverse: a probe whose sampling catches someone
+  else's material cannot fail.** The latch's post-presence box was
+  drawn 0.50 wide in y and two tab positions stand close enough to the
+  back-press columns that the box caught a column's edge -- 0.072 mm³
+  of it, measured -- so at those positions the check would have said
+  "post present" with the post six millimetres away, and did, under
+  injection. A presence probe earns trust the same way a guard does:
+  move the feature and watch the count drop; if it does not, ask what
+  the box is touching instead. The fix is a band the neighbour cannot
+  reach, and the injection re-run (10/10 -> 8/10) is what said so.
+
   **A bounding box is a sum too, and it lies the same way.** A probe that
   catches two features reports one box spanning both, which reads as a
   single enormous feature: a 4.8-long strip across a cross arm crossed
@@ -309,8 +320,18 @@ one, not necessarily the only one.
   standoffs shifted half a pitch onto the switches 26.260 mm³, breakout
   pegs grown to `COLUMN_DIA` 64.796 mm³, the wire channel over the screws
   -0.455 and the columns 0.005, the head seat 0.790 mm³, the plate under
-  the channel 0.200, and a column against a board's components 0.141 at
-  `FIELD_SUPPORT_DIA` 3.50 and 0.191 at 3.40.
+  the channel 0.200, a column against a board's components 0.141 at
+  `FIELD_SUPPORT_DIA` 3.50 and 0.191 at 3.40, and the slide latch's
+  five: posts 6/8 and everything downstream (free-play 8.672, corridor
+  5.744/7.184/8.840) with a pair moved +4.0, shelves 0/8 with the
+  capture cut through them -- the coupon differ check firing too, at
+  steps 0.0, because a shelfless sweep tests nothing -- free-play
+  0.168 mm³ **alone** with the shelf raised half a fit, corridor
+  26.036 with the trim skipped, and 4.784/6.624 with the entries cut
+  short while the mid-slide probe rightly stayed green. Two real
+  faults were also caught before any injection: 1.681 mm³ of tongue
+  corner in the skirt's corner arcs, and 1.122 mm³ cut from a screw
+  seat by the box reliefs that first answered it.
 - **A sweep can only answer a question the mechanism can answer.** The
   seam got a snap -- barbs on the shell's skirt into a groove round the
   plate's tongue -- and a coupon sweeping the barb 0.30 to 0.70. All four
@@ -361,6 +382,54 @@ one, not necessarily the only one.
   fix a Y that never went through. `END_HOOK_BACK` is the painted
   square's X (1.60); the Y is `CASE_D`. Watched failing at 0.512 mm³
   with the cut limited to the bands.
+- **The end hook is retired -- by the printed case, not by a model.**
+  The full latched case would not slide home; Saqoosha cut the boss off
+  the print, the eight noses held the bottom fine without it, and the
+  slide still stopped 0.1 short: the hook's wall kept 0.10 to the
+  shell's C lip and the tongue's right corners ~0.14 to the skirt's --
+  swing-era clearances inside the hole shrink, never widened the way
+  the latch's were. Gone whole (wall, boss, C-back, band reliefs,
+  slots); the tongue now ends at `SLIDE_RIGHT_TRIM_X` before its corner
+  arcs, 2.10 to the right skirt where the wall had 0.10, and home in x
+  is the screws' alone. **A 0.1 stop is invisible to every boolean at
+  nominal** -- it only exists once printing shrink eats it -- so the
+  trim is guarded as a shape (tongue *gone* past the plane, watched at
+  25.408 mm³ with the trim skipped, every other check green around it).
+- **The slide latch is ten small end hooks, and every turn of its
+  shape was bought by a print.** Posts (4.00 x 0.85 x 2.20) stand on
+  the plate's tongue rim, each with an **eave** off its top reaching
+  0.90 outboard; the shell's wall underside takes entry pockets, a
+  channel per post, and a **ledge running along x** the eave rides
+  over -- a sagging middle is an eave landing on its ledge. The shape
+  history: v1's in-step ledges were unprintably small; the +x nose
+  that followed became a 1.5 free cantilever whose printed droop
+  rammed its shelf; the first eave (0.65, capture 0.80, slide 1.25)
+  was "too tiny... too short"; and the grown eave-and-ledge pair
+  jammed as two opposed drooping flats, which is why **both bearing
+  faces are parallel 45-degree wedges now** -- no free overhang
+  survives in the latch at any size. So the slide **flipped
+  leftward** --
+  rightward travel was capped at 1.25 by the left trim against the
+  screw seats, leftward is capped only by the right trim -- giving
+  2.00 of capture, a 0.90 drop window, and a fifth tab pair at -66 as
+  the screws' understudy. Motion: push right to the touch, drop,
+  slide left ~2, screws. Both tongue ends are cut with the skirt's
+  own inner outline (shifted for home clearance left, swept for the
+  drop right, intersected) -- straight faces left corners standing in
+  the skirt's arcs, watched at 1.681 mm³ left and 1.488 mm³ right,
+  and box reliefs cut 1.122 mm³ from the screw seats; the arcs pass
+  between. The corridor is legal because the columns dodge the
+  sockets in **y**, not in x. `SLIDE_FIT` is **0.30, settled on two
+  printed sweeps** (0.20 felt failing below it); its meaning survives
+  every reshape unchanged -- vertical clearance onto shell material
+  below -- and each reshape re-confirms it on the coupon before the
+  case. Screwless is the stated goal if the latch proves itself: what
+  the screws still do is x registration and slide-back retention, and
+  the candidate replacement is a ~0.25 detent riding inside SLIDE_FIT,
+  engaged by the plate's own hang -- no material bent, so the barb
+  arithmetic never applies. Full
+  reasoning: `case/README.md`, *The slide latch*.
+
 - **Shell slack does not help too-tall columns.** `BOARD_CLAMP_SLACK`
   sits above the board. Columns that run to `Z_BOARD_BOTTOM` push the
   board into the switches, which hold the shell up. Printed: a hair
@@ -556,9 +625,29 @@ different halves:
 
 ## Where the case stands
 
-Both halves of the `choc` case are printed and fitting, and every number
-it owns is settled on a part. **The reasoning behind each one is in
-`case/README.md`** -- that is the story, this is only the state. The
+Both halves of the `choc` case are printed and fitting, but the model
+has since grown the **slide latch** -- eight small end hooks along the
+long sides, answering the tiny gap at the middle of the seam -- and the
+printed pair predates it, and the printed iterations keep deciding it:
+the first latched case retired the end hook (its 0.1-class swing-era
+clearances were the slide's last stops), and the third coupon grew the
+tab and flipped the slide leftward ("eave is too tiny. slide length is
+too short"). Current state: **printed and perfect** -- Saqoosha's
+word, on the full case at `SLIDE_FIT` 0.30: ten tabs, capture 2.00,
+leftward slide, 45-degree wedge bearing faces, both tongue ends
+outline-trimmed. The fit is settled with a mechanism at both bounds
+(0.20 puts the printed slopes in interference and visibly expands the
+shell -- the wedge turns squeeze into outboard wall load -- and 0.40
+is loose). What remains is the screw question: the bores stay as
+insurance while the case is lived with screwless (nothing holds x but
+seam friction, so a desk shove can walk the lid; carrying cannot --
+the hanging plate loads the wedges), and the designed answer is a
+detent: a 0.40 bump on one ledge slope behind a notch in that eave's
+underside, passed by bowing the 151 mm plate ~0.1 at mid-span, the
+one compliance in this case the barb arithmetic blesses. Every other
+number is settled on a part. **The
+reasoning behind each one is in `case/README.md`** -- that is the story,
+this is only the state. The
 earlier device's `inline` case is likewise finished, assembled and in
 use; its numbers are in the same file, under the sections marked as that
 device's.

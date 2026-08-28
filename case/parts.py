@@ -113,64 +113,137 @@ def _board_pocket(z0, z1):
 
 
 # --- shell --------------------------------------------------------------
-def _hook_wall(x0, x1, y0, y1, z0, z1, c_in):
-    """The raised wall with a lead-in chamfered off each top edge.
+def _slide_tab(x, side):
+    """One latch tab, to fuse into the plate: a post standing on the
+    tongue's top rim, mostly inboard of the wall's face, with an
+    **eave** off its top reaching outboard over the shell's ledge.
 
-    Chamfered as an isolated box, before it is fused into the plate.
-    Three attempts at doing it with a subtracted wedge each failed in a
-    different silent way -- the face placed on the corner removed nothing
-    (0.000 against an expected 0.270), the half-space unclamped ate the
-    plate below it (27.833 against 0.367), and the clamp put on the
-    normal's side removed nothing again. None of them raised, and
-    `build.py` was green through all three.
-
-    On a lone box there is exactly one top face and exactly two edges on
-    it running along y, so selecting them cannot pick the wrong thing.
+    The eave is the third shape this feature has worn and printed
+    parts chose all three turns: v1's ledges were too small to print,
+    and the +x nose that replaced them grew into a 1.5 mm free
+    cantilever that drooped below its own model and rammed the shelf
+    it was meant to ride. The eave overhangs 0.65 and is anchored
+    along its whole 3.00 length; its droop-prone outer bottom edge
+    carries the chamfer.
     """
-    w = _block(x0, x1, y0, y1, z0, z1)
-    # Re-select between the two cuts. `chamfer(edge, ...)` works on the
-    # solid that edge belongs to, so an edge picked before the first cut
-    # still points at the original box -- the second call then returns
-    # that box with only its own chamfer and the first one is gone. The
-    # volume said 0.120 where 0.390 was wanted, which is the outer
-    # chamfer alone; nothing raised.
-    edge = w.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[0]
-    return chamfer(edge, length=c_in)
+    y_in = P.CASE_D / 2 - P.WALL
+    post_out = y_in + P.SLIDE_POST_UNDER
+    lo, hi = sorted((side * (y_in - P.SLIDE_POST_IN), side * post_out))
+    part = _block(x - P.SLIDE_TAB_L / 2, x + P.SLIDE_TAB_L / 2, lo, hi,
+                  P.BOTTOM_T - 0.10, P.BOTTOM_T + P.SLIDE_TAB_H)
+    elo, ehi = sorted((side * (post_out - 0.10),
+                       side * (post_out + P.SLIDE_NOSE_Y)))
+    eave = _block(x - P.SLIDE_TAB_L / 2, x + P.SLIDE_TAB_L / 2, elo, ehi,
+                  P.BOTTOM_T + P.SLIDE_TAB_H - P.SLIDE_NOSE_H,
+                  P.BOTTOM_T + P.SLIDE_TAB_H)
+    # The whole underside is the wedge: a 45-degree chamfer off the
+    # outer bottom edge, leaving a 0.15 flat at the root and a 0.15
+    # tip face. Printed upright this face steps outboard layer by
+    # layer -- no free overhang, which the flat underside was and
+    # which drooped shut on the fifth print.
+    lead = eave.edges().filter_by(Axis.X).group_by(Axis.Z)[0]
+    lead = lead.sort_by(Axis.Y)[-1 if side > 0 else 0]
+    return part + chamfer(lead, length=P.SLIDE_WEDGE)
 
 
-def _hook_boss(x0, x1, y0, y1, z0, z1, nose):
-    """The boss, with a lead-in off its leading **top** edge.
+def _slide_pockets():
+    """What the latch removes from the shell's wall underside, per tab:
+    a full-height ENTRY the whole tab rises through at the drop
+    offset; past its right edge, a full-height channel over the post's
+    path; and outboard of the channel a cut that stops short of the
+    underside, leaving the **ledge** the eave rides over. The ledge's
+    top is the capture -- SLIDE_FIT below the eave's underside -- and
+    it runs along x, which is what dissolves the x-clearance class the
+    +x nose kept failing: nothing of the tab ends near anything in x.
 
-    This was on the bottom edge first, reasoned from where the slack is:
-    the slot is taller than the boss and all of that play sits underneath,
-    so nose-first along x the bottom edge is the one with somewhere to go.
-    That reasoning is about a purely horizontal insertion and the case is
-    not assembled that way -- the shell comes **down** over the plate, so
-    the corner that meets the shell's slot roof is the top one. Saqoosha
-    read it off the section and said so.
+    In the flipped print the ledge is a short bridge off the wall's
+    outer skin. The skirt below z 2.40 is outboard of everything here
+    and never touched: nothing of the latch shows on the seam.
     """
-    b = _block(x0, x1, y0, y1, z0, z1)
-    lead = b.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[-1]
-    return chamfer(lead, length=nose)
+    y_in = P.CASE_D / 2 - P.WALL
+    ch_out = y_in + P.SLIDE_POST_UNDER + 0.15
+    cut = None
+    for xt in P.SLIDE_TAB_X:
+        # The entry opens toward +x and the ledge runs off to -x: the
+        # slide is leftward, the drop offset rightward.
+        x1e = xt + P.SLIDE_TAB_L / 2 + P.SLIDE_ENTRY_MAX + 0.10
+        x_e = xt - P.SLIDE_TAB_L / 2 + P.SLIDE_CAPTURE
+        x0 = xt - P.SLIDE_TAB_L / 2 - 0.30
+        z_top = P.Z_FLOOR + P.SLIDE_TAB_H + P.SLIDE_ENTRY_HEAD
+        # The gallery's floor is where the eave's wedge lands, so it is
+        # a wedge too: the cut box's bottom outer edge is chamfered at
+        # 45 degrees, and what the chamfer spares of the wall is the
+        # sloped ledge. Both slopes rise outboard in parallel; z_ledge
+        # places the ledge's plane SLIDE_FIT below the eave's,
+        # vertically, over the whole face.
+        eave_root = y_in + P.SLIDE_POST_UNDER - 0.10
+        z_ledge = (P.Z_FLOOR + P.SLIDE_TAB_H - P.SLIDE_NOSE_H
+                   - P.SLIDE_FIT
+                   + ((y_in + P.SLIDE_POCKET_OUT - P.SLIDE_WEDGE)
+                      - (eave_root + 0.15)))
+        for side in (-1, 1):
+            lo_a, hi_a = sorted((side * (y_in - P.SLIDE_POCKET_IN),
+                                 side * (y_in + P.SLIDE_POCKET_OUT)))
+            lo_c, hi_c = sorted((side * (y_in - P.SLIDE_POCKET_IN),
+                                 side * ch_out))
+            lo_l, hi_l = sorted((side * (ch_out - 0.10),
+                                 side * (y_in + P.SLIDE_POCKET_OUT)))
+            one = _block(x_e, x1e, lo_a, hi_a, P.Z_FLOOR - 0.10, z_top)
+            one += _block(x0, x_e + 0.10, lo_c, hi_c,
+                          P.Z_FLOOR - 0.10, z_top)
+            gal = _block(x0, x_e + 0.10, lo_l, hi_l, z_ledge, z_top)
+            edge = gal.edges().filter_by(Axis.X).group_by(Axis.Z)[0]
+            edge = edge.sort_by(Axis.Y)[-1 if side > 0 else 0]
+            one += chamfer(edge, length=P.SLIDE_WEDGE)
+            cut = one if cut is None else cut + one
+    return cut
 
 
-def _hook_x0(x_seam):
-    """Inboard face of the raised wall, rib included."""
-    return x_seam - P.END_HOOK_WALL_T - P.END_HOOK_RIB
+def _slide_trim():
+    """The left-end trim: the plate's top half ends 1.25 short of the
+    left skirt, cut with the skirt's own inner outline -- the same
+    rounded rect the shell is built from -- shifted right, so the
+    corners go with the face. It opened the drop offset back when the
+    slide ran rightward; since the flip it is what guarantees the
+    leftward slide's home has nothing to hit, the exact 0.1-stop class
+    that cost a case print at the other end.
 
+    Shaped, not boxed, because both box versions failed: a straight
+    face left the tongue's corners standing in the skirt's corner arcs
+    (the first slide latch watched 1.681 mm3 in the corridor probe),
+    and box corner reliefs wide enough to fix that cut 1.122 mm3 out of
+    the screw heads' seat rings. The arcs of the real outline pass
+    between the two: corners cleared, rings whole.
 
-def _end_hook_bands():
-    """(y0, y1) for each hook, at the right wall, both sides of the port.
-
-    Derived once and used by the boss, the pocket and the raised seam, so
-    the three cannot drift apart. The band is bounded by the USB plug's
-    opening on the inboard side and the case's corner radius outboard;
-    everything is measured from those two rather than placed by eye.
+    Only the left end loses material -- the shift moves the outline's
+    right boundary past the plate -- and the trim face touching the
+    left skirt is the deepest reachable offset, which the entry
+    pockets are cut to cover.
     """
-    return [
-        (sign * P.END_HOOK_Y0, sign * (P.END_HOOK_Y0 + P.END_HOOK_L))
-        for sign in (-1, 1)
-    ]
+    z0 = P.BOTTOM_T - P.SEAM_STEP_H
+    top = P.BOTTOM_T + P.SLIDE_TAB_H + 0.2
+    shift = P.SLIDE_TRIM_X - (-P.CASE_W / 2 + P.SEAM_STEP_W
+                              - P.SEAM_FIT / 2)
+
+    def outline(dx):
+        return Pos(dx, 0, 0) * _slab(
+            P.CASE_W - 2 * P.SEAM_STEP_W + P.SEAM_FIT,
+            P.CASE_D - 2 * P.SEAM_STEP_W + P.SEAM_FIT,
+            max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
+            z0, top)
+
+    # The right half of the intersection is the leftward slide's drop
+    # clearance: the plate must fit inside the skirt's outline at every
+    # offset up to the right touch, and the intersection of the outline
+    # swept left by SLIDE_ENTRY_MAX is exactly that. Its corner arcs
+    # are what a straight right trim lacked -- the corridor probe read
+    # 1.488 mm3 of tongue corner standing in the right skirt's arcs at
+    # the deep offset, the mirror of the 1.681 the left trim was shaped
+    # for.
+    allowed = outline(shift) & outline(-P.SLIDE_ENTRY_MAX)
+    return _block(-P.CASE_W / 2 - 5.0, P.CASE_W / 2 + 5.0,
+                  -P.CASE_D / 2 - 5.0, P.CASE_D / 2 + 5.0,
+                  z0, top) - allowed
 
 
 def _bed_chamfer(solid, z, size):
@@ -209,27 +282,10 @@ def shell():
                 skirt_z0 - 0.1, P.Z_FLOOR + 0.1)
     )
 
-    # The seam climbs at the right end. In the two bands beside the USB
-    # port the shell gives up its inner SEAM_STEP_W all the way to
-    # END_HOOK_SEAM_Z, so the plate's wall can carry on up inside it, and
-    # takes a pocket in what is left for the boss to drop into.
-    x_in = P.CASE_W / 2 - P.WALL
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    for y0, y1 in _end_hook_bands():
-        lo, hi = sorted((y0, y1))
-        part -= _block(x_in - 0.1, x_seam + P.SEAM_FIT / 2,
-                       lo - P.SEAM_FIT / 2, hi + P.SEAM_FIT / 2,
-                       P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z)
-        # Through the outer face, deliberately: it is what lets the reach
-        # use the whole wall, and it is the only way to see from outside
-        # whether the hook actually went in.
-        f = P.END_HOOK_FIT
-        part -= _block(
-            x_seam - 0.1, P.CASE_W / 2 + 0.1,
-            lo - f / 2, hi + f / 2,
-            P.END_HOOK_SEAM_Z - P.END_HOOK_H - f,
-            P.END_HOOK_SEAM_Z,
-        )
+    # The slide latch's half of the wall: entry pockets and shelves.
+    # The right wall is unbroken -- the end hook's band reliefs and
+    # through slots retired with it, on the printed case's evidence.
+    part -= _slide_pockets()
 
     # Standoffs that set the board height. No pegs -- the switch locates.
     for x, y in P.PRESS_XY:
@@ -280,31 +336,19 @@ def bottom():
                   max(P.OUTER_CORNER_R - P.SEAM_STEP_W, 0.5),
                   P.BOTTOM_T - P.SEAM_STEP_H, P.BOTTOM_T)
 
-    # The other half of the raised seam: the plate's wall carries on up
-    # inside the shell in the same two bands, and the boss stands off its
-    # outer face. The boss is what stops this end lifting -- it is
-    # captured by the shell's material above the pocket, not gripped.
-    x_in = P.CASE_W / 2 - P.WALL
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-    for y0, y1 in _end_hook_bands():
-        lo, hi = sorted((y0, y1))
-        part += _hook_wall(_hook_x0(x_seam), x_seam, lo, hi, P.BOTTOM_T,
-                           P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
-        part += _hook_boss(
-            x_seam, x_seam + P.END_HOOK_REACH, lo, hi,
-            P.END_HOOK_SEAM_Z - P.END_HOOK_H, P.END_HOOK_SEAM_Z,
-            P.END_HOOK_NOSE,
-        )
+    # Both tongue ends -- and their corner arcs -- go with _slide_trim's
+    # shaped cut: the left end 1.25 short of its skirt, the right end at
+    # SLIDE_RIGHT_TRIM_X so the plate can shift right for the drop. The
+    # end hook that used to stand at the right is retired on the printed
+    # case's evidence; the 0.10 its wall kept to the shell's C lip was
+    # the slide's final stop.
 
-    # The C-back cut, through the whole depth. Band-only left the slab
-    # standing between the bosses; the shell hits that and the boss
-    # never seats. Boss stays, notch stays.
-    part -= _block(
-        x_seam - P.END_HOOK_BACK, x_seam + 0.1,
-        -P.CASE_D / 2 - 0.1, P.CASE_D / 2 + 0.1,
-        P.BOTTOM_T - P.SEAM_STEP_H,
-        P.END_HOOK_SEAM_Z - P.END_HOOK_H,
-    )
+    # The slide latch's half of the plate: eight posts with noses, and
+    # the left-end trim that opens the drop offset.
+    for xt in P.SLIDE_TAB_X:
+        for side in (-1, 1):
+            part += _slide_tab(xt, side)
+    part -= _slide_trim()
 
     # Columns under the press points, so the clamp is a sandwich.
     # They stop COLUMN_SLACK short of the board -- exact height is what
@@ -473,143 +517,61 @@ def coupon():
     return part
 
 
-END_TEST_REACH = 25.0     # how far inboard of the end wall to cut
+# --- slide coupon -------------------------------------------------------
+SLIDE_COUPON_TAB = 32.0   # which tab pair the slice is cut around
+SLIDE_COUPON_X = (
+    SLIDE_COUPON_TAB - 10.0,   # room for the entry pocket and a finger
+    SLIDE_COUPON_TAB + 12.0,
+)
 
 
-def end_test():
-    """The case's right end, both halves, cut and not otherwise touched.
+def slide_coupon():
+    """One full-depth slice of the case per SLIDE_FIT_SWEEP entry.
 
-    The coupon this follows is **not** the case end and Saqoosha said so:
-    its wall runs the whole side beside the port where the case gives it
-    END_HOOK_L, because the first coupon broke in the hand. That widening
-    is the one place the coupon and the part disagree, and it is on the
-    wall -- which is what you push on.
+    **Cut out of the real parts, not modelled again**, for the same
+    reason the hook's coupon is: a number settled here is settled about
+    the case. The slice spans both walls at one tab pair, so what is
+    felt is the real two-sided engagement -- push left to the touch,
+    drop, slide right, lift the middle -- not one tab in a fragment
+    free to twist.
 
-    So this is the other kind of test piece. Nothing is added, nothing is
-    widened; `shell()` and `bottom()` are sliced END_TEST_REACH inboard of
-    the end wall and laid out in the orientation each is printed in. If
-    the hook seats here it seats in the case, and if the wall breaks here
-    it will break in the case.
+    Only the shell reads SLIDE_FIT (it is the shelf's height under the
+    nose; the tab does not know about it), so the plate's slice is
+    built once and repeated, and the shell's is rebuilt per swept
+    value -- the same split as the hook coupon, for the same reason.
 
-    There are no screws at this end -- both are in the left bay -- so the
-    hook is the whole joint in this piece, which is exactly the thing
-    being asked about.
+    Both halves are laid out in the orientation each is printed in:
+    the fit being swept is between two printed faces, and each takes
+    its tolerance from the direction it was grown.
     """
-    x0 = P.CASE_W / 2 - END_TEST_REACH
-    x1 = P.CASE_W / 2 + 0.5
+    x0, x1 = SLIDE_COUPON_X
+    cx = (x0 + x1) / 2
     y0, y1 = -P.CASE_D / 2 - 0.1, P.CASE_D / 2 + 0.1
-
-    plate = bottom() & _block(x0, x1, y0, y1, -0.1, P.CASE_H + 0.1)
-    shell_piece = shell() & _block(x0, x1, y0, y1,
-                                   P.Z_FLOOR - P.SEAM_STEP_H - 0.1,
-                                   P.CASE_H + 0.1)
-    flipped = Rotation(180, 0, 0) * shell_piece
-    flipped = Pos(0, 0, -flipped.bounding_box().min.Z) * flipped
-    return plate + Pos(END_TEST_REACH + 6.0, 0, 0) * flipped
-
-
-def hook_coupon_layout():
-    """Where each swept pair sits, and how big a bite is taken.
-
-    The bite is the case's **whole end**: the USB opening in the middle
-    and a hook on each side of it. One hook on its own answers whether a
-    boss fits a slot; two, 24 mm apart with the port between them, answer
-    whether the end actually goes together -- which is the question, and
-    not one a single fragment can be asked.
-    """
-    return {
-        "n": len(P.END_HOOK_FIT_SWEEP),
-        "y0": -P.CASE_D / 2 - 0.1,
-        "y1": P.CASE_D / 2 + 0.1,
-        # How far inboard of the wall each fragment reaches. 6.0 gave a
-        # piece you pinch; this gives one you hold with two fingers while
-        # pushing the other half on, which is the motion being felt.
-        # Inboard of the wall both halves are flat and empty -- the
-        # plate's floor on one, the switch plate over the cavity on the
-        # other -- so it costs nothing but bed.
-        "grip": 16.0,
-        "pitch": P.CASE_D + 5.0,
-        "gap": 8.0,
-    }
-
-
-def _coupon_wall_runs():
-    """The two straight runs of end wall, one each side of the port.
-
-    The case gives the wall END_HOOK_L, the same 3.00 as the boss. The
-    coupon gives it the whole side, plug opening to corner, because
-    Saqoosha printed the first one and it broke in the hand: a 1.00 x
-    2.00 wall three long with a 0.90 boss on the far side is a cantilever
-    loaded at the tip, and a coupon has none of the case around it.
-
-    The boss and the slot keep their real length. They are what is being
-    measured and the fit is a clearance between those two; the wall's
-    length has no part in it.
-    """
-    plug = P.USB_PLUG_W / 2 + 0.30
-    corner = P.CASE_D / 2 - P.OUTER_CORNER_R - 0.10
-    return [(-corner, -plug), (plug, corner)]
-
-
-def hook_coupon():
-    """One plate end and one shell end per END_HOOK_FIT_SWEEP entry.
-
-    **Cut out of the real parts, not modelled again.** A coupon drawn by
-    hand answers a question about the coupon; this one is the geometry
-    `shell()` and `bottom()` build, so a number settled here is settled
-    about the case.
-
-    Only the shell reads END_HOOK_FIT -- it is the slot's clearance and
-    the boss does not know about it -- so the plate is built once and its
-    fragment repeated, and the shell is rebuilt per swept value.
-
-    Both halves are laid out in the orientation each is printed in: the
-    plate on its underside, the shell turned over onto its plate face.
-    That is not decoration. The fit being swept is between two printed
-    faces, and each takes its tolerance from the direction it was grown.
-    """
-    L = hook_coupon_layout()
-    x_in = P.CASE_W / 2 - P.WALL
-    x_seam = P.CASE_W / 2 - P.SEAM_STEP_W
-
-    plate_box = _block(x_in - L["grip"], P.CASE_W / 2 + 0.5,
-                       L["y0"], L["y1"], -0.1, P.END_HOOK_SEAM_Z + 0.1)
-    shell_box = _block(x_in - L["grip"], P.CASE_W / 2 + 0.5,
-                       L["y0"], L["y1"],
+    plate_box = _block(x0, x1, y0, y1, -0.1, P.CASE_H)
+    shell_box = _block(x0, x1, y0, y1,
                        P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.CASE_H + 0.1)
-
     plate_piece = bottom() & plate_box
-    for wy0, wy1 in _coupon_wall_runs():
-        plate_piece += _hook_wall(_hook_x0(x_seam), x_seam, wy0, wy1, P.BOTTOM_T,
-                                  P.END_HOOK_SEAM_Z, P.END_HOOK_CHAMFER_IN)
 
-    was = P.END_HOOK_FIT
+    pitch = P.CASE_D + 6.0
+    gap = 8.0
+    was = P.SLIDE_FIT
     part = None
     try:
-        for i, fit in enumerate(P.END_HOOK_FIT_SWEEP):
-            P.END_HOOK_FIT = fit
+        for i, fit in enumerate(P.SLIDE_FIT_SWEEP):
+            P.SLIDE_FIT = fit
             shell_piece = shell() & shell_box
-            # The shell's relief widened to match, or the two foul along
-            # the wall the coupon just lengthened.
-            for wy0, wy1 in _coupon_wall_runs():
-                shell_piece -= _block(
-                    x_in - 0.1, x_seam + P.SEAM_FIT / 2,
-                    wy0 - P.SEAM_FIT / 2, wy1 + P.SEAM_FIT / 2,
-                    P.Z_FLOOR - P.SEAM_STEP_H - 0.1, P.END_HOOK_SEAM_Z,
-                )
-
-            dy = (i - (L["n"] - 1) / 2) * L["pitch"]
-            one = Pos(0, dy, 0) * plate_piece
             flipped = Rotation(180, 0, 0) * shell_piece
             flipped = Pos(0, 0, -flipped.bounding_box().min.Z) * flipped
-            one += Pos(L["grip"] + P.WALL + L["gap"], dy, 0) * flipped
-
-            # Engraved on the flat inboard of the wall, clear of the port.
-            one -= Pos(x_in - L["grip"] / 2, dy, P.BOTTOM_T - 0.4) * extrude(
-                _label("%.2f" % fit), amount=0.5)
+            dy = (i - (len(P.SLIDE_FIT_SWEEP) - 1) / 2) * pitch
+            one = Pos(-cx, dy, 0) * plate_piece
+            # Engraved on the plate's flat top at the key row's y, clear
+            # of the posts and the columns in every slice.
+            one -= Pos(0, dy, P.BOTTOM_T - 0.4) * extrude(
+                _label(f"{fit:.2f}"), amount=0.5)
+            one += Pos((x1 - x0) + gap - cx, dy, 0) * flipped
             part = one if part is None else part + one
     finally:
-        P.END_HOOK_FIT = was
+        P.SLIDE_FIT = was
     return part
 
 

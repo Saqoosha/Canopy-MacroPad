@@ -7,9 +7,16 @@ rebuild.
 **One layout**, `choc`, and no switch to select it. `params.py` loads
 `pcb/params.py` by path, so the board's width, corner radius, switch pitch
 and pad positions are read rather than restated — the two files cannot
-drift into disagreeing. It is printed, both halves: its end hook and its
-column heights are settled on the printed parts, and the bottom that
-`COLUMN_SLACK` asked for has been reprinted and fits.
+drift into disagreeing. It is printed, both halves, its
+column heights settled on the printed parts, and the bottom that
+`COLUMN_SLACK` asked for has been reprinted and fits. The model has since
+grown the **slide latch** — ten small hooks along the long sides that
+close the middle of the seam, the end hook multiplied — and the latched
+case is **printed and working** at `SLIDE_FIT` 0.30 ("perfect" is the
+word that came back from the desk). Six prints shaped it, and *The
+slide latch* under *How it holds together* carries every turn and why.
+The screw bores remain as insurance while the screwless detent is the
+one open design.
 
 Three sections here are about the **earlier device** rather than this one
 — *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —
@@ -657,68 +664,173 @@ A cantilever that deflects 0.40 within 2% wants about 5 mm of length and
 this plate is 2.40 thick, so no hook in this geometry can work. A third
 screw at mid-span is out for a different reason: the boards fill the case
 wall to wall there, 0.200 between the field and the cavity against the
-5.60 a post needs. **If the
-centre ever lifts, the next thing to try is a magnet pair under the
-boards, not a plastic spring.**
+5.60 a post needs. The magnet pair this paragraph used to name as the
+next thing to try was never printed; the **slide latch** below is what
+answered the lifted centre, and it captures where a magnet would only
+pull.
 
-**And the far end is hooked.** Both screws sit in the left bay, so 145.50
-of a 151.00 case had nothing on it. At the right end the seam climbs to
-`END_HOOK_SEAM_Z`, the plate's wall carries on up inside the shell's, and
-a horizontal boss off that wall drops into a slot cut right through. It
-is not friction: the boss is captured, so that end cannot lift. **Ends
-only, and the reason is the assembly motion rather than strength** -- the
-boss is engaged by moving the plate along x, right end in and left end
-swung down, and on a long side the same boss would need the plate to move
-in y at the same time, which the other end forbids.
+**The end hook is retired, and the printed case is what retired it.**
+It was a raised wall at the right end whose horizontal boss dropped into
+a slot cut through the shell's outer face, engaged by the swing-era
+motion -- and it held that end well through every print that carried it.
+The slide latch adopted its rightward engagement precisely to keep it.
+Then the full latched case would not slide home: Saqoosha cut the boss
+off the printed plate, found the eight noses hold the bottom fine
+without it, and the slide *still* stopped 0.1 short -- the hook's
+remaining geometry was the stop. Its wall's outer face kept 0.10 to the
+shell's C lip and the tongue's right corners ~0.14 to the skirt's, both
+sized for a part that came down vertically and both inside the
+~0.15..0.20 this machine shrinks a hole. Not printer error: designed-in
+stops, of exactly the class the first coupon sweep had already convicted
+at the latch's own pockets -- the latch got its clearances widened, the
+hook never did.
 
-The slot goes through the outer face on purpose. A blind pocket had to
-share the skirt's 1.00 with the skin outside it and burst through anyway,
-and through you can see from outside whether the hook engaged -- which is
-otherwise unknowable once the case is shut.
+So it is gone whole -- wall, boss, C-back recess, the shell's band
+reliefs and through slots -- the right wall closes up with no slit in
+it, and the tongue now ends at `SLIDE_RIGHT_TRIM_X`, corners and all,
+before its own arcs begin: 2.10 to the right skirt where the wall had
+0.10. Home in x belongs to the screws alone (Ø3.70 over M3, ±0.35).
+`build.py` guards the trim as a shape, not a formula -- a probe asserts
+the tongue is *gone* past the trim plane, because a 0.1 stop is
+invisible to every boolean at nominal and only exists once the shrink
+has eaten it. The hook's numbers, in case it is ever wanted back: wall
+3.00 plus a 1.60 rib, boss 1.60 tall reaching 0.90, slot clearance 0.40
+settled on its own coupon (0.10..0.30 would not go on), seam climbed to
+4.40 in two 3.00 bands, a 1.60 C-back across the whole depth.
 
-`END_HOOK_FIT` is 0.40, from the coupon. The full 151 mm plate at that
-number still had to be forced -- the boss would not go fully in, and
-forcing it bowed the plate.
-**`END_HOOK_BACK` is 1.60**, the square on the back of the C -- under
-the boss, above the notch -- and it runs the **whole depth**, not just
-the 3.00 hook bands. A band-only cut left the slab standing between the
-bosses; the shell hits that and the boss never seats. That includes
-under the USB opening. The outer lip below the seam stays; looking into
-the port you see the C, not a second slit through the bottom.
-**`END_HOOK_RIB` is 1.60** inboard, so the boss is still held.
+**`COLUMN_SLACK` is 0.40.** The first bottom closed with a hair under
+1 mm of seam until you pressed: the columns ran to the board and the
+shell's 0.20 slack sits above it, which does not help. The reprint at
+0.40 closes, and on the seam Saqoosha's words were *"i still can see
+tiny gaps but its ok"* — an acceptance that has since expired, and the
+slide latch is its answer. The two numbers stay different questions:
+0.40 is why the seam *closes*, the latch is what *holds* it closed, and
+reopening `COLUMN_SLACK` because the middle lifted would be fixing the
+wrong constant.
 
-**`COLUMN_SLACK` is 0.40.** The first bottom with the C seated closed
-with a hair under 1 mm of seam until you pressed: the columns ran to
-the board and the shell's 0.20 slack sits above it, which does not
-help. The reprint at 0.40 closes, and on the seam Saqoosha's words are
-*"i still can see tiny gaps but its ok"* — gaps, plural, visible, no
-number given and none invented here, and **acceptable**, which is what
-settles 0.40 rather than leaving it open. Reasoning rather than report,
-and worth separating: that says 0.40 fixed the *failure* — the ~1 mm
-that needed pressing — and did not close the seam to invisible. If an
-invisible seam is ever wanted, this record says 0.40 is not the number
-that gets there, and it is a different question from the one that was
-being asked.
-`out/<layout>/coupon-hook.stl` is the sweep that asked the fit (0.10 to
-0.40, four pairs of whole case ends so both hooks have to find both
-slots at once).
+**The slide latch: the end hook multiplied.** The tiny gap at the middle
+of the plate was Saqoosha's complaint and the slide was his answer, and
+its final shape is his three calls made geometry: the first cut hid
+0.50-tall ledges inside the seam step's 1.20 and he said they were too
+tiny and too thin to print; he said neither half may touch the other at
+either end of the slide; and he said keep the boss. All three point the
+same way -- **so the latch is ten small end hooks.** Each is a post
+standing on the tongue's top rim, mostly inboard of the wall's face,
+with an **eave** off its top reaching 0.90 outboard, and the shell's
+wall takes a pocket up into its 2.00 x 5.80 underside: a full-height
+entry for the drop, a channel the post runs along, and a **ledge
+running along x** that the eave rides over. A sagging middle is an
+eave landing on its ledge -- shell material under a plate feature, the
+same capture the boss got from its slot's bottom edge, at ten points
+spanning 132 mm. Five pairs, `SLIDE_TAB_X`, mirrored across both long
+sides -- the fifth, at -66, is the screws' understudy for the day the
+latch proves it can carry the case alone.
 
-**Open: a fillet where that wall meets the plate.** The first coupon
-printed and broke in the hand -- 1.00 thick, 2.00 tall, with a 0.90 boss
-on the far side, a cantilever loaded at the tip, and nothing in the model
-had an opinion about that. The coupon's wall was widened to survive
-handling; the case's is still `END_HOOK_L` long. A fillet can only go
-inboard: outboard the shell's skirt fills the root to 2.40 and its own
-material carries on to the slot at 2.60, so there is 0.20 there and the
-shell is in it. Inboard is empty cavity, with the board's edge stopping
-at 73.30 and its underside at 5.70. Ø1.00 takes the root section from
-1.00 to 3.00 mm2.
+The eave is this feature's third shape, and printed parts chose every
+turn. It began as the +x **nose** -- the boss at half scale -- which
+the first sweep lengthened 0.80 to 1.50 for x clearance, and at 1.50
+it was a free cantilever on the upright plate print: Saqoosha saw it
+drooping, and a drooped tip hangs below its modelled 3.40, under the
+shelf top at 3.10, so it rammed the shelf's edge instead of riding
+over it -- the slide's next 0.1..0.2 stop after the hook's. Slicer
+support under eight bearing undersides is the wrong fix (scars where
+the capture bears, on parts that print support-free by contract), so
+the overhang turned 90 degrees: 0.65 instead of 1.50, carried along
+its whole 3.00 length instead of free at a tip. And because the ledge
+runs along x, the x-clearance class the nose kept losing to hole
+shrink has no members left -- nothing of the tab ends near anything
+in x.
 
-**Deliberately after the fit, not before.** The fillet is inboard of the
-wall and the fit is a clearance between boss and slot, so the two do not
-touch -- but changing the case mid-sweep would mean the coupon and the
-part had stopped being the same thing, which is the one property that
-makes this coupon worth more than a drawn one.
+The motion becomes one flat translation, and **it runs leftward now**:
+push the plate right until the trimmed tongue touches the right skirt
+(the entry pockets are cut to cover that touch, so the stop *is* the
+drop zone), drop it flat, slide left ~2 until the screw holes line up
+-- the screws are the slide's backstop and the x registration. At rest
+in either position nothing on one half touches the other; the
+transient right touch is the only face contact and it is how the hand
+finds the drop.
+
+The fourth print is what flipped the direction and grew the tab.
+Saqoosha's verdict on the third coupon was "eave is too tiny. slide
+length is too short" -- and the rightward travel could never grow: it
+was capped at 1.25 by the left trim against the screw seats. Leftward
+has no such cap (the drop is opened by the *right* trim, which has
+nothing to its right but the corner radius), so the travel is 2.0 with
+a 0.90 drop window, and the post grew to 4.00 x 2.20 with the eave at
+0.90 x 1.00 -- roughly three times the bearing. The direction was
+rightward only for the boss; the boss is gone; this is the leftward
+fact that finally argued for the re-flip. Both trims are the skirt's
+own inner outline, shifted and intersected -- the corridor probe
+caught the straight right trim's corners in the skirt's arcs at
+1.488 mm³, the mirror of the left's 1.681, and the shaped cut answers
+both ends the same way.
+
+Three facts carry the design:
+
+- **Leftward, at the fourth print's insistence.** The direction began
+  rightward for the boss, survived the boss's retirement on inertia,
+  and flipped when "slide length is too short" met the arithmetic: the
+  rightward drop was capped at 1.25 by the left trim against the screw
+  heads' seat rings at x -73.05, and the leftward drop is capped only
+  by how far right the tongue is trimmed. Both tongue ends are cut
+  with the skirt's own inner outline -- shifted right 1.25 for home
+  clearance on the left, swept left by `SLIDE_ENTRY_MAX` for the drop
+  on the right, intersected -- because straight faces leave tongue
+  corners standing in the skirt's corner arcs (watched at 1.681 mm³
+  left, 1.488 mm³ right) and box reliefs wide enough to fix that cut
+  1.122 mm³ out of the screw seats. The outline's arcs pass between.
+- **No free overhang anywhere, because the fifth print jammed on
+  two.** The flat-bottomed eave and the flat-topped ledge were a pair
+  of opposed horizontal overhangs -- the eave drooping down off the
+  upright plate, the ledge drooping up off the flipped shell -- and
+  they ate the 0.30 between them from both sides: every coupon of
+  that sweep hit and would not slide. So **both bearing faces are
+  parallel 45-degree wedges now**, rising outboard, `SLIDE_FIT` apart
+  vertically. At 45 degrees each face prints supported in its own
+  orientation -- the eave's underside steps outboard layer by layer,
+  the ledge grows off the wall's outer skin -- and a sagging plate
+  lands slope on slope, full-face, the two walls' inboard wedge
+  pushes cancelling through the plate. Nothing of the latch shows on
+  the seam -- the pockets stop 0.85 inside the wall's outer skin and
+  never touch the skirt.
+- **The corridor is legal because the columns dodge the sockets in
+  y, not in x** (sockets case y 2.2..7.4, front columns -8.29, the back
+  row's 0.26 at 9.16). A layout that dodged in x could never slide.
+  `build.py` walks the drop, the descent and the mid-slide as booleans
+  against the shell and the plugless board.
+
+What the printer owns is one number: `SLIDE_FIT`, the clearance between
+eave underside and ledge top, which is also exactly how far the seam can
+open before the capture catches. `out/choc/coupon-slide.stl` sweeps it
+0.20 to 0.50 -- full-depth slices of the real case at one tab pair, both
+halves in their print orientations, so the touch, the drop, the slide
+and the lift are felt on case geometry.
+
+**Two printed sweeps settled it, and each earned its keep.** The first
+(nose 0.80) said 0.30 reads best -- and stopped ~0.1 short of home on
+every entry. The fit was innocent: the post's leading face had 0.10 to
+the shelf's edge and the nose's tip 0.20 to the pocket's end, both x
+clearances inside the ~0.15..0.20 this machine shrinks a hole, so the
+post's foot landed on the shelf's printed edge. "We need more longer
+hook" is the fix as Saqoosha said it: `SLIDE_NOSE_R` went 0.80 to 1.50,
+moving the shelf's edge 0.70 from the post and putting 0.50 past the
+nose's tip, without changing the drop or the slide. The 0.10 had sat
+below the margin table's own 0.25 bar and was simply never written as a
+margin -- `post clear of the shelf's edge` exists now so the class
+cannot come back quietly.
+
+The second sweep (nose 1.50) slid fully home in coupon form and put a
+floor under the fit: **0.20 will not slide in, 0.30 and 0.40 both go
+and hold, 0.30 is the answer** -- the smallest that works, with the
+failure felt one step below rather than assumed. It is also a shrink
+measurement: printed clearance at 0.20 is at or under zero, so the
+pocket loses ~0.20 in the printing and the lift at 0.30 is ~0.10 of
+printed plastic. The full case then failed where the coupon had not --
+the hook's own 0.1 stops, and the 1.50 nose's droop -- which is what
+retired the hook and turned the nose into the eave. The eave keeps the
+0.30: the fit's meaning (vertical clearance onto shell material below)
+is unchanged, and the coupon sweep exists to re-confirm it cheaply
+before the case goes back on the printer.
 **The wires have a trench, and the case grew for them.** Five have to
 cross the whole field, and the first wired unit would not lie down: the
 space under the boards was 3.36 mm, of which a hot-swap socket took 1.83
