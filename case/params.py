@@ -116,11 +116,15 @@ PCB_SLOP = 0.40
 BOARD_CLAMP_SLACK = 0.20
 COLUMN_SLACK = 0.40
 
-# Room past the left board end for an M3 post. The USB tab on the right
-# sits against the wall (with PCB_SLOP), so there is no matching bay there
-# -- a second pair of posts stands just inboard of the right wall past
-# the board's own right edge once PCB_SLOP is spent.
-END_BAY = 7.00
+# The left bay was room for an M3 post and its 7.00 went with the
+# screws. What is left of it is a looks number: Saqoosha wants the cap
+# margin equal on the three non-USB sides, and the equality solves to
+# a fact about the board alone -- the cap's width cancels, leaving the
+# gap between "first switch to the board's left edge" (9.525) and
+# "switch row to the board's front edge" (10.795). 1.27 of bay makes
+# left = front = back = 3.795 from cap edge to case edge; the fourth
+# side is the electronics'.
+END_BAY = SWITCH_Y - SWITCH_X[0]
 
 # Air under the board: socket plus the same 1.40 that opened the wire
 # lane on the wired pad. No STEMMA receptacle here, so SOCKET_DROP is
@@ -192,7 +196,10 @@ SEAM_FIT = 0.20        # total clearance between skirt and tongue
 # a ~0.25 bump on a ledge, riding inside SLIDE_FIT, engaged by the
 # plate's own hang, no material ever bent -- but it is a coupon
 # question for after this geometry settles, not a free rider on it.)
-SLIDE_TAB_X = (-66.0, -40.0, -8.0, 30.0, 66.0)
+# Re-spread for the 144.00 case: the left pair hugs the corner the
+# screws' bay used to hold apart, the right pair keeps its entry 0.9
+# clear of the corner radius.
+SLIDE_TAB_X = (-66.0, -40.0, -8.0, 28.0, 63.0)
 
 # The post. Third print's verdict was "eave is too tiny. slide length
 # is too short", so everything here grew: the post from 3.00 x 1.80 to
@@ -412,13 +419,14 @@ CASE_W = WALL + END_BAY + PCB_SLOP + BOARD_W + WALL
 CASE_D = WALL + BOARD_D + PCB_SLOP + WALL
 
 # The left trim: the tongue and the plate's top half end here on the
-# left, so the plate can shift left for the drop at all. Capped by the
-# screw heads' seat rings -- their outboard edge is POST_X + HEAD/2 at
-# x -73.05 -- with 0.30 of margin; the deepest reachable offset (the
-# trimmed face touching the left skirt) and the entry pockets' length
-# both follow from it rather than being chosen.
+# left. With the slide leftward it only has to guarantee that home has
+# nothing to hit -- the 0.1-stop class that cost a case print at the
+# other end -- so it is a plain home clearance now. (Its whole history
+# of being capped by the screw seats at -73.05 went with the screws;
+# the rightward-era version opened the drop offset instead.)
+SLIDE_HOME_CLEAR = 1.00
 SLIDE_TRIM_X = (
-    -CASE_W / 2 + WALL + END_BAY / 2 - SCREW_HEAD_DIA / 2 - 0.30
+    -CASE_W / 2 + SEAM_STEP_W - SEAM_FIT / 2 + SLIDE_HOME_CLEAR
 )
 # The right trim opens the drop offset for the leftward slide (its face
 # against the right skirt IS the drop position) and still deletes the
@@ -482,17 +490,6 @@ FOOT_XY = [
     for y in (-CASE_D / 2 + 7.0, CASE_D / 2 - 7.0)
 ]
 
-_POST_Y = (
-    -CASE_D / 2 + WALL + POST_DIA / 2,
-    CASE_D / 2 - WALL - POST_DIA / 2,
-)
-# Two posts on the left-bay centreline, front and back. A 7.00 bay
-# cannot take two posts side by side (POST_DIA is 5.60), and the right
-# wall has no room beside a full-depth board that ends in a USB plug.
-_POST_X = (
-    -CASE_W / 2 + WALL + END_BAY / 2,
-)
-POST_XY = [(x, y) for x in _POST_X for y in _POST_Y]
 
 
 # --- Dummy keycap -------------------------------------------------------

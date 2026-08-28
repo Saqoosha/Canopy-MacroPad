@@ -83,21 +83,6 @@ def export_step_stable(part, path):
                         f.read_text(), count=1))
 
 
-def _head_seat_probe():
-    """The plate that has to be there above each counterbore."""
-    z0 = P.SCREW_SINK + P.CLEAR_CHAMFER
-    part = None
-    for x, y in P.POST_XY:
-        ring = (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
-                * Cylinder(radius=P.SCREW_HEAD_DIA / 2,
-                           height=P.BOTTOM_T - z0))
-        ring -= (Pos(x, y, (z0 + P.BOTTOM_T) / 2)
-                 * Cylinder(radius=P.SCREW_CLEAR_DIA / 2,
-                            height=P.BOTTOM_T - z0 + 0.2))
-        part = ring if part is None else part + ring
-    return part
-
-
 def check(label, got, want, tol=0.01):
     ok = abs(got - want) <= tol
     print(f"  [{'ok ' if ok else 'BAD'}] {label:<38} {got:8.3f}  (want {want:.3f})")
@@ -154,19 +139,17 @@ def main():
         check("key field mid-x",
               (P.SWITCH_XY[0][0] + P.SWITCH_XY[-1][0]) / 2,
               P.BOARD_ORIGIN[0] + P.KEY_FIELD_W / 2),
+        # Three equal cap margins is what END_BAY buys now; measure it
+        # on the placed switches rather than trusting the derivation.
+        check("cap margin, left equals front",
+              (P.SWITCH_XY[0][0] - P.CAP_XY / 2) - (-P.CASE_W / 2),
+              P.CASE_D / 2 - P.CAP_XY / 2),
     ]
     bh = built["bottom"].bounding_box().max.Z
     ok.append(bh <= P.Z_PLATE_BOTTOM + 1e-6)
     print(f"  [{'ok ' if bh <= P.Z_PLATE_BOTTOM else 'BAD'}] "
           f"{'bottom plate fits under the shell':<38} {bh:8.3f}  "
           f"(limit {P.Z_PLATE_BOTTOM:.3f})")
-
-    ring = (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2 - P.CLEAR_CHAMFER
-    good = 0.25 <= ring <= P.CLEAR_RING_MAX + 1e-6
-    ok.append(good)
-    print(f"\n  [{'ok ' if good else 'BAD'}] "
-          f"{'ring over the counterbore':<38} {ring:8.3f}  "
-          f"(0.250 to {P.CLEAR_RING_MAX:.3f})")
 
     margins = {
         # Receptacle sits in a 1.00 pocket cut into the plate top, so the
@@ -206,15 +189,24 @@ def main():
         # The tab's only x neighbour is the pocket's own end -- the
         # ledge runs along x, so the x-clearance class the +x nose kept
         # losing to hole shrink has no members left. The 0.30 here is a
-        # deliberate over-travel: printed it measures 0.1..0.2 (the
-        # wedge coupon "slides a bit deep" by exactly that), the screws
-        # register home inside it, and the screwless detent will own
-        # home when it comes.
+        # deliberate over-travel: on the printed screwless case it
+        # measures ~0.1 and Saqoosha accepted it ("i can slide 0.1mm
+        # deeper but ok"); the detent will pin home exactly if it ever
+        # stops being ok.
         "tab clear of the pocket's end": 0.30,
         "entry clear of the corner radius": (
             (P.CASE_W / 2 - P.OUTER_CORNER_R)
             - (max(P.SLIDE_TAB_X) + P.SLIDE_TAB_L / 2
                + P.SLIDE_ENTRY_MAX + 0.10)
+        ),
+        # The left pair moved toward the corner when the screws' bay
+        # went and the case shrank 7.00 around it.
+        "pocket clear of the left corner radius": (
+            (min(P.SLIDE_TAB_X) - P.SLIDE_TAB_L / 2 - 0.30)
+            - (-P.CASE_W / 2 + P.OUTER_CORNER_R)
+        ),
+        "post clear of the left trim": (
+            (min(P.SLIDE_TAB_X) - P.SLIDE_TAB_L / 2) - P.SLIDE_TRIM_X
         ),
         "post top under the board": (
             P.Z_BOARD_BOTTOM - (P.BOTTOM_T + P.SLIDE_TAB_H)
@@ -226,10 +218,6 @@ def main():
         ),
         "drop window the entry accepts": (
             P.SLIDE_ENTRY_MAX - P.SLIDE_ENTRY_MIN
-        ),
-        "trim short of the screw seats": (
-            (min(x for x, _ in P.POST_XY) - P.SCREW_HEAD_DIA / 2)
-            - P.SLIDE_TRIM_X
         ),
 
         # The two clearances the right end owns now that the hook is
@@ -265,14 +253,6 @@ def main():
              - (P.USB_PLUG_H + P.USB_PLUG_CLEAR) / 2)
             - (P.BOTTOM_T - P.SEAM_STEP_H) + 0.05
         ),
-        "screw post bite depth": (
-            P.Z_PLATE_BOTTOM - P.Z_FLOOR - 1.0 - P.PILOT_MOUTH_H
-        ),
-        "post wall at the pilot mouth": (P.POST_DIA - P.PILOT_MOUTH_DIA) / 2,
-        "plate left under the screw head": P.BOTTOM_T - P.SCREW_SINK,
-        "counterbore ring under the head": (
-            (P.SCREW_HEAD_DIA - P.SCREW_CLEAR_DIA) / 2
-        ),
         "counterbore ring at the widest swept hole": (
             (P.SCREW_HEAD_DIA - max(P.CLEAR_SWEEP)) / 2
         ),
@@ -282,15 +262,6 @@ def main():
         ),
         "coupon label inside the pad": (
             parts.coupon_layout()["clear_label_edge"]
-        ),
-        "feet clear the screw heads": (
-            (P.FOOT_H - P.FOOT_RECESS) - (P.SCREW_HEAD_H - P.SCREW_SINK)
-        ),
-        "screw post clears the board": (
-            min(abs(px - (P.BOARD_ORIGIN[0] + P.BOARD_W))
-                if px > 0 else abs(px - P.BOARD_ORIGIN[0])
-                for px, _ in P.POST_XY)
-            - P.POST_DIA / 2
         ),
         "board columns inside the cavity": min(
             P.CASE_D / 2 - P.WALL - abs(y) - dia / 2
@@ -346,12 +317,6 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'shell':<7} vs {'bottom plate':<22}"
           f" {hit:9.3f} mm3")
-
-    missing = (_head_seat_probe() - built["bottom"]).volume
-    good = missing < 1e-6
-    ok.append(good)
-    print(f"  [{'ok ' if good else 'BAD'}] {'plate':<7} missing under the "
-          f"head {missing:9.3f} mm3")
 
     # The outer lip below the USB opening has to stop you: nothing may
     # read as a second slit through the bottom of the port. Written for

@@ -295,12 +295,12 @@ def shell():
         part += _tube(x, y, P.Z_BOARD_TOP + P.BOARD_CLAMP_SLACK,
                       P.Z_PLATE_BOTTOM, P.BACK_COLUMN_DIA)
 
-    for x, y in P.POST_XY:
-        part += _tube(x, y, P.Z_FLOOR, P.Z_PLATE_BOTTOM, P.POST_DIA)
-        part -= _tube(x, y, P.Z_FLOOR - 0.1, P.Z_PLATE_BOTTOM - 1.0, P.PILOT_DIA)
-        part -= _lead_in(
-            x, y, P.Z_FLOOR, P.PILOT_MOUTH_H, P.PILOT_MOUTH_DIA, P.PILOT_DIA
-        )
+    # The screw posts stood here until the latch proved itself on the
+    # printed case; the ten tabs hold the plate now (the -66 pair is
+    # the left bay's), and the underside closes up with no counterbores.
+    # What the screws still did -- x registration and slide-back
+    # retention -- is the detent's job, which is the latch's one open
+    # design.
 
     for x, y in P.SWITCH_XY:
         part -= Pos(x, y, P.Z_PLATE_BOTTOM - 0.1) * extrude(
@@ -375,15 +375,6 @@ def bottom():
     _ox = P.BOARD_ORIGIN[0]
     part -= _stadium((P.USB_CY, _zc), _tw, _th, P.USB_AXIS,
                      _ox + P.BOARD_W - P.USB_TAB_W - 1.0, P.CASE_W / 2 + 0.1)
-
-    for x, y in P.POST_XY:
-        part -= _tube(x, y, -0.1, P.BOTTOM_T + 0.1, P.SCREW_CLEAR_DIA)
-        part -= _tube(x, y, -0.1, P.SCREW_SINK, P.SCREW_HEAD_DIA)
-        if P.CLEAR_CHAMFER > 0:
-            part -= _lead_in(
-                x, y, P.SCREW_SINK, P.CLEAR_CHAMFER,
-                P.SCREW_CLEAR_DIA + 2 * P.CLEAR_CHAMFER, P.SCREW_CLEAR_DIA,
-            )
 
     for x, y in P.FOOT_XY:
         part -= _tube(x, y, -0.1, P.FOOT_RECESS, P.FOOT_DIA)

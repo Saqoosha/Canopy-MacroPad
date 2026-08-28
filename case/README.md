@@ -15,8 +15,13 @@ close the middle of the seam, the end hook multiplied — and the latched
 case is **printed and working** at `SLIDE_FIT` 0.30 ("perfect" is the
 word that came back from the desk). Six prints shaped it, and *The
 slide latch* under *How it holds together* carries every turn and why.
-The screw bores remain as insurance while the screwless detent is the
-one open design.
+The screws are gone -- the latch carries the case alone -- and with
+them went the left bay that existed to hold their posts: the case is
+**145.27 long now, 5.73 shorter**, and what remains of the bay is a
+looks number -- 1.27 that makes the cap margin equal on the three
+non-USB sides (3.795 from cap edge to case edge; the fourth side is
+the electronics'). The detent that will pin home in x is the one open
+design.
 
 Three sections here are about the **earlier device** rather than this one
 — *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —
@@ -722,7 +727,7 @@ entry for the drop, a channel the post runs along, and a **ledge
 running along x** that the eave rides over. A sagging middle is an
 eave landing on its ledge -- shell material under a plate feature, the
 same capture the boss got from its slot's bottom edge, at ten points
-spanning 132 mm. Five pairs, `SLIDE_TAB_X`, mirrored across both long
+spanning 133 mm. Five pairs, `SLIDE_TAB_X`, mirrored across both long
 sides -- the fifth, at -66, is the screws' understudy for the day the
 latch proves it can carry the case alone.
 
@@ -744,8 +749,12 @@ in x.
 The motion becomes one flat translation, and **it runs leftward now**:
 push the plate right until the trimmed tongue touches the right skirt
 (the entry pockets are cut to cover that touch, so the stop *is* the
-drop zone), drop it flat, slide left ~2 until the screw holes line up
--- the screws are the slide's backstop and the x registration. At rest
+drop zone), drop it flat, slide left ~2 to home. **The screws are
+gone** -- removed once the printed case proved the latch -- so the
+underside closes with no counterbores, and home in x is held by seam
+friction and the pocket-end over-travel stop until the detent takes it
+over: a desk shove can in principle walk the lid rightward 2 mm and
+free it, carrying cannot (the hanging plate loads the wedges). At rest
 in either position nothing on one half touches the other; the
 transient right touch is the only face contact and it is how the hand
 finds the drop.

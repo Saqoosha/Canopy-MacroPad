@@ -413,7 +413,7 @@ one, not necessarily the only one.
   screw seats, leftward is capped only by the right trim -- giving
   2.00 of capture, a 0.90 drop window, and a fifth tab pair at -66 as
   the screws' understudy. Motion: push right to the touch, drop,
-  slide left ~2, screws. Both tongue ends are cut with the skirt's
+  slide left ~2 -- no screws; the latch carries the case alone. Both tongue ends are cut with the skirt's
   own inner outline (shifted for home clearance left, swept for the
   drop right, intersected) -- straight faces left corners standing in
   the skirt's arcs, watched at 1.681 mm³ left and 1.488 mm³ right,
@@ -638,14 +638,22 @@ leftward slide, 45-degree wedge bearing faces, both tongue ends
 outline-trimmed. The fit is settled with a mechanism at both bounds
 (0.20 puts the printed slopes in interference and visibly expands the
 shell -- the wedge turns squeeze into outboard wall load -- and 0.40
-is loose). What remains is the screw question: the bores stay as
-insurance while the case is lived with screwless (nothing holds x but
-seam friction, so a desk shove can walk the lid; carrying cannot --
-the hanging plate loads the wedges), and the designed answer is a
-detent: a 0.40 bump on one ledge slope behind a notch in that eave's
-underside, passed by bowing the 151 mm plate ~0.1 at mid-span, the
-one compliance in this case the barb arithmetic blesses. Every other
-number is settled on a part. **The
+is loose). The screws are gone -- posts, pilots, counterbores
+and their checks, removed once the printed case proved the latch --
+so the underside is unbroken, and the bay that held the posts shrank
+the case to 145.27: `END_BAY` is 1.27 now, derived so the cap margin
+is equal on the three non-USB sides (3.795, measured by a check on
+the placed switches). Nothing holds x but seam friction and
+the pocket-end over-travel stop -- printed, the over-travel reads
+~0.1 and is accepted -- and a desk shove can in principle walk the
+lid rightward 2 mm and free it, carrying cannot (the hanging plate
+loads the wedges). The screwless case is printed and working at
+145.27. The one open design is the detent that pins
+home: a 0.40 bump on one ledge slope behind a notch in that eave's
+underside, passed by bowing the 145 mm plate ~0.1 at mid-span, the
+one compliance in this case the barb arithmetic blesses. The
+fastener constants stay in `params.py` for the coupons that settled
+them. Every other number is settled on a part. **The
 reasoning behind each one is in `case/README.md`** -- that is the story,
 this is only the state. The
 earlier device's `inline` case is likewise finished, assembled and in
