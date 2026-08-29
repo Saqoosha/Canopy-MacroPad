@@ -569,6 +569,16 @@ CAP_CEIL_RELIEF = 0.50    # ceiling stepped up off the bearing pad
 STEM_CLEAR = 0.00
 STEM_CLEAR_SWEEP = (0.00, 0.04, 0.07, 0.10)
 STEM_LEN_CLEAR = 0.30     # on the arm length; the flats are what grips
+# The 0.30 of boss wall this leaves beside each arm tip **does not
+# survive slicing at a 0.4 nozzle** -- Saqoosha's g-code preview shows
+# four flank-wall pillars and no tip walls, and the six validated caps
+# were printed exactly so. That is fine, and known: the grip is the
+# flank walls squeezing the ribs, the tips carry nothing, and the Choc
+# stem's own ring encloses the whole boss in use. If a slicer ever
+# does print the 0.30, the length clearance still clears (~0.15 after
+# shrink). The model keeps the walls because either printed outcome is
+# validated-or-clear; do not "fix" the thinness by shrinking this
+# clearance -- the length fit would go interference after shrink.
 STEM_MOUTH = 0.30         # a wider first 0.40 of bore, to start it
 
 # Outer shape: the wrk. MX Pure's envelope, so the swap changes nothing

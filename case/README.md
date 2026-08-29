@@ -303,6 +303,14 @@ individually.
 how much rib is left alone: 1.20 + `STEM_CLEAR` against 1.30 is the
 squeeze, 0.05 per side at 0.00 and none at 0.10.
 
+**The bore's tip walls do not print, and never did.** The model leaves
+0.30 of boss wall beside each arm tip and a 0.4 nozzle drops it: the
+sliced cap is four flank-wall pillars and the bearing ring, which is
+exactly what the six validated caps were, so the part that "fits
+really well" is the tip-less one. The grip never lived there -- it is
+the flank walls squeezing the ribs -- and the Choc stem's own ring
+encloses the boss in use. Print `keycap.stl` as it is.
+
 **Settled at 0.00, on two printed sweeps and then on the caps
 themselves** — six printed at 0.00 go onto the switches and fit really
 well, which is the claim the tokens could only stand in for.
