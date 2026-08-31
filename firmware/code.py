@@ -677,8 +677,9 @@ phase_ms = [0] * NUM_KEYS
 # Nanoseconds the frame delta has not yet handed to `phase_ms`, and the
 # timestamp it was last measured from. Carrying the remainder rather than
 # dropping it is not tidiness: truncating each frame's delta would run every
-# breath slow by the truncation, 0.6% at a 7 ms frame, and a rate error
-# never corrects itself.
+# breath slow by the truncation -- 0.6% at a 7.042 ms frame and 11% at a
+# 6.76 ms one, the worst of the four rates check 10 tests -- and a rate
+# error never corrects itself.
 _phase_carry_ns = 0
 _phase_last_ns = 0
 # Last value actually pushed to each pixel. None means "nothing written
@@ -1296,11 +1297,27 @@ try:
                     # phase is a position that is advanced and reduced, never
                     # a difference of two timestamps that both grow for ever.
                     _p = phase_ms[i] + _step_ms
-                    # A subtract rather than `%`: `_step_ms` is one frame and
-                    # `period_ms` is clamped at 100, so the wrap can fire at
-                    # most once and a modulo is the more expensive way to ask.
+                    # The compare is the optimisation and the modulo is the
+                    # correctness. A frame is normally a fraction of a period
+                    # so the branch is not taken at all, and taking it costs a
+                    # modulo once per period per key, which is nothing.
+                    #
+                    # Written as a bare subtract first, on the reasoning that
+                    # a frame cannot reach a whole period. It can: a host that
+                    # stops draining the CDC endpoint stalls each `write_line`
+                    # for `serial.write_timeout`, several key edges can be
+                    # reported in one pass, and `period_ms` is clamped no
+                    # higher than 100. `_p` then stays past the period, the
+                    # index below runs off the end of a 512-entry array, and
+                    # the `except` around this block turns it into a `tick_err`
+                    # -- which the accounting at the bottom of the loop counts
+                    # as an **I2C** failure and eventually reports as a lost
+                    # bus, on a board that may have no I2C at all. The old
+                    # `(now - pulse_started[i]) % period_ns[i]` could not do
+                    # this at any gap length; the subtract was resilience sold
+                    # for speed that the modulo does not actually cost.
                     if _p >= period_ms[i]:
-                        _p -= period_ms[i]
+                        _p %= period_ms[i]
                     phase_ms[i] = _p
                     level = floor + (1 - floor) * PULSE_CURVE[
                         _p * _CURVE_STEPS // period_ms[i]]

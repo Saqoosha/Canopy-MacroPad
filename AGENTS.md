@@ -927,8 +927,9 @@ it is, and do not let it name a replacement number it has not earned.
 
   The price of a position is that it is advanced by a whole number of
   milliseconds, so the sub-millisecond remainder has to be carried --
-  dropping it runs **every breath 11% slow**, for ever, with nothing in the
-  pulse to notice. `_phase_carry_ns` is that carry and check 10 in
+  dropping it runs **every breath up to 11% slow** -- that is the worst of
+  the four frame rates check 10 tests, 6.76 ms truncating to 6; a 7.042 ms
+  frame loses 0.6% -- for ever, with nothing in the pulse to notice. `_phase_carry_ns` is that carry and check 10 in
   `tools/dither_check.py` is what watches it.
 
   What was measured and does **not** help: fixed-point, because a float

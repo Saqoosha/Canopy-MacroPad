@@ -584,19 +584,61 @@ for frame_us, label in ((6_760, "148 Hz"), (5_882, "170 Hz"),
             drift * 100, label, total_ms, wall_ms)
     print("    {:>6} frame: {} frames, {} ms of phase over {:.0f} ms of wall, drift {:+.4f}%"
           .format(label, frames, total_ms, wall_ms, drift * 100))
-# and the wrap has to land the phase back at its trough, not past it
-env = {"_phase_carry_ns": 0, "_phase_last_ns": 0, "now": 0, "last_pulse_at": 0,
-       "PULSE_STEP_NS": 0, "phase_ms": [0], "period_ms": [PERIOD_MS], "NUM_KEYS": 1}
-seen_hi = 0
-for _ in range(4000):
-    env["now"] += 6_760_000
-    exec(PHASE_SRC, env)
-    p = (env["phase_ms"][0] + env["_step_ms"])
-    if p >= PERIOD_MS:
-        p -= PERIOD_MS
-    env["phase_ms"][0] = p
-    seen_hi = max(seen_hi, p)
-assert 0 <= seen_hi < PERIOD_MS, "phase left its period: {}".format(seen_hi)
-print("    4000 frames: phase stayed in [0, {}), highest {}".format(PERIOD_MS, seen_hi))
+# The wrap has to survive a frame LONGER THAN THE PERIOD, and this half of
+# the check exists because the first version could not fail: it swept 4000
+# frames of a 6.76 ms step against a 2500 ms period, never came within two
+# orders of magnitude of the boundary, and passed just as happily on the
+# single-subtract wrap that breaks there. A guard that cannot reach the
+# condition it guards is not a guard.
+#
+# The condition is reachable in service: `serial.write_timeout` is 0.05 s
+# per write, several key edges can be reported in one pass against a host
+# that has stopped draining, and `set_pulse` clamps the period no higher
+# than 100 ms. Driven through the real render loop, so what is asserted is
+# the actual IndexError rather than a reimplementation of the arithmetic.
+STALL_PERIOD_MS = 100          # the clamped minimum a host may ask for
+
+
+def render_one_frame(step_ms, period_ms, phase_ms, rgb=0x00FF80):
+    seen = []
+
+    class Grp:
+        def __setitem__(self, k, v):
+            seen.append(v)
+
+    env = {"NUM_KEYS": 1, "DITHER": True, "brightness": 0.6,
+           "math": math, "array": array, "time": __import__("time"),
+           "DITHER_FLOOR": FIRMWARE_FLOOR,
+           "dither_err": [0.0] * 3, "last_rgb": [None], "group_dirty": [False],
+           "from_rgb": [rgb], "to_rgb": [rgb],
+           "from_floor": [0.1], "to_floor": [0.1],
+           "phase_ms": [phase_ms], "period_ms": [period_ms],
+           "_step_ms": step_ms, "now": 0,
+           "crossfade_ns": 0, "fade_started": [0],
+           "fade_progress": lambda i, now: 1.0,
+           "pixel_groups": [(Grp(), 0, 1)]}
+    exec(CURVE_SRC, env)
+    exec(WRITE, env); exec(PAINT, env); exec(func_src("lerp_rgb"), env)
+    exec(RENDER, env)
+    return env["phase_ms"][0], len(seen)
+
+
+worst = 0
+for step in (7, 50, 99, 100, 101, 150, 260, 300, 1000, 25_000):
+    for start in (0, 1, 60, STALL_PERIOD_MS - 1):
+        try:
+            p, writes = render_one_frame(step, STALL_PERIOD_MS, start)
+        except IndexError as err:
+            raise AssertionError(
+                "a {} ms frame on a {} ms period ran the curve index off the "
+                "end: {} -- in service that is caught as a tick error and "
+                "counted as an I2C failure".format(
+                    step, STALL_PERIOD_MS, err)) from None
+        assert 0 <= p < STALL_PERIOD_MS, \
+            "phase left its period: start {} + step {} -> {}".format(start, step, p)
+        worst = max(worst, step)
+print("    frames from 7 ms to {} ms on a {} ms period, from four starting "
+      "phases: no index ran off the curve and the phase stayed in range"
+      .format(worst, STALL_PERIOD_MS))
 
 print("\nall checks passed")
