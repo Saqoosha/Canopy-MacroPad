@@ -144,6 +144,15 @@ def main():
         check("cap margin, left equals front",
               (P.SWITCH_XY[0][0] - P.CAP_XY / 2) - (-P.CASE_W / 2),
               P.CASE_D / 2 - P.CAP_XY / 2),
+        # The case corner is concentric with the corner cap's corner
+        # and 3.795 larger -- OUTER_CORNER_R is written as a number
+        # because CAP_XY/CAP_R are defined below it in params.py, and
+        # this pair of checks is what stops the two drifting apart.
+        check("case corner radius is margin + cap R", P.OUTER_CORNER_R,
+              P.CASE_D / 2 - P.CAP_XY / 2 + P.CAP_R),
+        check("corner centres concentric, x",
+              -P.CASE_W / 2 + P.OUTER_CORNER_R,
+              P.SWITCH_XY[0][0] - P.CAP_XY / 2 + P.CAP_R),
     ]
     bh = built["bottom"].bounding_box().max.Z
     ok.append(bh <= P.Z_PLATE_BOTTOM + 1e-6)
@@ -317,6 +326,48 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'shell':<7} vs {'bottom plate':<22}"
           f" {hit:9.3f} mm3")
+
+    # The four corners, probed for the hole class the concentric radius
+    # introduced: a near-square cavity corner against the 7.995 outer
+    # face left a 0.07 slit through the wall on each diagonal, and an
+    # interference boolean cannot see a hole. Rays march the diagonal
+    # at wall height; any that get through are a leak, and the first
+    # blocked step is the wall's thickness, printed as a reading.
+    # Watched failing at 4 leaks / 4 with the cavity corner back at
+    # 1.00 -- the original fault, reproduced on purpose.
+    import math as _m
+    leaks2 = 0
+    thin_w = 99.0
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cx0 = sx * (P.CASE_W / 2)
+            cy0 = sy * (P.CASE_D / 2)
+            got = 0.0
+            through = True
+            # The march has to overshoot both faces: the outer face
+            # sits R*(sqrt(2)-1) ~ 3.3 inboard of the square corner on
+            # the diagonal, and the first cut of this probe walked only
+            # 2.0 -- 40 steps of air, "4 leaks" about a wall it never
+            # reached.
+            for i in range(130):
+                t = i * 0.05
+                x = cx0 - sx * t / _m.sqrt(2)
+                y = cy0 - sy * t / _m.sqrt(2)
+                pr = Pos(x, y, 5.0) * Box(0.06, 0.06, 0.6)
+                if (pr & built["shell"]).volume > 1e-12:
+                    if through:
+                        start = t
+                        through = False
+                elif not through:
+                    got = t - start
+                    break
+            leaks2 += through
+            if not through:
+                thin_w = min(thin_w, got)
+    good = leaks2 == 0 and thin_w >= 0.45
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'corner':<7} wall through the "
+          f"diagonal {thin_w:5.2f} mm, {leaks2} leaks / 4")
 
     # The outer lip below the USB opening has to stop you: nothing may
     # read as a second slit through the bottom of the port. Written for
@@ -513,16 +564,63 @@ def main():
     bare_board = mock.board() - parts._block(
         P.USB_CX + P.USB_OVERHANG, P.CASE_W / 2 + 20.0,
         -P.CASE_D / 2, P.CASE_D / 2, 0.0, P.CASE_H)
+    # The corridor runs against the shell **without the detent's
+    # bumps**: camming over them at seam-closed is the detent working,
+    # not a corridor fault, and it gets its own checks below.
+    shell_less = built["shell"] - parts._detent_ridges()
     deep = P.SLIDE_ENTRY_MAX - 0.05
     for dx, dz in ((deep, -4.0), (deep, -0.5), (deep, 0.0), (1.0, 0.0)):
         moved = Pos(dx, 0, dz) * built["bottom"]
-        hit = (moved & built["shell"]).volume + _shared(moved, bare_board)
+        hit = (moved & shell_less).volume + _shared(moved, bare_board)
         good = hit < 1e-6
         ok.append(good)
         print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} corridor at "
               f"dx {dx:+.2f} dz {dz:+.2f}         {hit:9.3f} mm3")
 
+    # --- the detent -----------------------------------------------------
+    # Shape first: the ridge stands where the gallery was void, the
+    # notch opens where the eave's tip was solid. Watched failing at
+    # ridge 0/2 + all contacts 0.000 with the ridges never added, and
+    # at notch 0/2 with the notches never cut -- that one also firing
+    # the global interference at 0.031 (the ridge standing in an
+    # un-notched tip at home IS the notch's necessity).
+    X = P.SLIDE_DETY_X
+    y_in2 = P.CASE_D / 2 - P.WALL
+    ridges = voids_n = 0
+    for side in (-1, 1):
+        pr = Pos(X, side * (y_in2 + 1.02), 4.50) * Box(0.6, 0.18, 0.3)
+        if (pr & built["shell"]).volume > 1e-6:
+            ridges += 1
+        pr = Pos(X, side * (y_in2 + 0.95), 4.45) * Box(0.6, 0.18, 0.2)
+        if (pr & built["bottom"]).volume < 1e-6:
+            voids_n += 1
+    good = ridges == 2 and voids_n == 2
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'detent':<7} ridge on the skin "
+          f"{ridges}/2, notch in the tip {voids_n}/2")
+
+    # Function second. Slid back past the notch's play, the notch's
+    # west wall must meet the ridge -- that is the click's catch, in
+    # any orientation, because it acts in y. Mid-slide the un-notched
+    # tip must overlap the ridge (that is the drag the skin's bending
+    # absorbs; ~1.5% strain, the arithmetic is at the constants). No
+    # rigid probe can show the flexed pass, so what is checked is that
+    # both contacts exist and everything else stays clear -- the
+    # corridor above already runs without the ridges.
+    det_win = Pos(X, 0, 4.4) * Box(4.0, 2 * P.CASE_D, 1.4)
+    lock = _shared(built["shell"] & (Pos(0.80, 0, 0) * built["bottom"]),
+                   det_win)
+    cam = _shared(built["shell"] & (Pos(1.50, 0, 0) * built["bottom"]),
+                  det_win)
+    home = _shared(built["shell"] & built["bottom"], det_win)
+    good = lock > 1e-3 and cam > 1e-3 and home < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'detent':<7} catches slid-back "
+          f"{lock:6.3f} mm3, drags mid-slide {cam:6.3f}, free at home "
+          f"{home:6.3f}")
+
     # A sweep whose entries come out identical tests nothing. Only the
+    # shell reads SLIDE_FIT    # A sweep whose entries come out identical tests nothing. Only the
     # shell reads SLIDE_FIT -- it is the shelf's height under the nose
     # -- so its four slices must differ and the plate's four must not,
     # except by the ink in the labels.

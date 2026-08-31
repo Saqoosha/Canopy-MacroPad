@@ -477,6 +477,24 @@ one, not necessarily the only one.
   and say when you measured. It cost a round to settle something both
   sides could have checked in one command.
 
+- **The case corner is the cap corner grown concentric, and its price
+  is written at the diagonals.** `OUTER_CORNER_R` 7.995 = cap margin
+  3.795 + `CAP_R` 4.2, checked against that equation in `build.py`
+  (the CAP constants live below it in `params.py`, so a check referees
+  instead of file order). The cavity corner cannot follow (the board
+  closes the window: `CAVITY_CORNER_R` 2.70 is the most its corner
+  permits) and cannot stay square either -- at 1.00 it poked a 0.07
+  slit THROUGH the 7.995 outer face at every corner, a hole no
+  interference boolean can see. A diagonal leak probe owns the class
+  (watched at 4/4 on the reproduced fault; its first march was 2.0
+  long against an outer face 3.3 in and reported leaks about a wall it
+  never reached -- overshoot the range, again). Corner wall: 0.65, the
+  whole budget between board corner and concentric arc. The shell's
+  top chamfer (`SHELL_TOP_CHAMFER` 1.20) is cut on the bare slab and
+  doubles as first-layer relief; its try/except-wrapped predecessor
+  swallowed its own failure at 1.20 and the bed-inset probe (0.35 for
+  an expected ~1.2) was what confessed.
+
 - **The dummy caps mount on a ring, not on a cross.**
   `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure
   set is in the post, and its mount is **read off `ref/choc-v2.step` by
@@ -643,17 +661,29 @@ and their checks, removed once the printed case proved the latch --
 so the underside is unbroken, and the bay that held the posts shrank
 the case to 145.27: `END_BAY` is 1.27 now, derived so the cap margin
 is equal on the three non-USB sides (3.795, measured by a check on
-the placed switches). Nothing holds x but seam friction and
-the pocket-end over-travel stop -- printed, the over-travel reads
-~0.1 and is accepted -- and a desk shove can in principle walk the
-lid rightward 2 mm and free it, carrying cannot (the hanging plate
-loads the wedges). The screwless case is printed and working at
-145.27. The one open design is the detent that pins
-home: a 0.40 bump on one ledge slope behind a notch in that eave's
-underside, passed by bowing the 145 mm plate ~0.1 at mid-span, the
-one compliance in this case the barb arithmetic blesses. The
-fastener constants stay in `params.py` for the coupons that settled
-them. Every other number is settled on a part. **The
+the placed switches). The screwless case is printed and working at
+145.27, and **the detent holds x** -- its second shape, printed:
+Saqoosha's read is "good tight", no discrete カチッ (the ~2 of drag
+before the notch smears the click into friction), and accepted,
+because retention was the requirement and tight is retention. The
+pocket-end over-travel stop backs it up at ~0.1 printed. The first
+detent shape -- a 0.40
+bump raised on the ledge's 45° slope, sprung by the plate's own weight
+-- printed to nothing ("i dont think detent is working... theres no
+bit change"): a two-layer feature on a stair-stepped slope smears away
+in slicing, the cap's tip walls again, and a gravity spring has no
+click. The second is vertical in both print orientations and sprung by
+elasticity: a round ridge (r 0.50, 0.25 proud) on the mid tab's pocket
+skin, parking in a 1.60 window cut 0.30 into that eave's outboard tip.
+The spring is the skin panel bending 0.15 (~1.5% strain -- the barb
+arithmetic passed for once), the same measured force that visibly
+expanded the shell at the 0.20 fit. No opening gesture: the click is
+symmetric, home pinned ±0.30. Probed (catch 0.016 / drag 0.016 / free
+at home 0.000) and injections watched: ridges gone → 0.000s; notches
+gone → global interference 0.031, the ridge standing in an un-notched
+tip being the notch's necessity. `SLIDE_DETY_PROUD` up is the knob if
+a felt click is ever wanted. The fastener constants stay in `params.py` for the coupons that
+settled them. Every other number is settled on a part. **The
 reasoning behind each one is in `case/README.md`** -- that is the story,
 this is only the state. The
 earlier device's `inline` case is likewise finished, assembled and in

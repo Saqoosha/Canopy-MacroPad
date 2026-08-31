@@ -20,8 +20,33 @@ them went the left bay that existed to hold their posts: the case is
 **145.27 long now, 5.73 shorter**, and what remains of the bay is a
 looks number -- 1.27 that makes the cap margin equal on the three
 non-USB sides (3.795 from cap edge to case edge; the fourth side is
-the electronics'). The detent that will pin home in x is the one open
-design.
+the electronics'). **The corners are the corner cap's, grown.** `OUTER_CORNER_R` is
+7.995 -- the 3.795 cap margin plus the cap's own 4.2 -- so the case's
+corner arc is concentric with the corner keycap's and the border wraps
+it at a constant 3.795, straights and arc alike; the shell's top edge
+carries `SHELL_TOP_CHAMFER` 1.20, which also serves as the flipped
+print's first-layer relief (a 0.50 chamfer applied later inside a
+try/except had silently failed at 1.20 -- the bed-inset probe reading
+0.35 instead of ~1.2 is what told). The radius has a price paid at the
+diagonals: the board's own corner and the case's arc fight over the
+same space, and the corner wall is **0.65** -- all the material the
+two leave between them, with `CAVITY_CORNER_R` 2.70 the most the board
+permits. Less than that and the cavity pokes a slit hole through the
+outer face (0.07 at the old 1.00 -- invisible to every interference
+boolean, a hole shares volume with nothing); a four-corner leak probe
+owns that class now, watched failing at 4/4 on the reproduced fault.
+
+The **detent** pins home in x, and its second
+shape is the one that works on a printer: a vertical round ridge on
+the mid tab's pocket skin, parking in a notch cut into that eave's
+outboard tip -- vertical features in both halves' print orientations,
+immune to the slicing that smeared the first cut (a 0.40 bump raised
+on the stair-stepped ledge slope, whose spring was also only the
+plate's own weight: "theres no bit change"). The spring now is the
+skin panel bending 0.15 -- ~1.5% strain, the barb arithmetic passed,
+and the same felt force that expanded the shell at the 0.20 fit.
+Slide home: drag, click in. Slide back: the same click in reverse, no
+special gesture. Home pinned to +-0.30.
 
 Three sections here are about the **earlier device** rather than this one
 — *The earlier device*, *Cable, per layout*, and *Stack, in `stacked`* —

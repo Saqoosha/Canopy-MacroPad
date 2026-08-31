@@ -101,7 +101,29 @@ STANDOFF_DIA = 4.20
 # --- Case ---------------------------------------------------------------
 WALL = 2.00
 BOTTOM_T = 2.40
-OUTER_CORNER_R = 3.00
+# 7.995, and it is not a taste number: Saqoosha wants the case's
+# corner concentric with the corner keycap's corner and larger. The
+# three-sides-equal cap margin already puts the two centres on the
+# same diagonal, so concentricity reduces to one equation --
+# OUTER_CORNER_R = (CASE_D/2 - CAP_XY/2) + CAP_R -- and the border
+# around the corner cap becomes the same 3.795 along the straights AND
+# around the arc. CAP_XY/CAP_R live at the bottom of this file, so the
+# value is written out and `build.py` checks the equation instead of
+# the file order enforcing it.
+OUTER_CORNER_R = 7.995
+# The cavity's corner does NOT follow OUTER_CORNER_R - WALL: at 5.995
+# the arc closes over the board's corners. But it cannot stay at the
+# old 1.00 either -- against the 7.995 outer face a near-square cavity
+# corner pokes THROUGH on the diagonal by 0.07, a slit hole at all
+# four corners that no interference boolean can see (a hole is shared
+# volume with nothing). 2.70 is the most the board's own corner
+# (BOARD_CORNER_R 2.54 + slop) permits, and it buys the thickest
+# corner wall this geometry can have: **0.65 on the diagonal**. That
+# number is the price of the concentric 7.995 -- the board's corner
+# and the case's corner arc fight over the same diagonal, and 0.65 is
+# what is left between them. A leak probe in build.py owns the hole
+# class now.
+CAVITY_CORNER_R = 2.70
 PCB_SLOP = 0.40
 
 # How much shorter the shell's standoffs are than the space they sit in.
@@ -186,9 +208,10 @@ SEAM_FIT = 0.20        # total clearance between skirt and tongue
 # sockets in **y**, not in x (sockets case y 2.2..7.4, front columns
 # -8.29, back row 9.16 with its 0.26), so the plate can translate in x
 # with every column staying in its lane.
-# 66, not 68: the entry pockets open toward +x now and the rightmost
-# one has to stay clear of the shell's corner radius at 72.5. The
-# fifth pair at -66 is the screws' understudy: Saqoosha wants the
+# Respread twice: once for the 145.27 case, again when the corner
+# radius grew to 7.995 -- the straight wall now ends at |x| 64.64 and
+# every pocket has to live inside it. The fifth pair is the screws'
+# understudy: Saqoosha wants the
 # latch to carry the case alone if it proves itself, and without the
 # screws the left bay needs its own hold-down. It costs nothing while
 # they coexist. (What the screws still do that no tab does: register x
@@ -199,7 +222,7 @@ SEAM_FIT = 0.20        # total clearance between skirt and tongue
 # Re-spread for the 144.00 case: the left pair hugs the corner the
 # screws' bay used to hold apart, the right pair keeps its entry 0.9
 # clear of the corner radius.
-SLIDE_TAB_X = (-66.0, -40.0, -8.0, 28.0, 63.0)
+SLIDE_TAB_X = (-62.0, -38.0, -8.0, 26.0, 59.0)
 
 # The post. Third print's verdict was "eave is too tiny. slide length
 # is too short", so everything here grew: the post from 3.00 x 1.80 to
@@ -313,6 +336,45 @@ SLIDE_ENTRY_HEAD = 0.60   # entry roof above the post top, for the drop
 SLIDE_POCKET_IN = 0.10    # inboard of the wall's inner face
 SLIDE_POCKET_OUT = 1.15   # outboard of the wall's inner face
 
+# --- the detent ---------------------------------------------------------
+# What the screws used to do in x, done by shape -- second cut. The
+# first was a 0.40 bump raised on the ledge's 45-degree slope with the
+# plate's weight as its spring, and the print executed both flaws at
+# once: a two-layer feature on a stair-stepped slope smeared away (the
+# cap's tip walls all over again), and a gravity spring has no click
+# in it. Saqoosha's verdict on the printed case: "i dont think detent
+# is working... theres no bit change".
+#
+# So the second cut is vertical faces and a real spring. A round
+# **ridge** stands on the pocket's outer skin inside the mid tab's
+# gallery -- a vertical feature in the flipped print, immune to
+# slicing -- reaching 0.25 inboard, 0.15 of it into the eave's tip.
+# The eave takes a matching **tip notch** (its outboard 0.30 shortened
+# over a 1.60 window, vertical walls, upright print). The spring is
+# the skin panel itself bending 0.15 outboard -- ~1.5% surface strain
+# against PLA's ~2 (the barb arithmetic, passed this time), and it is
+# the same measured force that visibly expanded the shell at the 0.20
+# fit, so the click is a felt one. Sliding home drags the tip over the
+# ridge and snaps it into the notch; sliding back is the same click in
+# reverse -- no special gesture, the retention is elastic, and home is
+# pinned to +-0.30 by the notch walls either side of the ridge.
+#
+# **Printed** (2026-08-29): "its good tight... no カチッと feeling but
+# ok". The engagement is real but reads as friction, not a click --
+# the tip drags ~2 over the ridge before the notch, and print
+# tolerance smears the drop-in edge into that drag. Retention is what
+# was needed and retention is what "tight" is; accepted as is. If a
+# felt click is ever wanted, SLIDE_DETY_PROUD up is the knob, and
+# shortening the drag (ridge nearer the eave's west end) sharpens the
+# transition.
+SLIDE_DET_TAB = -8.0      # the pair whose skin carries the ridge
+SLIDE_DETY_X = -8.50      # ridge centre; inside the gallery and the
+                          # eave's home footprint
+SLIDE_DETY_R = 0.50       # the ridge's radius
+SLIDE_DETY_PROUD = 0.25   # inboard of the skin face; 0.15 into the tip
+SLIDE_DETY_NOTCH = 0.80   # notch half-length; play 0.30 past the ridge
+SLIDE_DETY_TRIM = 0.30    # how much of the eave's tip the notch removes
+
 # --- USB-C --------------------------------------------------------------
 # Receptacle class figure from the design spec (3.16). Overhang and plug
 # overmold are the numbers the wired pad already settled with a real
@@ -381,6 +443,13 @@ USB_R = USB_H / 2
 # so the slide's last millimetre has nothing to meet: the gap to the
 # right skirt at home is 2.10 where the hook's wall had 0.10.
 SLIDE_RIGHT_TRIM_X = None  # derived below, needs CASE_W
+# The chamfer round the shell's top outline. It was 0.50 and buried as
+# a literal in parts.py; Saqoosha wants a larger one, and 1.20 is the
+# first cut at it -- a looks number, free to move. It has ~4.7 of top
+# face to the nearest switch hole and the whole wall below it, so
+# nothing structural bounds it for a while.
+SHELL_TOP_CHAMFER = 1.20
+
 # Elephant foot: the first layer is squashed and bulges past the outline,
 # so the edge that lands on the bed gets a chamfer to give it somewhere
 # to go. **Both halves need it and on different faces** -- the plate
@@ -428,15 +497,14 @@ SLIDE_HOME_CLEAR = 1.00
 SLIDE_TRIM_X = (
     -CASE_W / 2 + SEAM_STEP_W - SEAM_FIT / 2 + SLIDE_HOME_CLEAR
 )
-# The right trim opens the drop offset for the leftward slide (its face
-# against the right skirt IS the drop position) and still deletes the
-# tongue's corner arcs; the pocket entries stop 1.25 short of the
-# corner radius above it.
-SLIDE_RIGHT_TRIM_X = CASE_W / 2 - OUTER_CORNER_R - 0.90
-# Where the right trim face touches the right skirt's inner face: the
-# deepest drop offset a hand can reach, which the entries must cover.
-SLIDE_ENTRY_MAX = (
-    (CASE_W / 2 - SEAM_STEP_W + SEAM_FIT / 2) - SLIDE_RIGHT_TRIM_X
+# The drop window's deep end is chosen, and the right trim follows --
+# it used to be the other way round, measured off the corner radius,
+# and the radius growing to 7.995 for the concentric corners would
+# have ballooned the entries to 8 mm. The trim face against the right
+# skirt is still the drop position.
+SLIDE_ENTRY_MAX = 3.00
+SLIDE_RIGHT_TRIM_X = (
+    (CASE_W / 2 - SEAM_STEP_W + SEAM_FIT / 2) - SLIDE_ENTRY_MAX
 )
 
 BOARD_ORIGIN = (

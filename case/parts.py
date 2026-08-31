@@ -199,6 +199,64 @@ def _slide_pockets():
     return cut
 
 
+def _below_45(y_ref, z_ref, side):
+    """The half-space under the latch's 45-degree plane, as a solid.
+
+    The plane is z = z_ref + (side*y - y_ref): the same family every
+    wedge face in the latch lies on. A big box rotated 45 about X, its
+    top face laid on the plane -- intersect to keep what is under a
+    slope, subtract to keep what is above one.
+    """
+    r = 2 ** 0.5
+    ny, nz = -side / r, 1 / r
+    return (Pos(0, side * y_ref - 30 * ny, z_ref - 30 * nz)
+            * Rotation(side * 45, 0, 0) * Box(400, 60, 60))
+
+
+def _detent_ridges():
+    """The detent's shell half, second cut: a vertical round ridge on
+    the pocket's outer skin inside the mid tab's gallery, reaching
+    SLIDE_DETY_PROUD inboard -- 0.15 of that into the eave's tip. The
+    first cut raised a two-layer bump on the stair-stepped ledge slope
+    and the slicer smeared it away; a vertical cylinder is the shape
+    slicers cannot spoil, in either half's print orientation.
+    """
+    y_in = P.CASE_D / 2 - P.WALL
+    y_skin = y_in + P.SLIDE_POCKET_OUT
+    z_e0 = P.BOTTOM_T + P.SLIDE_TAB_H - P.SLIDE_NOSE_H
+    z0 = z_e0 + 0.70              # the tip's underside at the overlap
+    z1 = P.BOTTOM_T + P.SLIDE_TAB_H + 0.16
+    out = None
+    for side in (-1, 1):
+        c = _tube(P.SLIDE_DETY_X,
+                  side * (y_skin + P.SLIDE_DETY_R - P.SLIDE_DETY_PROUD),
+                  z0, z1, P.SLIDE_DETY_R * 2)
+        out = c if out is None else out + c
+    return out
+
+
+def _detent_notches():
+    """The detent's plate half, second cut: the eave's outboard
+    SLIDE_DETY_TRIM shortened over a window SLIDE_DETY_NOTCH either
+    side of the ridge -- vertical walls in the upright print. The
+    ridge parks between them at home; the click is the skin panel
+    bending 0.15, not anything here deflecting.
+    """
+    y_in = P.CASE_D / 2 - P.WALL
+    tip = y_in + P.SLIDE_POST_UNDER + P.SLIDE_NOSE_Y
+    z_e0 = P.BOTTOM_T + P.SLIDE_TAB_H - P.SLIDE_NOSE_H
+    out = None
+    for side in (-1, 1):
+        lo, hi = sorted((side * (tip - P.SLIDE_DETY_TRIM),
+                         side * (tip + 0.30)))
+        n = _block(P.SLIDE_DETY_X - P.SLIDE_DETY_NOTCH,
+                   P.SLIDE_DETY_X + P.SLIDE_DETY_NOTCH,
+                   lo, hi, z_e0 + 0.40,
+                   P.BOTTOM_T + P.SLIDE_TAB_H + 0.10)
+        out = n if out is None else out + n
+    return out
+
+
 def _slide_trim():
     """The left-end trim: the plate's top half ends 1.25 short of the
     left skirt, cut with the skirt's own inner outline -- the same
@@ -262,12 +320,19 @@ def _bed_chamfer(solid, z, size):
 def shell():
     """Top shell: the switch plate, its walls, and the board clamp."""
     outer = _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R, P.Z_FLOOR, P.CASE_H)
-    # This half prints flipped, so CASE_H is the face on the bed.
-    outer = _bed_chamfer(outer, P.CASE_H, P.ELEPHANT_CHAMFER)
+    # This half prints flipped, so CASE_H is the face on the bed, and
+    # one chamfer serves two masters: SHELL_TOP_CHAMFER is the look of
+    # the top edge and, being larger than ELEPHANT_CHAMFER, it is also
+    # the first layer's relief. It is cut here on the bare slab -- a
+    # later version chamfered the finished part's top wire inside a
+    # try/except, and at 1.20 that chamfer quietly failed (its downhill
+    # leg overran the 0.40 elephant face) while the except swallowed
+    # it; the bed-inset probe reading 0.35 instead of ~1.2 is what told.
+    outer = _bed_chamfer(outer, P.CASE_H, P.SHELL_TOP_CHAMFER)
     cavity = _slab(
         P.CASE_W - 2 * P.WALL,
         P.CASE_D - 2 * P.WALL,
-        max(P.OUTER_CORNER_R - P.WALL, 0.5),
+        P.CAVITY_CORNER_R,
         P.Z_FLOOR,
         P.Z_PLATE_BOTTOM,
     )
@@ -286,6 +351,9 @@ def shell():
     # The right wall is unbroken -- the end hook's band reliefs and
     # through slots retired with it, on the printed case's evidence.
     part -= _slide_pockets()
+    # The detent's ridges go in after the pockets open the galleries
+    # they stand in.
+    part += _detent_ridges()
 
     # Standoffs that set the board height. No pegs -- the switch locates.
     for x, y in P.PRESS_XY:
@@ -317,11 +385,6 @@ def shell():
     part = part & _slab(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R,
                         P.Z_FLOOR - P.SEAM_STEP_H, P.CASE_H)
 
-    try:
-        top = part.faces().sort_by(Axis.Z)[-1]
-        part = chamfer(top.outer_wire().edges(), 0.5)
-    except Exception:
-        pass
     return part
 
 
@@ -348,6 +411,7 @@ def bottom():
     for xt in P.SLIDE_TAB_X:
         for side in (-1, 1):
             part += _slide_tab(xt, side)
+    part -= _detent_notches()
     part -= _slide_trim()
 
     # Columns under the press points, so the clamp is a sandwich.
