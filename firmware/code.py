@@ -10,7 +10,7 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
   host -> device
     C <idx> <rrggbb>   set key idx to that color, e.g. `C 0 ff8000`
     S <idx> <rrggbb> [ms] [floor]
-                       pulse that color, sine-eased. `ms` is the full
+                       pulse that color, eased by `PULSE_CURVE`. `ms` is the full
                        period (min 100), `floor` is the percentage the
                        dip bottoms out at, 0-100: 0 reads as an alert,
                        50 as a slow breath that says "alive" without
@@ -51,6 +51,7 @@ with the REPL banner and any tracebacks. The host is told so explicitly:
 it receives `ERR no-data-cdc-check-boot-py` right after `HELLO`.
 """
 
+import array
 import math
 import os
 import sys
@@ -74,7 +75,7 @@ NeoKey1x4 = None
 NeoPixel = None
 
 # 1: C / B / P / R
-# 2: adds S (device-side sine pulse)
+# 2: adds S (device-side eased pulse)
 # 3: adds X, crossfades every C/S, and holds phase across a colour change
 PROTOCOL_VERSION = 3
 
@@ -103,6 +104,11 @@ PROFILES = {
         "gpio_keys": (4, 6),                # MISO, SCK
         "gpio_pixel": 3,                    # MOSI
         "pad_addresses": (0x30,),
+        # 50 Hz, and no dithering at that rate -- see `PAINT_HZ`. Four of
+        # this board's six pixels live behind seesaw, so a paint is I2C
+        # traffic competing with the key scan for the same bus, and the
+        # NeoKey's own comment upstream is about exactly that cost.
+        "paint_hz": 50,
     },
     # The custom PCB. Six switches on GPIO in the board's physical key
     # order, one chain of six pixels, and no I2C anywhere on the board --
@@ -111,6 +117,10 @@ PROFILES = {
         "gpio_keys": (3, 4, 6, 20, 5, 24),
         "gpio_pixel": 25,
         "pad_addresses": (),
+        # 200 Hz, which is what buys the dithering below. Every pixel is
+        # on one bit-banged GPIO chain: six of them is ~260 us per show,
+        # so 200 Hz costs about 5% of wall time and no bus at all.
+        "paint_hz": 200,
     },
 }
 
@@ -164,7 +174,8 @@ else:
         "MPAD_BOARD" if _forced else "build",
         _forced or _build,
         "/".join(sorted(PROFILES)))
-    _profile = {"gpio_keys": (), "gpio_pixel": None, "pad_addresses": ()}
+    _profile = {"gpio_keys": (), "gpio_pixel": None, "pad_addresses": (),
+                "paint_hz": 50}
 
 # The I2C addresses of the NeoKey boards, in physical left-to-right key
 # order. This tuple is the single source of truth for how many boards
@@ -238,6 +249,14 @@ NUM_KEYS = SEESAW_KEYS + GPIO_KEYS
 # values near its floor and visibly stalls there. 60% measured as the
 # point where the fade stays smooth without being glaring. The host can
 # override this at runtime with `B`.
+#
+# Measured on a lit board, and the number stands -- but for a reason the
+# original note did not have. `DITHER` buys steps back above
+# `DITHER_FLOOR`, and separately the board says a one-level step stops
+# being visible around value 2 anyway. So the low end is not as bad as
+# this comment once implied, and 60 is no longer a floor forced by
+# quantisation. It is still what idle's white balance was measured at,
+# which is the reason not to move it casually.
 DEFAULT_BRIGHTNESS = 0.6
 
 # All timing is integer nanoseconds. `time.monotonic()` returns a float
@@ -248,7 +267,57 @@ DEFAULT_BRIGHTNESS = 0.6
 # is silent and awful: the debounce window stops measuring anything, so
 # one press reports as several and the wrong pane gets focused.
 DEBOUNCE_NS = 15_000_000       # 15 ms
-PULSE_STEP_NS = 20_000_000     # 20 ms, i.e. 50 Hz
+
+# How often the LEDs are repainted, and it is a per-board number because
+# it buys different things on the two boards. It is the pulse's sample
+# rate, and -- at 200 Hz and above -- the carrier the dithering below
+# rides on. The loop's own period bounds it: `POLL_INTERVAL_S` is 5 ms,
+# so 200 Hz is the ceiling reachable without making the key scan spin
+# faster, and the achieved rate is a little under it.
+PAINT_HZ = _profile["paint_hz"]
+PULSE_STEP_NS = 1_000_000_000 // PAINT_HZ
+# Temporal dithering is only switched on where the paint rate can carry
+# it, and 200 Hz is not a round number -- it is where the measurement
+# crosses over. Error-diffusing at 50 Hz is *worse than not dithering*,
+# because the dither's own alternation then lands inside the band the eye
+# sees as flicker rather than above it. Simulated against the real
+# quantiser, error energy in the visible 5-30 Hz band, in LSB rms, for a
+# gamma-2.0 breath at floor 0.15:
+#
+#     brightness   today@50   dither@50   @100    @200    @400
+#     0.10            0.254      0.396   0.230   0.084   0.031
+#     0.15            0.237      0.378   0.237   0.075   0.029
+#     0.60            0.347      0.390   0.198   0.082   0.037
+#
+# So 50 Hz loses, 100 Hz draws, and 200 Hz wins by 3x. A board that
+# cannot afford 200 Hz must not dither at all, which is why this is a
+# threshold and not a preference.
+DITHER = PAINT_HZ >= 200
+
+# Below this output value a channel is rounded rather than dithered, and
+# it is the second half of the threshold above -- 200 Hz is necessary and
+# is not sufficient. Both numbers came off the lit board, on static
+# ladders where nothing but the dither could move.
+#
+# What the eye is judging is the dither's *depth*, one level as a share
+# of the light there, against the rate its pattern happens to run at.
+# Error diffusion holds one value for 1/fraction frames, so a fraction of
+# 0.1 alternates at 20 Hz however fast the paint is -- the rate cannot be
+# bought out of this, because the fraction can always be smaller.
+#
+#   depth   1 LSB on   at 100 Hz   at 20 Hz
+#   100%    value 1    calm        flickers
+#    50%    value 2    calm        flickers
+#    33%    value 3    calm        faint, still there
+#    20%    value 5    calm        calm
+#    11%    value 9    calm        calm
+#
+# So 5 is where the worst rate stops being visible. 4 is the untested
+# boundary and 5 is inside it. What this buys back is everything above
+# it; below it the levels were never recoverable by any temporal trick,
+# and rounding at least fails quietly. A dither there is not a smoother
+# value, it is a light switching on and off.
+DITHER_FLOOR = 5.0
 
 # Adds roughly 5 ms plus the scan and paint themselves on top of the
 # 15 ms debounce, so a press reaches the host in ~20 ms. The debounce
@@ -272,36 +341,108 @@ POLL_INTERVAL_S = 0.005
 # key index to a pane state, so it could be any of them. Keys whose states change at different
 # moments still drift apart on their own.
 #
-# 2 s measured as the point where the breath reads as deliberate rather
-# than nervous; every state uses it and only the floor changes.
-DEFAULT_PULSE_PERIOD_NS = 2_000_000_000
-# Perceptually a raw sine lingers at the top, and gamma 2.0 corrects
-# that -- but only where there are 8-bit steps to spend. At a low global
-# brightness the bottom of a deep pulse has a handful of distinct values
-# in total, and squaring makes the level crawl through exactly that
-# region, so the fade visibly stalls at the floor. Staying near 1.0
-# trades the perceptual curve for movement that never runs out of steps.
-# 1.0 makes the exponentiation an identity; it is kept as a retunable
-# knob, not left behind by accident.
+# 2.5 s, chosen on a lit board against 2/3/4/5/6/8 s shown on the six keys
+# at once. 2 s is 30 breaths a minute, outside the 12-20 a resting adult
+# does, and a photodiode capture of a real MacBook sleep light measured
+# about 12; this lands at 24, which is slower than the 2 s it replaces and
+# still quick enough that a deep pulse reads as a request rather than as
+# scenery. Every state uses it and only the floor changes.
 #
-# The knob exists because the underlying problem was not solved, only
-# stepped around: at low brightness there are not enough levels, and 1.0
-# spends the perceptual curve to keep what levels there are. **Temporal
-# dithering is the improvement this is waiting for** -- trading update
-# rate for effective depth, which is the standard answer to running out
-# of amplitude resolution, and cheap here because the pulse already
-# repaints at 50 Hz (`PULSE_STEP_NS`).
+# The host sends its own period with every `S`, so this is what a host that
+# omits one gets, not what the pad normally runs. Canopy sends 2500.
+DEFAULT_PULSE_PERIOD_NS = 2_500_000_000
+# `PULSE_GAMMA` shapes nothing any more. It is the exponent of the cosine
+# family the curve below replaced, kept because that family's runner-up is
+# one line away and because the number itself was earned: 1.5, picked on a
+# lit board from a sweep of 1.0/1.2/1.4/1.6/1.8/2.0 carried on the six keys
+# at once.
 #
-# It was investigated once on the QT Py, on scratch scripts that live on
-# that board's CIRCUITPY and were never committed. Do not treat their
-# conclusions as carrying over: the PCB changed the premise underneath
-# them. Its pixels are SK6812MINI-E on the regulated 3V3 rail, below
-# their own datasheet minimum, where the QT Py's hang off the
-# unregulated Qwiic rail and are a different part on two separate
-# chains. How the bottom of the range quantises is a property of the
-# driver and its supply, so the measurement is worth re-running here
-# before anything is tuned.
-PULSE_GAMMA = 1.0
+# What that sweep settled, and it is worth keeping because the first
+# explanation of it was half wrong. A raw sine (gamma 1.0) reads as "the
+# bottom is short and the top is long" -- it lingers exactly where the eye
+# is least able to see a change. Gamma 2.0 reads as a pause at the bottom,
+# because level-minus-floor goes as t^4 there against t^2 at 1.0, so the
+# lowest 1% of the swing lasts 410 ms of a 2 s breath instead of 128. Both
+# ends are wrong and the answer was between them.
+#
+# The old note in this place blamed that pause on there being few 8-bit
+# levels at low brightness. Both facts are real and they are not cause and
+# effect: the freeze is the two **meeting**, 410 ms of dwell spanning under
+# 2 LSB. Dithering is the right instrument for that half and the note was
+# right to name it; what it got wrong was calling it cheap. It costs a 4x
+# paint rate (`DITHER`), below 200 Hz it makes the pulse worse, and below
+# `DITHER_FLOOR` no rate saves it at all.
+#
+# And the whole quantisation half turned out not to happen in service. The
+# deepest breath Canopy sends bottoms out at 7.7 of 255 in its faintest lit
+# channel, where a one-level step stopped being visible around 2 -- measured
+# on the board, keys held at 0/1/2/3/4/5 side by side. Everything above was
+# found at brightness 15 with a floor of 0, which is outside the envelope
+# the pad is ever driven in.
+PULSE_GAMMA = 1.5
+
+# The breath, precomputed at boot. Not from `PULSE_GAMMA` -- that constant
+# belongs to the cosine family this replaced; see its own note above.
+#
+# The shape is `exp(sin)`: `(e^sin(x) - 1/e) / (e - 1/e)`, normalised and
+# phase-shifted to start at its minimum. Narrow peak, wide trough -- the
+# dwell sits at the bottom of the breath where a raw sine puts it at the
+# top, and the top is exactly where the eye is least able to see a change.
+# Traced to a 2010 comment by Adam Shea, popularised by Sean Voisen in
+# 2011; Shea's stated reason was correcting the log response of
+# LED->eye->brain rather than modelling breathing, and the curve is
+# exactly time-symmetric about its peak whatever the folklore says.
+#
+# Chosen on a lit board against five others shown side by side on the six
+# keys at once -- a plain triangle, FastLED's `quadwave` and `cubicwave`,
+# `sine^1.5`, and the Gaussian fitted to a real MacBook sleep light -- all
+# sharing colour, floor, phase and brightness so only the curve differed.
+# A gamma sweep over the cosine ran the same way first: 1.0 read as "the
+# bottom is short and the top is long", 2.0 as a pause at the bottom, and
+# 1.5 was the best of that family before this beat it.
+#
+# `PULSE_GAMMA` no longer shapes anything -- it belongs to the cosine
+# family this replaced. It is kept only because `sine^1.5` is one line
+# away and was the runner-up:
+#
+#     _raw = [((1 - math.cos(2 * math.pi * _i / _CURVE_STEPS)) / 2)
+#             ** PULSE_GAMMA for _i in range(_CURVE_STEPS)]
+#
+# The **table** is a speed change with no effect on the shape. `math.cos`
+# and `** PULSE_GAMMA` ran once per key per frame and measured as the
+# largest single cost in the loop, and the index is integer arithmetic so
+# the float divide goes with them.
+#
+# 512 is not a round number, it is the smallest power of two finer than a
+# frame. A table adds a visible stair only when its steps are coarser than
+# the frames sampling it, so the comparison that decides the size is
+# against the loop rate rather than against the eye:
+#
+#     table    step     biggest jump      steps per frame
+#     entries  apart    between entries   at 148 Hz (6.76 ms)
+#      256     7.81 ms      3.61 LSB           0.9   <- coarser than a frame
+#      512     3.91 ms      1.81 LSB           1.7
+#
+# The biggest change one frame to the next is 3.13 LSB at 148 Hz, so at 512
+# the table's own step is already the smaller of the two and contributes no
+# hold the frames did not already have. At 256 it is the larger, and would.
+#
+# Written out as literals this table **hard-faulted CircuitPython into
+# safe mode** -- 1536 floats of source, and it was the parser rather than
+# the data: measured on the board afterwards, the array costs ~2 KB of a
+# free 162 KB and a lookup is 21 us. Build it, never paste it.
+_CURVE_STEPS = 512
+_E = math.e
+_raw = [(math.exp(math.sin(2 * math.pi * _i / _CURVE_STEPS - math.pi / 2)) - 1 / _E)
+        / (_E - 1 / _E) for _i in range(_CURVE_STEPS)]
+_span = max(_raw) - min(_raw)
+PULSE_CURVE = array.array("f", [(_v - min(_raw)) / _span for _v in _raw])
+# The cosine starts at its minimum, and the whole phase rule depends on it:
+# a key that begins pulsing has to fade up rather than snap to full. That
+# is a property of the expression above, so it is asserted rather than
+# assumed -- a curve edited to start anywhere else breaks a promise made
+# in `set_pulse`, and nothing else in this file would notice.
+assert PULSE_CURVE[0] < 0.02
 
 # How long a color or floor change takes to complete. An instant switch
 # reads as "something just happened", but most transitions are a session
@@ -381,7 +522,15 @@ if i2c is not None:
             # with the key scan for the same bus. Batch instead: write
             # the pixels, then show once per pad per tick.
             pad.pixels.auto_write = False
-            pad.pixels.brightness = DEFAULT_BRIGHTNESS
+            # Left at 1.0 and scaled in `paint()` instead. Not a style
+            # choice: pixelbuf scales with `(v * int(b*256)) // 256`, an
+            # integer floor *after* this file has already rounded to 8
+            # bits, so at brightness 0.30 seventy per cent of the values
+            # this file can express collapse onto a byte something else
+            # already occupies. Dithering upstream of that is provably a
+            # no-op -- simulated at 0.30 and below it reproduces today's
+            # output frame for frame. One quantisation, owned here.
+            pad.pixels.brightness = 1.0
             pad.pixels.fill(0x000000)
             pad.pixels.show()
             pads.append((base, pad))
@@ -429,7 +578,10 @@ if GPIO_KEYS:
         gpio_pixels = NeoPixel(
             getattr(microcontroller.pin, "GPIO{}".format(GPIO_PIXEL_GPIO)),
             GPIO_KEYS,
-            auto_write=False, brightness=DEFAULT_BRIGHTNESS,
+            # 1.0 for the reason given at the NeoKey's own brightness
+            # line: the scaling happens in `paint()` so there is one
+            # quantisation rather than two stacked.
+            auto_write=False, brightness=1.0,
             pixel_order="GRB")
         gpio_pixels.fill(0x000000)
         gpio_pixels.show()
@@ -478,9 +630,28 @@ pulse_started = [0] * NUM_KEYS
 # the cache. Holds the *logical* color: adafruit_pixelbuf re-renders from
 # its unscaled buffer when brightness changes, so `B` still lands on
 # solid keys without invalidating this.
+# Holds the *hardware* byte triple -- what pixelbuf will transmit --
+# because this file now applies the global brightness itself. It used to
+# hold the logical colour and lean on pixelbuf re-rendering its unscaled
+# buffer when `.brightness` changed; with the scaling moved here that no
+# longer happens, so `B` has to invalidate instead. `set_brightness`
+# does, and the settled-solid skip in the render loop tests this list so
+# that the invalidation actually reaches a key that has stopped moving.
 last_rgb = [None] * NUM_KEYS
 # Which pixel groups have writes waiting for a show().
 group_dirty = [False] * len(pixel_groups)
+
+# The global brightness, 0.0-1.0, applied in `paint()`. The host owns it
+# through `B`.
+brightness = DEFAULT_BRIGHTNESS
+# Per-channel dither residue, three floats per key, flat so the hot path
+# indexes instead of allocating. Carrying the fraction a byte cannot hold
+# into the next frame is the whole mechanism: the output alternates
+# between the two bytes either side of the true value at whatever duty
+# makes the time-average land on it, which is why the mean tracks the
+# ideal to about 0.002 LSB. Only meaningful above `DITHER`'s threshold --
+# below it the alternation is slow enough to read as flicker.
+dither_err = [0.0] * (NUM_KEYS * 3)
 
 serial = usb_cdc.data
 using_fallback_port = serial is None
@@ -590,6 +761,80 @@ def invalidate_pixels():
         group_dirty[i] = True
 
 
+def paint(idx, base, level, settled):
+    """Scale one key's colour by `level` and the global brightness, to bytes.
+
+    The single quantisation in this file. Everything upstream is float,
+    everything downstream is what pixelbuf transmits, and `.brightness`
+    is left at 1.0 so nothing rounds twice.
+
+    Above `DITHER`'s threshold the fraction a byte cannot carry is kept
+    and added to the next frame, so a key whose true value sits between
+    two bytes alternates between them at whatever duty averages out
+    right. That is what gives a low-brightness breath back the levels the
+    8-bit output does not have. Longest freeze on one byte at the bottom
+    of a gamma-2.0 breath, floor 0.15, worst of the three channels,
+    measured by `tools/dither_check.py` running this very function with
+    `DITHER` off at 50 Hz against on at 200 Hz: 500 -> 50 ms at brightness
+    0.60, 580 -> 100 at 0.15, 740 -> 130 at 0.10. The rate is not what
+    does it -- the same code undithered at 200 Hz measures 585 ms where
+    50 Hz measured 580.
+
+    Under `DITHER_FLOOR` the channel is rounded instead, which is the
+    whole reason that constant exists: down there one level is most of the
+    light, and toggling it is a lamp switching rather than a value.
+
+    A settled key is rounded too, and its residue cleared. Error diffusion
+    on a value that never changes keeps alternating for ever, which would
+    mean a solid key never stops writing and the render loop's skip never
+    engages -- trading a one-LSB gain on a static colour for permanent
+    traffic and a permanent shimmer.
+
+    The floor is tested per channel, not per key. ff8000 at a low
+    brightness puts red near 39, green near 19 and blue at 0, so a key is
+    routinely above the floor in one channel and below it in another; a
+    per-key test would either flicker the blue or freeze the red.
+    """
+    o = idx * 3
+    r = ((base >> 16) & 0xFF) * level * brightness
+    g = ((base >> 8) & 0xFF) * level * brightness
+    b = (base & 0xFF) * level * brightness
+    if settled or not DITHER:
+        dither_err[o] = dither_err[o + 1] = dither_err[o + 2] = 0.0
+        write_pixel(idx, (int(r + 0.5) << 16) | (int(g + 0.5) << 8) | int(b + 0.5))
+        return
+    # Written out per channel rather than through a helper: this runs
+    # three times per key per frame, 3600 times a second on the PCB, and a
+    # CircuitPython call costs more than the arithmetic inside it.
+    #
+    # Each residue is `v - int(v)` of a non-negative v, so it stays in
+    # [0, 1) and the sum stays under 256. That is what keeps a channel
+    # from carrying into the one above it, which would not look like a
+    # rounding error -- it would look like the wrong colour.
+    if r < DITHER_FLOOR:
+        dither_err[o] = 0.0
+        ir = int(r + 0.5)
+    else:
+        r += dither_err[o]
+        ir = int(r)
+        dither_err[o] = r - ir
+    if g < DITHER_FLOOR:
+        dither_err[o + 1] = 0.0
+        ig = int(g + 0.5)
+    else:
+        g += dither_err[o + 1]
+        ig = int(g)
+        dither_err[o + 1] = g - ig
+    if b < DITHER_FLOOR:
+        dither_err[o + 2] = 0.0
+        ib = int(b + 0.5)
+    else:
+        b += dither_err[o + 2]
+        ib = int(b)
+        dither_err[o + 2] = b - ib
+    write_pixel(idx, (ir << 16) | (ig << 8) | ib)
+
+
 def lerp_rgb(a, b, t):
     return ((int(((a >> 16) & 0xFF) + (((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t) << 16)
             | (int(((a >> 8) & 0xFF) + (((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t) << 8)
@@ -681,14 +926,23 @@ def all_off():
         fade_started[i] = 0
         pulse_started[i] = 0
         period_ns[i] = DEFAULT_PULSE_PERIOD_NS
+        dither_err[i * 3] = dither_err[i * 3 + 1] = dither_err[i * 3 + 2] = 0.0
         write_pixel(i, 0x000000)
 
 
 def set_brightness(percent):
-    level = max(0, min(100, percent)) / 100
-    for g in range(len(pixel_groups)):
-        pixel_groups[g][0].brightness = level
-        group_dirty[g] = True
+    """Set the global brightness. Every key is repainted, not re-sent.
+
+    pixelbuf used to do this for free: it kept an unscaled buffer and
+    re-rendered it when `.brightness` moved, so `B` landed on solid keys
+    without this file touching them. The scaling lives in `paint()` now,
+    so the staged bytes are simply wrong until each key is computed
+    again -- and `invalidate_pixels()` is what makes the render loop stop
+    skipping the settled ones long enough to do it.
+    """
+    global brightness
+    brightness = max(0, min(100, percent)) / 100
+    invalidate_pixels()
 
 
 def handle(line):
@@ -898,24 +1152,33 @@ try:
                 last_pulse_at = now
                 for i in range(NUM_KEYS):
                     t = fade_progress(i, now)
+                    settled = False
                     if t >= 1.0:
-                        if to_floor[i] >= 1.0 and from_floor[i] >= 1.0 \
-                                and from_rgb[i] == to_rgb[i]:
-                            continue  # settled and solid: nothing moves
+                        settled = (to_floor[i] >= 1.0 and from_floor[i] >= 1.0
+                                   and from_rgb[i] == to_rgb[i])
+                        # `last_rgb` joins the test, and it is load-bearing
+                        # rather than defensive. This skip is now the only
+                        # thing standing between a settled key and a `B`
+                        # that changed what its bytes should be: pixelbuf
+                        # used to re-render a brightness change for free
+                        # and no longer does, so a key skipped here would
+                        # hold its old brightness until the host happened
+                        # to recolour it. `invalidate_pixels()` clears the
+                        # entry, this lets exactly one repaint through, and
+                        # the entry it writes puts the skip back.
+                        if settled and last_rgb[i] is not None:
+                            continue  # settled, solid, and already on the wire
                         from_rgb[i] = to_rgb[i]
                         from_floor[i] = to_floor[i]
                     base = lerp_rgb(from_rgb[i], to_rgb[i], t)
                     floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
-                    # Integer modulo before the divide, so phase stays exact
-                    # no matter how long the board has been up. Cosine starts
-                    # at its minimum, so a key that begins pulsing fades up
-                    # rather than snapping to full.
-                    phase = ((now - pulse_started[i]) % period_ns[i]) / period_ns[i]
-                    level = (1 - math.cos(2 * math.pi * phase)) / 2
-                    level = floor + (1 - floor) * level ** PULSE_GAMMA
-                    write_pixel(i, (int(((base >> 16) & 0xFF) * level) << 16)
-                                | (int(((base >> 8) & 0xFF) * level) << 8)
-                                | int((base & 0xFF) * level))
+                    # Integer modulo *and* integer scale, so the phase stays
+                    # exact however long the board has been up and no float
+                    # divide happens here.
+                    level = floor + (1 - floor) * PULSE_CURVE[
+                        ((now - pulse_started[i]) % period_ns[i])
+                        * _CURVE_STEPS // period_ns[i]]
+                    paint(i, base, level, settled)
         except Exception as err:  # noqa: BLE001
             # Not necessarily I2C -- this arm also covers the pulse
             # arithmetic, which is why the type name is carried into the

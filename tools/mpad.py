@@ -472,10 +472,17 @@ def palette(path, brightness=60):
     """Step through candidate status colors at adjustable brightness.
 
     Also prints what each color becomes *after* the global brightness
-    multiply. That number is the thing to watch: NeoPixel brightness
-    scales the 8-bit channels, so a dark color at a low brightness lands
-    in single digits, where WS2812 mixing is coarse and picks up a color
-    cast. `101010` at brightness 30 is `(4,4,4)` — four steps above off.
+    multiply. That number is the thing to watch: brightness scales the
+    8-bit channels, so a dark color at a low brightness lands in single
+    digits, where WS2812 mixing is coarse and picks up a color cast.
+    `101010` at brightness 30 is `(5,5,5)` — five steps above off.
+
+    Rounded, not truncated, because that is what the firmware does now:
+    `paint()` applies the brightness itself and pixelbuf is left at 1.0,
+    so there is one quantisation instead of the two that used to stack.
+    This mode only ever shows solid colours and those are the values a
+    solid key gets — the dithering is on pulses, and a pulse's bottom is
+    a time-average that no single number here could stand for.
     """
     fd = open_raw(path)
     reader = LineReader(fd)
@@ -495,7 +502,7 @@ def palette(path, brightness=60):
         for idx, (hexcolor, label) in enumerate(entries):
             send(fd, "C {} {}".format(idx, hexcolor))
             raw = int(hexcolor, 16)
-            scaled = tuple(int(((raw >> s) & 0xFF) * brightness / 100)
+            scaled = tuple(int(((raw >> s) & 0xFF) * brightness / 100 + 0.5)
                            for s in (16, 8, 0))
             print("  key {}  #{}  -> {!s:<15} {}".format(
                 idx, hexcolor, scaled, label))
