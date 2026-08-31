@@ -11,14 +11,17 @@ asserts instead of reporting a green run about a copy.
 
 What it is for. Temporal dithering is the one thing here that cannot be
 judged by reading, because it is correct only on average and only above a
-rate. Six checks, and three of them exist because the obvious version of
+rate. Nine checks, and four of them exist because the obvious version of
 this test passes on code that does nothing:
 
   1  the dithered mean lands on the ideal        -- the whole mechanism
   2  no channel carries into the one above it    -- a rounding error that
                                                     would look like the
                                                     wrong colour
-  3  the floor freeze actually shortens          -- the claim
+  3  the floor freeze shortens above the floor,
+     and below it the two builds agree exactly   -- the claim, and the
+                                                    deliberate half that
+                                                    gives up
   4  the same code undithered at 200 Hz does not -- so the win is the
                                                     dithering and not the
                                                     paint rate
@@ -29,25 +32,63 @@ this test passes on code that does nothing:
      not without the invalidation                -- the skip that pays for
                                                     `.brightness` moving
                                                     into `paint()`
+  7  under DITHER_FLOOR a channel is rounded and
+     its residue cleared; over it, it dithers    -- the second half of the
+                                                    threshold, the half
+                                                    that gives up
+  8  the floor is tested per channel, not by key -- ff8000 is routinely
+                                                    over it in red and
+                                                    under it in blue
+  9  a key that FADES into settlement lands on
+     round-to-nearest and stays there            -- check 6 starts its key
+                                                    already settled, and
+                                                    missed a real bug in
+                                                    the one frame it skips
 
 Every check here has been watched going red, by injecting the fault into
 `firmware/code.py` and re-running:
 
-    residue dropped in R / G / B   -> 1, at -0.455 / -0.518 / -0.533 LSB
+    residue dropped in R / G / B     -> 1, at -0.455/-0.518/-0.533 LSB
     control sweep dithered after all -> 4
     settled branch keeps its residue -> 5
     skip written `settled` alone     -> 6
+    green never consults the floor   -> 3, and 7 once 3 is muted
+    floor decided per key            -> 3, and 7 once 3 is muted
+    floor comparison inverted        -> 3, and 8 once 3 is muted
+    `settled` read before the assign -> 9, at 2 of 7 tick rates
 
-Two lessons are baked into the shape above. **The fault has to leave the
-extraction asserts' text alone.** Deleting `settled or not DITHER` turned
-the whole run red at the top of this file, which reads as a catch and is
-not one -- the drift guard fired, the checks never ran. And **check 1 and
-check 3 used to sweep 0xFFFFFF and read `& 0xFF`**, which is the blue
-channel tested three times: red's accumulator was deleted and the run
-came back green. `COLOR` differs per channel now and each is asserted on
-its own. The harness has also been wrong twice in the other direction --
-`write_pixel()` elides an unchanged value, so reading the last write
-instead of the cache reported "no output" for code that was working.
+Check 3's "below the floor the two builds agree exactly" fires first on all
+three floor faults, so 7 and 8 were watched with that one assertion muted --
+and **that isolation run was confirmed green on unmodified firmware before
+any of its reds were believed.** The first attempt was not, and it is the
+sharpest version of this file's whole lesson: the muted copy was run from a
+scratch directory, where its own relative path to `firmware/code.py` does
+not resolve, so all three faults "failed" with a FileNotFoundError that had
+nothing to do with them. Three reds, no catches, and it reads exactly like
+success.
+
+**A guard can also stop working without being touched.** Check 4 swept the
+whole breath, and the day `DITHER_FLOOR` landed most of that breath stopped
+being dithered at all -- so the difference it watches for no longer existed
+and its injection came back green. It measures only above the floor now,
+like check 3. A guard that used to fail and quietly cannot any more is
+worse than one that never could, because its history is why it is trusted.
+
+Three more lessons are baked into the shape above. **The fault has to leave
+the extraction asserts' text alone.** Deleting `settled or not DITHER`
+turned the whole run red at the top of this file, which reads as a catch and
+is not one -- the drift guard fired, the checks never ran. **Checks 1 and 3
+used to sweep 0xFFFFFF and read `& 0xFF`**, which is the blue channel tested
+three times: red's accumulator was deleted and the run came back green.
+`COLOR` differs per channel now and each is asserted on its own. And **a
+probe that starts in the state it means to test proves nothing about
+reaching it** -- check 6 seeds an already-settled key, so eight green checks
+sat on top of a bug living in the single frame a fade completes on, until an
+outside reviewer read the ordering. Check 9 is that frame.
+
+The harness has also been wrong twice in the other direction --
+`write_pixel()` elides an unchanged value, so reading the last write instead
+of the cache reported "no output" for code that was working.
 
 Photometry is not in scope. Every number here is arithmetic against the
 integer scaling in CircuitPython's `PixelBuf.c`; whether the result looks
@@ -320,6 +361,7 @@ print()
 print("--- 6. the render loop's settled-skip must let a B through ---")
 env = {"NUM_KEYS": 1, "DITHER": True, "brightness": 0.6,
        "math": math, "array": array, "time": __import__("time"),
+       "DITHER_FLOOR": FIRMWARE_FLOOR,
        "dither_err": [0.0] * 3, "last_rgb": [None], "group_dirty": [False],
        "from_rgb": [0x00FF00], "to_rgb": [0x00FF00],
        "from_floor": [1.0], "to_floor": [1.0],
@@ -416,5 +458,68 @@ assert green[0] == int(G_CH * BR + 0.5), "the low channel is not round-to-neares
 print("    one call: red {:.2f} swings {}..{} (dithered), "
       "green {:.2f} held at {} (rounded)".format(
           R_CH * BR, min(red), max(red), G_CH * BR, green[0]))
+
+print()
+print("--- 9. a key that fades into settlement lands on round-to-nearest ---")
+# Check 6 seeds a key that is *already* settled, so it never crosses the one
+# frame where a fade completes -- and that frame is where the bug was. The
+# `settled` flag was read before `from_rgb = to_rgb`, so the completing
+# frame still saw `from != to`, painted through the dithering branch, and
+# the skip then froze whichever of the two bytes the dither happened to
+# emit. Permanently, because the rounding branch was never reached again.
+CROSS = 500_000_000
+
+
+def fade_to(step_ns, target, bright, cross=CROSS):
+    """Drive one key from black to `target` through a real crossfade."""
+    seen = []
+
+    class Grp:
+        def __setitem__(self, k, v):
+            seen.append(v)
+
+    env = {"NUM_KEYS": 1, "DITHER": True, "brightness": bright,
+           "math": math, "array": array, "time": __import__("time"),
+           "DITHER_FLOOR": FIRMWARE_FLOOR,
+           "dither_err": [0.0] * 3, "last_rgb": [None], "group_dirty": [False],
+           "from_rgb": [0x000000], "to_rgb": [target],
+           "from_floor": [1.0], "to_floor": [1.0],
+           "pulse_started": [0], "period_ns": [2_500_000_000], "now": 0,
+           "crossfade_ns": cross, "fade_started": [0],
+           "pixel_groups": [(Grp(), 0, 1)]}
+    exec(CURVE_SRC, env)
+    exec(WRITE, env); exec(PAINT, env); exec(func_src("lerp_rgb"), env)
+    env["fade_progress"] = lambda i, now: min(1.0, max(0.0, now / cross))
+    t = 0
+    while t <= cross + 30 * step_ns:
+        env["now"] = t
+        exec(RENDER, env)
+        t += step_ns
+    return env["last_rgb"][0], len(seen)
+
+
+TARGET, BRIGHT = 0x734D26, 0.6      # every channel lands on a fraction at 0.6
+want = 0
+for _sh in (16, 8, 0):
+    want |= int(((TARGET >> _sh) & 0xFF) * BRIGHT + 0.5) << _sh
+assert any(((TARGET >> sh) & 0xFF) * BRIGHT % 1 for sh, _ in CHANNELS), \
+    "the probe colour has no fractional channel -- nothing to dither, inert"
+# Seven rates, because the fault only shows where the completing frame's
+# phase lands: two of these caught it and five did not. One rate would have
+# reported the broken code healthy five times out of seven.
+RATES = (5_100_000, 5_250_000, 5_333_333, 4_900_000,
+         6_760_000, 5_000_000, 6_500_000)
+off = []
+for step in RATES:
+    got, writes = fade_to(step, TARGET, BRIGHT)
+    assert writes > 5, "the fade never painted -- the probe is inert"
+    if got != want:
+        off.append((step, got))
+assert not off, "settled on the wrong value at {} of {} tick rates: {}".format(
+    len(off), len(RATES), ["{}ns->0x{:06x}".format(s, g) for s, g in off])
+print("    {} tick rates, all settling on round-to-nearest 0x{:06x} "
+      "(channels {:.1f}/{:.1f}/{:.1f})".format(
+          len(RATES), want,
+          *[((TARGET >> sh) & 0xFF) * BRIGHT for sh, _ in CHANNELS]))
 
 print("\nall checks passed")

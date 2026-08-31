@@ -355,7 +355,7 @@ purpose: the whole thing can be driven from a serial monitor.
 half period and would sit on the host happily, but an eased fade is ~50
 updates a second — silly to push down a wire, and it stutters on any host
 hiccup. It is also already where it needs to be for BLE. `ms` is the full
-period (default 2000); `floor` is the percentage the dip bottoms out at
+period (default 2500); `floor` is the percentage the dip bottoms out at
 (default 0). `C` on the same key cancels the pulse.
 
 **Every colour and floor change is crossfaded**, over `X` milliseconds.
@@ -589,8 +589,18 @@ What the bench actually taught, none of which was predictable on paper:
   variation in it costs nothing.
 - **Equal amplitude does not read as equal motion across hues.** Cyan sits
   near the eye's sensitivity peak and looks far brighter than blue, so the
-  same modulation reads as less movement. Cyan's floor is 40 against
-  blue's 50 to compensate.
+  same modulation reads as less movement.
+
+  **The arrangement that compensated for it is gone, twice over.** This
+  note was written when `running` was blue at a floor of 50 and the
+  background state was a green-cyan at 40 — so cyan really was the deeper
+  one. The colours later swapped (`running` became cyan `00ffff`,
+  background became blue `2800ff`) and the floors did not move with them,
+  which silently inverted the compensation; nothing caught it, because
+  nothing relates the two. Both are 40 now, so there is no compensation at
+  all. The observation still holds and the pad no longer acts on it —
+  recorded rather than fixed, because the two states are told apart by hue
+  and the deliberate ladder is `asking` against everything else.
 
 ## Bring-up
 

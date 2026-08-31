@@ -14,7 +14,7 @@ Wire protocol, line-delimited ASCII on usb_cdc.data.
                        period (min 100), `floor` is the percentage the
                        dip bottoms out at, 0-100: 0 reads as an alert,
                        50 as a slow breath that says "alive" without
-                       asking for attention. Defaults: 2000 ms and 0.
+                       asking for attention. Defaults: 2500 ms and 0.
                        Both are clamped silently.
     B <0-100>          global brightness
     X <ms>             crossfade duration for C and S, default 500
@@ -109,6 +109,9 @@ PROFILES = {
         # traffic competing with the key scan for the same bus, and the
         # NeoKey's own comment upstream is about exactly that cost.
         "paint_hz": 50,
+        # No dithering at 50 Hz: the table beside `DITHER` measures it as
+        # worse than none.
+        "dither": False,
     },
     # The custom PCB. Six switches on GPIO in the board's physical key
     # order, one chain of six pixels, and no I2C anywhere on the board --
@@ -121,6 +124,11 @@ PROFILES = {
         # on one bit-banged GPIO chain: six of them is ~260 us per show,
         # so 200 Hz costs about 5% of wall time and no bus at all.
         "paint_hz": 200,
+        # The loop achieves about 148 Hz of that with six keys pulsing, and
+        # the flag is True on the strength of the lit board rather than of
+        # the request: at that rate a 50/50 dither alternates near 74 Hz,
+        # and every depth from 67% down was invisible on a static ladder.
+        "dither": True,
     },
 }
 
@@ -175,7 +183,7 @@ else:
         _forced or _build,
         "/".join(sorted(PROFILES)))
     _profile = {"gpio_keys": (), "gpio_pixel": None, "pad_addresses": (),
-                "paint_hz": 50}
+                "paint_hz": 50, "dither": False}
 
 # The I2C addresses of the NeoKey boards, in physical left-to-right key
 # order. This tuple is the single source of truth for how many boards
@@ -271,9 +279,15 @@ DEBOUNCE_NS = 15_000_000       # 15 ms
 # How often the LEDs are repainted, and it is a per-board number because
 # it buys different things on the two boards. It is the pulse's sample
 # rate, and -- at 200 Hz and above -- the carrier the dithering below
-# rides on. The loop's own period bounds it: `POLL_INTERVAL_S` is 5 ms,
-# so 200 Hz is the ceiling reachable without making the key scan spin
-# faster, and the achieved rate is a little under it.
+# rides on.
+#
+# **It is a request, not the achieved rate.** `POLL_INTERVAL_S` is 5 ms so
+# 200 Hz is the arithmetic ceiling, but the loop measured **148 Hz** with
+# six keys pulsing -- a 26% shortfall. Which is why whether to dither is a
+# separate field in the profile rather than a comparison against this
+# number: a comparison would be deciding on a rate the board does not
+# reach. What was actually judged, on the lit board at 148 Hz, is recorded
+# beside each profile's flag.
 PAINT_HZ = _profile["paint_hz"]
 PULSE_STEP_NS = 1_000_000_000 // PAINT_HZ
 # Temporal dithering is only switched on where the paint rate can carry
@@ -292,7 +306,14 @@ PULSE_STEP_NS = 1_000_000_000 // PAINT_HZ
 # So 50 Hz loses, 100 Hz draws, and 200 Hz wins by 3x. A board that
 # cannot afford 200 Hz must not dither at all, which is why this is a
 # threshold and not a preference.
-DITHER = PAINT_HZ >= 200
+# Read from the profile rather than derived as `PAINT_HZ >= 200`, which is
+# what this line used to say and was a small lie: `PAINT_HZ` is the rate
+# the loop *asks* for and the PCB achieves about 148 of it, so the
+# comparison passed on a board that misses its own stated bar. The
+# threshold above is still the reason each flag is set the way it is; what
+# changed is that the flag records a decision instead of pretending to
+# derive one, and the profile carries the measurement beside it.
+DITHER = _profile["dither"]
 
 # Below this output value a channel is rounded rather than dithered, and
 # it is the second half of the threshold above -- 200 Hz is necessary and
@@ -313,7 +334,16 @@ DITHER = PAINT_HZ >= 200
 #    11%    value 9    calm        calm
 #
 # So 5 is where the worst rate stops being visible. 4 is the untested
-# boundary and 5 is inside it. What this buys back is everything above
+# boundary and 5 is inside it.
+#
+# **That derivation assumes the LED is linear, and it is not.** Keys held at
+# 0/1/2/3/4/5 side by side on the real board: 0 to 1 is a different world, 1
+# to 2 is plainly visible, and 2/3/4/5 cannot be told apart at all. Only the
+# first two steps are visible, so 5 is conservative rather than correct --
+# and the arithmetic above, which reasons about "one level as a share of the
+# light", is answering a question the part does not obey. Left at 5 because
+# nothing in service goes near it (see below), not because the number was
+# re-derived. What this buys back is everything above
 # it; below it the levels were never recoverable by any temporal trick,
 # and rounding at least fails quietly. A dither there is not a smoother
 # value, it is a light switching on and off.
@@ -773,12 +803,18 @@ def paint(idx, base, level, settled):
     two bytes alternates between them at whatever duty averages out
     right. That is what gives a low-brightness breath back the levels the
     8-bit output does not have. Longest freeze on one byte at the bottom
-    of a gamma-2.0 breath, floor 0.15, worst of the three channels,
-    measured by `tools/dither_check.py` running this very function with
-    `DITHER` off at 50 Hz against on at 200 Hz: 500 -> 50 ms at brightness
-    0.60, 580 -> 100 at 0.15, 740 -> 130 at 0.10. The rate is not what
-    does it -- the same code undithered at 200 Hz measures 585 ms where
-    50 Hz measured 580.
+    of a gamma-2.0 breath, floor 0.15, worst of the three channels and
+    counted only where dithering is allowed to act, measured by
+    `tools/dither_check.py` running this very function with `DITHER` off at
+    50 Hz against on at 200 Hz: 500 -> 50 ms at brightness 0.60, 500 -> 55
+    at 0.30, 180 -> 60 at 0.15, 380 -> 70 at 0.10. The rate is not what
+    does it -- the same code undithered at 200 Hz measures 185 ms where
+    50 Hz measured 180.
+
+    Those figures moved once already without being re-measured, which is
+    the reason to distrust any number pasted into a comment: `DITHER_FLOOR`
+    landing changed what the check counts, and only the 0.60 row survived
+    it. Re-run the tool rather than trusting this paragraph.
 
     Under `DITHER_FLOOR` the channel is rounded instead, which is the
     whole reason that constant exists: down there one level is most of the
@@ -1154,8 +1190,6 @@ try:
                     t = fade_progress(i, now)
                     settled = False
                     if t >= 1.0:
-                        settled = (to_floor[i] >= 1.0 and from_floor[i] >= 1.0
-                                   and from_rgb[i] == to_rgb[i])
                         # `last_rgb` joins the test, and it is load-bearing
                         # rather than defensive. This skip is now the only
                         # thing standing between a settled key and a `B`
@@ -1166,10 +1200,23 @@ try:
                         # to recolour it. `invalidate_pixels()` clears the
                         # entry, this lets exactly one repaint through, and
                         # the entry it writes puts the skip back.
-                        if settled and last_rgb[i] is not None:
+                        if (to_floor[i] >= 1.0 and from_floor[i] >= 1.0
+                                and from_rgb[i] == to_rgb[i]
+                                and last_rgb[i] is not None):
                             continue  # settled, solid, and already on the wire
                         from_rgb[i] = to_rgb[i]
                         from_floor[i] = to_floor[i]
+                        # Read AFTER the assignment, and that ordering is the
+                        # whole point. Read before it, the one frame a fade
+                        # completes on still sees `from != to`, so it paints
+                        # through the dithering branch -- and the skip above
+                        # then freezes whichever of the two bytes the dither
+                        # happened to emit, for ever. `paint`'s rounding
+                        # branch was unreachable for any key that got there
+                        # by fading, which is every key. Measured before the
+                        # fix: 2 of 7 tick rates settled a channel one level
+                        # off its round-to-nearest value and stayed there.
+                        settled = to_floor[i] >= 1.0
                     base = lerp_rgb(from_rgb[i], to_rgb[i], t)
                     floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
                     # Integer modulo *and* integer scale, so the phase stays

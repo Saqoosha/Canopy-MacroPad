@@ -897,8 +897,10 @@ it is, and do not let it name a replacement number it has not earned.
 
 - **The paint rate is bounded by the Python interpreter, not by the LEDs,
   and the ceiling is lower than the constant claims.** `PAINT_HZ` is 200 on
-  the PCB and the loop measured **148**, so `DITHER = PAINT_HZ >= 200` was
-  testing a number never achieved. Per loop with six keys pulsing: paint
+  the PCB and the loop measured **148**, so the `DITHER = PAINT_HZ >= 200`
+  this replaced was testing a number never achieved. The flag is a
+  per-profile boolean now, set from what the lit board showed at the rate
+  actually reached rather than derived from the rate requested. Per loop with six keys pulsing: paint
   4750 us, show 977, key scan 538, other 480. **The bit-banged LED chain is
   14% of it; the pulse arithmetic is 71%.**
 
