@@ -912,11 +912,24 @@ it is, and do not let it name a replacement number it has not earned.
   What shipped keeps the semantics and reaches 170 of that 180. The period
   is stored in **milliseconds**, which is what the wire already sends, and
   the phase is a **position inside the period** advanced once per frame
-  rather than a difference of two growing timestamps. Two more: the wrap is
-  a compare and a subtract rather than `%` (the step is one frame, the
-  period is clamped at 100 ms, so it can fire at most once), and the
-  finished-fade case skips the `fade_progress` and `lerp_rgb` calls, which
-  is almost every frame of a steady pulse.
+  rather than a difference of two growing timestamps. Two more: the wrap
+  tests before it reduces, so a frame shorter than a period -- every normal
+  one -- costs a compare and nothing else, and the finished-fade case skips
+  the `fade_progress` and `lerp_rgb` calls, which is almost every frame of a
+  steady pulse.
+
+  **The reduction inside that test is a modulo, and it was a bare subtract
+  for one commit.** The reasoning for the subtract was that a frame cannot
+  reach a whole period; it can. `serial.write_timeout` is 0.05 s per write,
+  several key edges can be reported in one pass against a host that has
+  stopped draining, and `set_pulse` clamps the period no higher than 100 ms.
+  One subtract then leaves the phase past its period, the curve index runs
+  off a 512-entry array, and the `except` around the pulse turns it into a
+  `tick_err` -- which the accounting at the bottom of the loop counts as an
+  **I2C** failure and can report as a lost bus on a board with no I2C at
+  all. `phase_ms` is assigned before the failing index, so the bad value
+  persists and unwinds one period a frame. The compare is the optimisation;
+  the modulo is the correctness, and it costs one modulo per period per key.
 
   **Milliseconds counted from boot would have been the wrong fix**, and it
   is the trap worth remembering: `now // 1_000_000` crosses the same
