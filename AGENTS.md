@@ -430,6 +430,17 @@ one, not necessarily the only one.
   arithmetic never applies. Full
   reasoning: `case/README.md`, *The slide latch*.
 
+- **The board's slop is split by axis, and the axis came from the
+  symptom, not the words.** `PCB_SLOP` 0.80 is the *length* (a 139.60
+  board between the frame's left wall and the right wall lost its
+  whole 0.40 to shrink -- forcing it in buckled the board), and
+  `PCB_SLOP_Y` 0.40 is the depth, which never complained. The first
+  fix widened the depth because "long side" was read as the case's
+  long walls; the buckling itself had named the axis -- a board bends
+  along its pinched length, never across its stiff 21.59 width.
+  Length position is not precision: switches tie board to plate, and
+  the USB opening derives from the board's own edge.
+
 - **Shell slack does not help too-tall columns.** `BOARD_CLAMP_SLACK`
   sits above the board. Columns that run to `Z_BOARD_BOTTOM` push the
   board into the switches, which hold the shell up. Printed: a hair
@@ -509,6 +520,19 @@ one, not necessarily the only one.
   answers it is a floor with a mechanism, not an untested edge: 0.00 is
   the slot on the arm body, and past it the bore eats the arm rather
   than the ribs. The reasoning is `case/README.md`'s *Dummy keycaps*.
+
+  **The tube round the bore closes only at boss Ø5.40 on a 0.4
+  nozzle, and the rule is a margin now.** The thin spot is where a
+  cross meets a circle: the arm's *corners*, ~15.6° off-axis -- 0.30
+  tips sliced away entirely (the six early caps are tip-less and
+  grip fine), 0.45 tips printed but *floated* on 0.37 corners. `tube
+  wall at the arm corners` guards the class: under ~0.44 is a slicing
+  casualty. 5.40 into the Ø5.50 ring is a near-press, relieved by
+  four diagonal flats (5.10 across, where the wall is fat) that cut
+  the contact to eight arcs -- printed verdict "still tight but ok".
+  The mouth is width-only 0.15 for the same corner reason, and
+  STEM_LEN_CLEAR must never shrink to buy wall: the length fit goes
+  interference after shrink.
 
   **The arm is 1.20 and the fit is 1.30**, because eight retention ribs
   stand 0.05 proud of the arm flats, ~0.10 wide, running z 4.10 to 8.39.
