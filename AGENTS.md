@@ -65,6 +65,21 @@ touch before committing.** The recovery is `git reset --soft HEAD~1`
 followed by `git reset`, which keeps every change and hands the split
 back; do it before anything is pushed and it costs one round.
 
+**A restore is only as good as the copy is fresh, and a stale one is
+worse than none.** The fault-injection harness took its backups once, by
+hand, near the start of a session; six hours later its restore step put
+those back and **silently reverted 241 lines of finished work in two
+files**, one of them untracked so git had nothing to offer. The run
+reported `restored: all checks passed` -- about the old file. Two things
+make this hard to see: every injection had gone red first, which reads as
+the harness working; and the reds after the clobber came from the
+harness's own drift guards rather than from any check, so they looked
+identical to real catches. **The snapshot has to be taken by the same
+command that does the restoring, on every run**, and the run should end
+by comparing hashes with what it started from. Recovery here came off
+the CIRCUITPY drive, which happened to hold a newer build than the
+repository did -- luck, not a plan.
+
 **Restore from a copy, never from git.** `git checkout -- <file>` after
 an injection restores the *committed* file, so any uncommitted work in it
 is gone -- which is how a session lost a finished `case/params.py` while
@@ -805,16 +820,113 @@ it is, and do not let it name a replacement number it has not earned.
   it is told. Which pane, which status, when to pulse — all host-side.
   Resist moving policy down here; the split is what keeps the protocol
   portable to BLE.
-- **Low-brightness smoothing is the known open improvement.**
-  `PULSE_GAMMA` is 1.0 because a deep pulse at low global brightness runs
-  out of 8-bit levels near its floor, and the perceptual curve was spent
-  to keep the levels rather than the other way round. Temporal dithering
-  is the actual answer and is cheap here -- the pulse already repaints at
-  50 Hz. It was investigated once on the QT Py, on scratch scripts that
-  only ever lived on that board's `CIRCUITPY`; **their conclusions do not
-  carry to the PCB**, whose pixels are a different part on a regulated
-  3V3 rail rather than the QT Py's unregulated Qwiic one. The constant's
-  own comment carries the detail.
+- **The breath is `exp(sin)` at 2500 ms, and every number in it was picked
+  by carrying the whole comparison on the six keys at once.** That method is
+  the transferable part: one build, six curves (or six gammas, six periods,
+  six values), everything else -- colour, floor, brightness, phase -- held
+  identical, and the answer arrives in one look instead of one flash per
+  candidate. Four questions were settled that way in an evening. A single
+  candidate shown alone answers almost nothing, because the eye is a
+  comparator and not a meter.
+
+  What it settled: a raw sine reads as "the bottom is short and the top is
+  long" (it lingers where the eye is least able to see a change); gamma 2.0
+  reads as a pause at the bottom (level-minus-floor goes as t^4 there
+  against t^2); 1.5 was the best of that family; and `exp(sin)` beat it,
+  along with a plain triangle, FastLED's `quadwave`/`cubicwave` and the
+  Gaussian fitted to a real MacBook sleep light. Then 2500 ms out of
+  2/3/4/5/6/8 s -- 2000 was 30 breaths a minute, outside the 12-20 a resting
+  adult does. The curve is a 512-entry table built at boot; 512 is the
+  smallest power of two whose step is finer than a frame, and `PULSE_CURVE`
+  carries the arithmetic.
+
+  Ladyada found the same thing scoping a MacBook sleep light in 2006 and a
+  2016 photodiode capture of one confirmed it. `research/2026-08-31-led-breathing-curve.md`
+  is the full survey; two things in it are worth knowing before reading any
+  of the folklore. The `exp(sin)` formula is **not** Sean Voisen's and does
+  **not** model breathing -- it is a 2010 comment by Adam Shea correcting
+  the log response of the eye, and it is exactly time-symmetric, so the
+  widely repeated "2 s in, 3 s out" story about it is arithmetically
+  impossible. And most published CIE-L* code carries a transcription bug
+  (119 where CIE says 116).
+
+- **Temporal dithering is in above `DITHER_FLOOR` on boards that paint at
+  200 Hz, and the honest summary is that it is insurance rather than a
+  fix.** The measurements are worth keeping because each one killed a
+  plausible idea.
+
+  **200 Hz is a threshold, not a preference.** Error diffusion at 50 Hz is
+  *worse* than not dithering -- its own alternation lands inside the band
+  the eye reads as flicker. Visible-band error, LSB rms, at brightness 0.15:
+  today 0.237, dithered 0.378 at 50 Hz, 0.237 at 100, 0.075 at 200. So a
+  board that cannot afford 200 Hz must not dither, which is why `PAINT_HZ`
+  is per profile: the PCB's six pixels are one bit-banged chain, but four of
+  the QT Py's live behind seesaw and a paint there competes with the key
+  scan for the same bus.
+
+  **Raising the rate cannot save the bottom, and no rate can.** Error
+  diffusion holds one value for 1/fraction frames, so a fraction of 0.1
+  alternates at 20 Hz however fast the paint is, and fractions get
+  arbitrarily small. Measured on the board with static ladders where nothing
+  but the dither could move: at a fixed 50/50 split (100 Hz) every depth
+  from 67% down was invisible; at 20 Hz, depth 100% and 50% flickered, 33%
+  was faint, and 20% and below were calm. Hence `DITHER_FLOOR` -- above
+  value 5 the worst rate stops being visible.
+
+  **Then the board contradicted the arithmetic that produced that 5.** It
+  was derived from "one level as a share of the light", which assumes the
+  LED is linear. Keys held at 0/1/2/3/4/5 side by side say otherwise: 0 to 1
+  is a different world, 1 to 2 is plainly visible, and 2/3/4/5 cannot be
+  told apart. Only the first two steps are visible at all, so 5 is
+  conservative rather than correct.
+
+  **And none of it happens in service.** The deepest breath Canopy sends
+  bottoms out at 7.7 of 255 in its faintest lit channel. Every measurement
+  above was taken at brightness 15 with a floor of 0 -- a condition invented
+  to make the fault visible, and outside the envelope the pad is driven in.
+  Say that before quoting any of these numbers as a problem.
+
+  Two structural changes paid for the dithering and outlive it. The
+  brightness multiply moved out of pixelbuf into `paint()`: pixelbuf scales
+  with `(v * int(b*256)) // 256`, an integer floor *after* this file has
+  already rounded, so at brightness 0.30 seventy per cent of expressible
+  values collapse and dithering upstream is a provable no-op. The price is
+  that `B` no longer re-renders for free, so `set_brightness()` invalidates
+  and the render loop's settled-solid skip tests `last_rgb`. And a settled
+  key rounds rather than dithering, or it would never stop writing.
+
+- **The paint rate is bounded by the Python interpreter, not by the LEDs,
+  and the ceiling is lower than the constant claims.** `PAINT_HZ` is 200 on
+  the PCB and the loop measured **148**, so the `DITHER = PAINT_HZ >= 200`
+  this replaced was testing a number never achieved. The flag is a
+  per-profile boolean now, set from what the lit board showed at the rate
+  actually reached rather than derived from the rate requested. Per loop with six keys pulsing: paint
+  4750 us, show 977, key scan 538, other 480. **The bit-banged LED chain is
+  14% of it; the pulse arithmetic is 71%.**
+
+  What was tried, on the board, with the instrumented build in the
+  scratchpad: baking `cos` and `**` into a table bought 148 -> 161 Hz;
+  replacing `monotonic_ns` big integers with millisecond small integers
+  bought 161 -> 192 (`now` exceeds MicroPython's 30-bit small int, so every
+  phase expression was allocating). Neither is committed. What was measured
+  and does *not* help: fixed-point, because a float multiply costs only 8%
+  more than an integer one; and `@micropython.native` / `viper`, which
+  **CircuitPython does not have** -- both raise SyntaxError. An empty loop
+  iteration is 3198 ns, so ~535 us per pulsing key is about 165 elementary
+  operations and there is no fat to cut. Going meaningfully faster means
+  leaving CircuitPython, and the only thing that buys is dithering below
+  value 5, which does not occur in service.
+
+- **Never write a large table as source literals.** 1536 float literals in
+  `code.py` -- a 75 KB file -- **hard-faulted CircuitPython into safe mode**,
+  which is not a `MemoryError` and not recoverable by a soft reload. It was
+  the parser: the same tables built at boot cost ~2 KB of a free 162 KB and
+  a lookup measured 21 us. Recovery needs `microcontroller.reset()` from the
+  REPL, which runs `boot.py` with no key held and takes the drive with it.
+  Prove a risky module-level construction in the REPL first -- pass it as
+  one `exec(repr(src))` line, because a multi-line paste puts the REPL into
+  continuation mode and silently swallows everything after it.
+
 - **An uncaught exception is indistinguishable from a dead board.**
   CircuitPython drops to the REPL, the data port goes silent, and the
   LEDs freeze at their last value. Every I2C touch in the main loop is
@@ -865,7 +977,8 @@ it is, and do not let it name a replacement number it has not earned.
 ## Verifying a change
 
 ```
-python3 -m py_compile firmware/*.py tools/mpad.py
+python3 -m py_compile firmware/*.py tools/*.py
+tools/dither_check.py          # expect: all checks passed
 # CIRCUITPY is not mounted unless a key was held through the last hard
 # reset. Hold one and replug before the copy.
 cp firmware/code.py /Volumes/CIRCUITPY/ && rm -f /Volumes/CIRCUITPY/._code.py

@@ -345,17 +345,17 @@ purpose: the whole thing can be driven from a serial monitor.
 | Command | Meaning |
 |---|---|
 | `C <idx> <rrggbb>` | set key to a solid color, e.g. `C 0 ff8000` |
-| `S <idx> <rrggbb> [ms] [floor]` | pulse that color, sine-eased. `ms` is clamped to ≥100, `floor` to 0-100 |
+| `S <idx> <rrggbb> [ms] [floor]` | pulse that color, eased by the firmware's `PULSE_CURVE`. `ms` is clamped to ≥100, `floor` to 0-100 |
 | `B <0-100>` | global brightness |
 | `X <ms>` | crossfade duration for `C` and `S`, default 500 |
 | `P` | ping |
 | `R` | all keys off, immediately |
 
 `S` runs on the device, not the host. A square blink is one command per
-half period and would sit on the host happily, but a sine fade is ~50
+half period and would sit on the host happily, but an eased fade is ~50
 updates a second — silly to push down a wire, and it stutters on any host
 hiccup. It is also already where it needs to be for BLE. `ms` is the full
-period (default 2000); `floor` is the percentage the dip bottoms out at
+period (default 2500); `floor` is the percentage the dip bottoms out at
 (default 0). `C` on the same key cancels the pulse.
 
 **Every colour and floor change is crossfaded**, over `X` milliseconds.
@@ -364,7 +364,7 @@ transitions are a session moving from one continuous state to the next,
 so an abrupt change makes the pad overstate the event.
 
 Internally there is only one appearance model: a colour and a floor,
-where **solid is a pulse whose floor is 100%** and the sine term drops
+where **solid is a pulse whose floor is 100%** and the curve term drops
 out. One interpolation therefore covers all four transitions with no
 special cases:
 
@@ -474,14 +474,26 @@ desk lighting. Values picked on a screen do not survive that trip.
 |---|---|---|---|
 | no pane, or launcher | off | — | `C n 000000` |
 | idle | `273027` | static | `C n 273027` |
-| running (`isThinking`, `.spawning`) | `0040ff` | breath | `S n 0040ff 2000 50` |
-| background task (`isWaiting`) | `00ffa0` | breath | `S n 00ffa0 2000 40` |
-| **awaiting approval (`isAsking`)** | `ff8000` | **pulse** | `S n ff8000 2000 10` |
+| running (`isThinking`, `.spawning`) | `00ffff` | breath | `S n 00ffff 2500 40` |
+| background task (`isWaiting`) | `2800ff` | breath | `S n 2800ff 2500 40` |
+| **awaiting approval (`isAsking`)** | `ff8000` | **pulse** | `S n ff8000 2500 10` |
 | done, unread | `00ff00` | static | `C n 00ff00` |
 | error (`.crashed`, `.reconnectFailed`) | `ff0000` | static | `C n ff0000` |
 
-Global brightness 60. Every period is 2000 ms; only the floor changes,
+Global brightness 60. Every period is 2500 ms; only the floor changes,
 and that is what separates "alive" from "answer me".
+
+**This table is a copy and `SessionActivity.swift` is the original.** Two of
+these colours were wrong here for a while -- `running` and `background task`
+were listed as `0040ff` and `00ffa0` long after Canopy had moved them to
+`00ffff` and `2800ff`, and the Swift's own comment records the blue slot
+changing meaning in that same edit. Nothing checks the two against each
+other, so read the source before trusting a value here.
+
+The floors are `40 / 40 / 10` now rather than `50 / 40 / 10`: `running` was
+deepened on a lit pad, which costs the thing the original 50 bought -- it
+used to read as static in peripheral vision and no longer does. `running`
+and `background task` are told apart by hue alone.
 
 **These values are tuned against a supply voltage nobody has written
 down, and that is no longer a debt.** The pixels sit on the incoming
@@ -515,16 +527,46 @@ What the bench actually taught, none of which was predictable on paper:
   from cutting cyan's blue channel so it reads green-dominant against a
   blue-dominant blue.
 - **Dark colors are unstable, and it is quantisation, not the LED.**
-  `101010` at 30% brightness is `(4,4,4)`; four steps above off, where
+  `101010` at 30% brightness is `(5,5,5)` — it was `(4,4,4)` when the
+  brightness multiply lived in pixelbuf and truncated twice; five steps above off, where
   WS2812 mixing is coarse enough to visibly flicker. Hence a lighter idle grey
   (white-balanced to `273027` below), and 60% global brightness rather than 30.
-- **The same shortage stalls a deep pulse.** At 30% brightness an orange
-  pulse with a floor of 5 has a handful of distinct values in its lower
-  half, so it freezes at the bottom. Raising global brightness buys steps;
-  lowering `PULSE_GAMMA` to 1.0 stops the level crawling through them.
-  Dimming via the color value is the same multiply as global brightness,
-  so trading one for the other buys no steps — and scaling the color down
-  on its own makes the shortage worse.
+- **The same shortage stalls a deep pulse — and the first explanation of
+  why was half wrong.** At 30% brightness an orange pulse with a floor of
+  5 has a handful of distinct values in its lower half, so it freezes at
+  the bottom; that much held. What was blamed for it was `PULSE_GAMMA`
+  2.0 "crawling through" those few values, and the fix was to drop the
+  constant to 1.0. Simulated against the exact quantiser afterwards, the
+  two effects turn out to be independent and to *meet*. The gamma-2.0
+  breath really does dwell — its bottom is quartic in time where gamma
+  1.0 is quadratic, so the lowest 1% of the swing lasts 410 ms of a
+  2000 ms breath against 128 — measured at the 2 s period of the time,
+  and both scale with it — but that is true at infinite precision and
+  at any brightness, and in what the eye responds to rather than in
+  linear units it is not a dwell at all. The freeze is those 410 ms
+  landing inside a span under 2 LSB wide. Raising global brightness buys
+  steps, and dimming via the color value is the same multiply, so trading
+  one for the other buys none — scaling the color down on its own makes
+  the shortage worse. What actually buys steps back is temporal
+  dithering, which the firmware now does on boards that can paint at
+  200 Hz and above `DITHER_FLOOR`.
+
+  **And then the board answered a question this note could not.** Keys held
+  at 0/1/2/3/4/5 side by side: 0 to 1 is a different world, 1 to 2 is
+  plainly visible, and 2/3/4/5 cannot be told apart at all. So the visible
+  steps are the first two and nothing below the floor is recoverable by any
+  temporal trick -- but also, the deepest breath Canopy sends bottoms out at
+  7.7 of 255 in its faintest lit channel, which never reaches them.
+  Everything above was found at brightness 15 with a floor of 0. That is
+  outside the envelope the pad is driven in, and the whole quantisation
+  story is insurance rather than a fix for something happening.
+
+  The curve moved for a different reason, and the gamma question is closed:
+  1.0 read as "the bottom is short and the top is long", 2.0 as a pause at
+  the bottom, 1.5 was the best of that family, and `exp(sin)` beat all of
+  them -- each judged against five alternatives carried on the six keys at
+  once. `firmware/code.py`'s `PULSE_CURVE` carries the numbers and
+  `tools/dither_check.py` re-measures the quantisation without a device.
 - **Equal RGB is not neutral, and the correction is level-dependent.**
   The green channel is the weak one, so an equal-RGB value reads purple
   through a clear keycap. What is surprising is that the size of the fix
@@ -547,8 +589,18 @@ What the bench actually taught, none of which was predictable on paper:
   variation in it costs nothing.
 - **Equal amplitude does not read as equal motion across hues.** Cyan sits
   near the eye's sensitivity peak and looks far brighter than blue, so the
-  same modulation reads as less movement. Cyan's floor is 40 against
-  blue's 50 to compensate.
+  same modulation reads as less movement.
+
+  **The arrangement that compensated for it is gone, twice over.** This
+  note was written when `running` was blue at a floor of 50 and the
+  background state was a green-cyan at 40 — so cyan really was the deeper
+  one. The colours later swapped (`running` became cyan `00ffff`,
+  background became blue `2800ff`) and the floors did not move with them,
+  which silently inverted the compensation; nothing caught it, because
+  nothing relates the two. Both are 40 now, so there is no compensation at
+  all. The observation still holds and the pad no longer acts on it —
+  recorded rather than fixed, because the two states are told apart by hue
+  and the deliberate ladder is `asking` against everything else.
 
 ## Bring-up
 
