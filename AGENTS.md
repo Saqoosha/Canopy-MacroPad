@@ -896,26 +896,62 @@ it is, and do not let it name a replacement number it has not earned.
   key rounds rather than dithering, or it would never stop writing.
 
 - **The paint rate is bounded by the Python interpreter, not by the LEDs,
-  and the ceiling is lower than the constant claims.** `PAINT_HZ` is 200 on
-  the PCB and the loop measured **148**, so the `DITHER = PAINT_HZ >= 200`
-  this replaced was testing a number never achieved. The flag is a
-  per-profile boolean now, set from what the lit board showed at the rate
-  actually reached rather than derived from the rate requested. Per loop with six keys pulsing: paint
-  4750 us, show 977, key scan 538, other 480. **The bit-banged LED chain is
-  14% of it; the pulse arithmetic is 71%.**
+  and the largest single cost was arithmetic nobody looked at.** Per loop
+  with six keys pulsing, before any of this: paint 5015 us, show 967, key
+  scan 541, other 516 -- **the bit-banged LED chain is 14% of it and the
+  pulse arithmetic is 71%**, at 142 Hz against a `PAINT_HZ` of 200.
 
-  What was tried, on the board, with the instrumented build in the
-  scratchpad: baking `cos` and `**` into a table bought 148 -> 161 Hz;
-  replacing `monotonic_ns` big integers with millisecond small integers
-  bought 161 -> 192 (`now` exceeds MicroPython's 30-bit small int, so every
-  phase expression was allocating). Neither is committed. What was measured
-  and does *not* help: fixed-point, because a float multiply costs only 8%
-  more than an integer one; and `@micropython.native` / `viper`, which
-  **CircuitPython does not have** -- both raise SyntaxError. An empty loop
-  iteration is 3198 ns, so ~535 us per pulsing key is about 165 elementary
-  operations and there is no fat to cut. Going meaningfully faster means
-  leaving CircuitPython, and the only thing that buys is dithering below
-  value 5, which does not occur in service.
+  **`monotonic_ns()` is past MicroPython's 30-bit small-integer boundary
+  within a second of boot**, so every expression touching it allocates. The
+  curve index was `(now - pulse_started[i]) % period_ns[i] * _CURVE_STEPS
+  // period_ns[i]` -- four big-integer operations per key per frame.
+  Replacing just that expression with a small-integer counter, semantics
+  broken on purpose to price it, took the loop from **142 Hz to 180**:
+  236 us a key.
+
+  What shipped keeps the semantics and reaches 170 of that 180. The period
+  is stored in **milliseconds**, which is what the wire already sends, and
+  the phase is a **position inside the period** advanced once per frame
+  rather than a difference of two growing timestamps. Two more: the wrap
+  tests before it reduces, so a frame shorter than a period -- every normal
+  one -- costs a compare and nothing else, and the finished-fade case skips
+  the `fade_progress` and `lerp_rgb` calls, which is almost every frame of a
+  steady pulse.
+
+  **The reduction inside that test is a modulo, and it was a bare subtract
+  for one commit.** The reasoning for the subtract was that a frame cannot
+  reach a whole period; it can. `serial.write_timeout` is 0.05 s per write,
+  several key edges can be reported in one pass against a host that has
+  stopped draining, and `set_pulse` clamps the period no higher than 100 ms.
+  One subtract then leaves the phase past its period, the curve index runs
+  off a 512-entry array, and the `except` around the pulse turns it into a
+  `tick_err` -- which the accounting at the bottom of the loop counts as an
+  **I2C** failure and can report as a lost bus on a board with no I2C at
+  all. `phase_ms` is assigned before the failing index, so the bad value
+  persists and unwinds one period a frame. The compare is the optimisation;
+  the modulo is the correctness, and it costs one modulo per period per key.
+
+  **Milliseconds counted from boot would have been the wrong fix**, and it
+  is the trap worth remembering: `now // 1_000_000` crosses the same
+  boundary after about twelve days. A bench build measured 192 Hz that way
+  and would have silently reverted to big-integer arithmetic in service,
+  on a device this file elsewhere describes as living plugged in for weeks.
+  A position bounded by the period never grows.
+
+  The price of a position is that it is advanced by a whole number of
+  milliseconds, so the sub-millisecond remainder has to be carried --
+  dropping it runs **every breath up to 11% slow** -- that is the worst of
+  the four frame rates check 10 tests, 6.76 ms truncating to 6; a 7.042 ms
+  frame loses 0.6% -- for ever, with nothing in the pulse to notice. `_phase_carry_ns` is that carry and check 10 in
+  `tools/dither_check.py` is what watches it.
+
+  What was measured and does **not** help: fixed-point, because a float
+  multiply costs only 8% more than an integer one; and
+  `@micropython.native` / `viper`, which **CircuitPython does not have** --
+  both raise SyntaxError. An empty loop iteration is 3198 ns, so what is
+  left is the interpreter itself. Going meaningfully faster means leaving
+  CircuitPython, and the only thing that buys is dithering below
+  `DITHER_FLOOR`, which does not occur in service.
 
 - **Never write a large table as source literals.** 1536 float literals in
   `code.py` -- a 75 KB file -- **hard-faulted CircuitPython into safe mode**,

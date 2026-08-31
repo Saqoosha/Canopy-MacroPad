@@ -380,7 +380,7 @@ POLL_INTERVAL_S = 0.005
 #
 # The host sends its own period with every `S`, so this is what a host that
 # omits one gets, not what the pad normally runs. Canopy sends 2500.
-DEFAULT_PULSE_PERIOD_NS = 2_500_000_000
+DEFAULT_PULSE_PERIOD_MS = 2500
 # `PULSE_GAMMA` shapes nothing any more. It is the exponent of the cosine
 # family the curve below replaced, kept because that family's runner-up is
 # one line away and because the number itself was earned: 1.5, picked on a
@@ -653,8 +653,35 @@ from_floor = [1.0] * NUM_KEYS
 to_rgb = [0x000000] * NUM_KEYS
 to_floor = [1.0] * NUM_KEYS
 fade_started = [0] * NUM_KEYS
-period_ns = [DEFAULT_PULSE_PERIOD_NS] * NUM_KEYS
-pulse_started = [0] * NUM_KEYS
+# The period in **milliseconds**, which is what the wire already sends, and
+# the phase as a **position** inside it rather than the timestamp the breath
+# started at. Both stay small integers for ever, and that is the whole
+# reason for the shape.
+#
+# `monotonic_ns()` passes MicroPython's 30-bit small-integer boundary within
+# a second of boot, so every expression touching it allocates. The curve
+# index used to be
+# `(now - pulse_started[i]) % period_ns[i] * _CURVE_STEPS // period_ns[i]`
+# -- four big-integer operations per key per frame, and replacing just that
+# expression with a small-integer counter took the loop from 142 Hz to 180
+# with six keys pulsing. 236 us a key.
+#
+# Milliseconds counted from boot would not have fixed it: `now // 1_000_000`
+# crosses the same boundary after about twelve days, and this device lives
+# plugged in for weeks -- so that version works on the bench and stops
+# working in service, silently, months later. A position advanced each frame
+# and reduced modulo the period is bounded by the period itself and never
+# grows.
+period_ms = [DEFAULT_PULSE_PERIOD_MS] * NUM_KEYS
+phase_ms = [0] * NUM_KEYS
+# Nanoseconds the frame delta has not yet handed to `phase_ms`, and the
+# timestamp it was last measured from. Carrying the remainder rather than
+# dropping it is not tidiness: truncating each frame's delta would run every
+# breath slow by the truncation -- 0.6% at a 7.042 ms frame and 11% at a
+# 6.76 ms one, the worst of the four rates check 10 tests -- and a rate
+# error never corrects itself.
+_phase_carry_ns = 0
+_phase_last_ns = 0
 # Last value actually pushed to each pixel. None means "nothing written
 # yet", which is distinct from black, so the startup fill does not poison
 # the cache. Holds the *logical* color: adafruit_pixelbuf re-renders from
@@ -904,7 +931,7 @@ def retarget(idx, rgb, floor, period, restart_phase):
     breath. That guarantee is why the host never has to track which keys
     are already doing what.
     """
-    if to_rgb[idx] == rgb and to_floor[idx] == floor and period_ns[idx] == period:
+    if to_rgb[idx] == rgb and to_floor[idx] == floor and period_ms[idx] == period:
         return
     now = time.monotonic_ns()
     # Start the new fade from what is on screen *now*, not from the last
@@ -916,16 +943,16 @@ def retarget(idx, rgb, floor, period, restart_phase):
     to_rgb[idx] = rgb
     to_floor[idx] = floor
     fade_started[idx] = now
-    if restart_phase or period_ns[idx] != period:
-        pulse_started[idx] = now
-    period_ns[idx] = period
+    if restart_phase or period_ms[idx] != period:
+        phase_ms[idx] = 0
+    period_ms[idx] = period
 
 
 def set_color(idx, rgb):
     if 0 <= idx < NUM_KEYS:
         # Solid is floor 1.0: the sine term drops out and the key just
         # sits at its colour.
-        retarget(idx, rgb, 1.0, period_ns[idx], False)
+        retarget(idx, rgb, 1.0, period_ms[idx], False)
 
 
 def set_pulse(idx, rgb, period, floor):
@@ -933,7 +960,7 @@ def set_pulse(idx, rgb, period, floor):
         return
     # Clamp before the comparison in retarget, so two commands that clamp
     # to the same effective pulse are recognised as identical.
-    period = max(100_000_000, period)
+    period = max(100, period)
     floor = min(max(floor, 0.0), 1.0)
     # Phase restarts only when a *solid* key begins pulsing. A key already
     # breathing keeps its phase through a colour or floor change: what
@@ -960,8 +987,8 @@ def all_off():
         from_rgb[i] = to_rgb[i] = 0x000000
         from_floor[i] = to_floor[i] = 1.0
         fade_started[i] = 0
-        pulse_started[i] = 0
-        period_ns[i] = DEFAULT_PULSE_PERIOD_NS
+        phase_ms[i] = 0
+        period_ms[i] = DEFAULT_PULSE_PERIOD_MS
         dither_err[i * 3] = dither_err[i * 3 + 1] = dither_err[i * 3 + 2] = 0.0
         write_pixel(i, 0x000000)
 
@@ -994,8 +1021,7 @@ def handle(line):
         # by the shift arithmetic, and a negative value pulses white.
         set_color(int(parts[1]), int(parts[2], 16) & 0xFFFFFF)
     elif cmd == "S" and len(parts) in (3, 4, 5):
-        period = (int(parts[3]) * 1_000_000 if len(parts) > 3
-                  else DEFAULT_PULSE_PERIOD_NS)
+        period = int(parts[3]) if len(parts) > 3 else DEFAULT_PULSE_PERIOD_MS
         floor = int(parts[4]) / 100 if len(parts) > 4 else 0.0
         set_pulse(int(parts[1]), int(parts[2], 16) & 0xFFFFFF, period, floor)
     elif cmd == "B" and len(parts) == 2:
@@ -1041,6 +1067,10 @@ crossfade_ns = DEFAULT_CROSSFADE_NS
 rx_buffer = b""
 was_connected = False
 last_pulse_at = 0
+# Seeded from the clock rather than left at 0, or the first paint would
+# hand every phase the whole uptime and start each breath somewhere
+# arbitrary instead of at its trough.
+_phase_last_ns = time.monotonic_ns()
 i2c_fail_count = 0
 i2c_lost_reported = False
 # Set when a host connects, so the first scan afterwards adopts whatever
@@ -1186,8 +1216,25 @@ try:
         try:
             if now - last_pulse_at >= PULSE_STEP_NS:
                 last_pulse_at = now
+                # Advance every breath by the time since the last paint,
+                # once per frame and in one place. This is the only
+                # big-integer arithmetic left in the pulse: one subtract and
+                # one divide a frame, where the per-key form cost four
+                # operations a key. The remainder is carried rather than
+                # dropped -- see `_phase_carry_ns`.
+                _phase_carry_ns += now - _phase_last_ns
+                _phase_last_ns = now
+                _step_ms = _phase_carry_ns // 1_000_000
+                _phase_carry_ns -= _step_ms * 1_000_000
                 for i in range(NUM_KEYS):
-                    t = fade_progress(i, now)
+                    # Inlined fast path for a fade that has finished, which
+                    # is almost every frame of a steady pulse. `fade_progress`
+                    # returns 1.0 for any elapsed past the crossfade, and for
+                    # a crossfade of 0 as well, so the test covers both.
+                    if now - fade_started[i] >= crossfade_ns:
+                        t = 1.0
+                    else:
+                        t = fade_progress(i, now)
                     settled = False
                     if t >= 1.0:
                         # `last_rgb` joins the test, and it is load-bearing
@@ -1234,14 +1281,46 @@ try:
                         # later edit "restore" the comparison believing
                         # position was all that mattered.
                         settled = to_floor[i] >= 1.0
-                    base = lerp_rgb(from_rgb[i], to_rgb[i], t)
-                    floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
+                    if t >= 1.0:
+                        # `from` was just assigned `to` above, so the lerp and
+                        # the floor interpolation both have closed forms here
+                        # and the call is pure overhead.
+                        base = to_rgb[i]
+                        floor = to_floor[i]
+                    else:
+                        base = lerp_rgb(from_rgb[i], to_rgb[i], t)
+                        floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
                     # Integer modulo *and* integer scale, so the phase stays
                     # exact however long the board has been up and no float
                     # divide happens here.
+                    # Small integers throughout, bounded by the period: the
+                    # phase is a position that is advanced and reduced, never
+                    # a difference of two timestamps that both grow for ever.
+                    _p = phase_ms[i] + _step_ms
+                    # The compare is the optimisation and the modulo is the
+                    # correctness. A frame is normally a fraction of a period
+                    # so the branch is not taken at all, and taking it costs a
+                    # modulo once per period per key, which is nothing.
+                    #
+                    # Written as a bare subtract first, on the reasoning that
+                    # a frame cannot reach a whole period. It can: a host that
+                    # stops draining the CDC endpoint stalls each `write_line`
+                    # for `serial.write_timeout`, several key edges can be
+                    # reported in one pass, and `period_ms` is clamped no
+                    # higher than 100. `_p` then stays past the period, the
+                    # index below runs off the end of a 512-entry array, and
+                    # the `except` around this block turns it into a `tick_err`
+                    # -- which the accounting at the bottom of the loop counts
+                    # as an **I2C** failure and eventually reports as a lost
+                    # bus, on a board that may have no I2C at all. The old
+                    # `(now - pulse_started[i]) % period_ns[i]` could not do
+                    # this at any gap length; the subtract was resilience sold
+                    # for speed that the modulo does not actually cost.
+                    if _p >= period_ms[i]:
+                        _p %= period_ms[i]
+                    phase_ms[i] = _p
                     level = floor + (1 - floor) * PULSE_CURVE[
-                        ((now - pulse_started[i]) % period_ns[i])
-                        * _CURVE_STEPS // period_ns[i]]
+                        _p * _CURVE_STEPS // period_ms[i]]
                     paint(i, base, level, settled)
         except Exception as err:  # noqa: BLE001
             # Not necessarily I2C -- this arm also covers the pulse
