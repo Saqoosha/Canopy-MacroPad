@@ -1,3 +1,32 @@
+> **This file is a verbatim capture of a research run on 2026-08-31, not
+> maintained prose.** It is kept as evidence for the curve and period this
+> repository now ships, and editing its body would stop it being the record.
+> Read its own confidence notes: the pipeline marks which claims survived
+> adversarial verification, which were single-source, and which it killed.
+>
+> Corrections found afterwards, in review, and deliberately **not** patched
+> into the text below:
+>
+> - **The 8-bit scale constant is wrong.** Line 45 gives `108.0`;
+>   `255 / (e - 1/e) = 108.492`, and `108.0` peaks at **253.84**, not the
+>   255 the same section claims. The report already flagged the
+>   108.0-vs-108.4 split as an open uncertainty and then used the wrong one.
+>   Its "under half a PWM step" remark is wrong for the same reason -- the
+>   gap is about 0.94 counts.
+> - **The evidence headings overstate.** "Unanimous / primary-source backed"
+>   covers one genuine primary source (the patent) alongside a commentary
+>   article and one person's photodiode measurement.
+> - **Citations are not all reproducible.** `Napoli (2022)` has no entry in
+>   the source list; the Voisen and Recktenwald entries name documents
+>   without stable links.
+> - **The 4-second `millis()/2000.0 * PI` example is historical**, not what
+>   this firmware does. The shipped default is 2500 ms through a 512-entry
+>   table; see `PULSE_CURVE` in `firmware/code.py`.
+>
+> None of these move the conclusions the firmware acted on: that a raw sine
+> is wrong for a breath, that the dwell belongs at the bottom, and that
+> 2000 ms was too fast. Those were settled on a lit board, not on this file.
+
 # LED Breathing Effects: Curves, Perception, and 8-bit Reality
 
 ## エグゼクティブサマリー
@@ -40,7 +69,7 @@ The formula everyone cites as "Sean Voisen's breathing LED" has a three-step pro
 
 The derivation is elementary and worth stating because the constants are otherwise magic numbers. `sin(x) ∈ [−1, 1]`, so `e^sin(x) ∈ [1/e, e]`. Subtract the floor `1/e = 0.36787944`, then scale by `range/(e − 1/e)`:
 
-```
+```text
 percent form:  f(x) = (e^sin(x) - 0.36787944) * 42.54590641    // 100/(e - 1/e)
 8-bit form:    val  = (exp(sin(millis()/2000.0 * PI)) - 0.368) * 108.0   // 255/(e - 1/e)
 ```
@@ -57,7 +86,7 @@ This is a real standards-vs-practice split, and the most useful finding is not w
 
 The CIE camp argues that gamma is a CRT-voltage artefact that only coincidentally resembles perception, and applies the inverse-L\* transfer directly:
 
-```
+```text
 Y = L* / 903.3                for L* ≤ 8
 Y = ((L* + 16) / 116)^3       for L* > 8
 ```
