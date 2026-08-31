@@ -1206,16 +1206,33 @@ try:
                             continue  # settled, solid, and already on the wire
                         from_rgb[i] = to_rgb[i]
                         from_floor[i] = to_floor[i]
-                        # Read AFTER the assignment, and that ordering is the
-                        # whole point. Read before it, the one frame a fade
-                        # completes on still sees `from != to`, so it paints
-                        # through the dithering branch -- and the skip above
-                        # then freezes whichever of the two bytes the dither
-                        # happened to emit, for ever. `paint`'s rounding
-                        # branch was unreachable for any key that got there
-                        # by fading, which is every key. Measured before the
-                        # fix: 2 of 7 tick rates settled a channel one level
-                        # off its round-to-nearest value and stayed there.
+                        # `settled` answers `paint`'s question and only that
+                        # one: is this key solid, so its value should be
+                        # rounded rather than dithered. The skip above asks a
+                        # different question -- is it solid *and already on
+                        # the wire* -- and needs the colour comparison for it.
+                        #
+                        # One flag used to answer both, and that was the bug.
+                        # Carrying `from_rgb[i] == to_rgb[i]` into `settled`
+                        # made it false on the one frame a fade completes on,
+                        # because the assignment two lines up had not run yet,
+                        # so that frame painted through the dithering branch
+                        # -- and then the skip froze whichever of the two
+                        # bytes the dither happened to emit, for ever.
+                        # `paint`'s rounding branch was unreachable for any
+                        # key that arrived by fading, which is every key.
+                        # Measured before the fix: 2 of 7 tick rates settled
+                        # a channel one level off round-to-nearest and stayed
+                        # there; check 9 in `tools/dither_check.py` is that
+                        # frame, and was watched going red on the old code.
+                        #
+                        # So what fixed it was dropping the comparison, not
+                        # moving the line: `to_floor[i]` is not written by
+                        # either assignment above, and this reads nothing
+                        # else. An earlier version of this comment claimed
+                        # the ordering was the point, which would have let a
+                        # later edit "restore" the comparison believing
+                        # position was all that mattered.
                         settled = to_floor[i] >= 1.0
                     base = lerp_rgb(from_rgb[i], to_rgb[i], t)
                     floor = from_floor[i] + (to_floor[i] - from_floor[i]) * t
