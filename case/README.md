@@ -328,13 +328,21 @@ individually.
 how much rib is left alone: 1.20 + `STEM_CLEAR` against 1.30 is the
 squeeze, 0.05 per side at 0.00 and none at 0.10.
 
-**The bore's tip walls do not print, and never did.** The model leaves
-0.30 of boss wall beside each arm tip and a 0.4 nozzle drops it: the
-sliced cap is four flank-wall pillars and the bearing ring, which is
-exactly what the six validated caps were, so the part that "fits
-really well" is the tip-less one. The grip never lived there -- it is
-the flank walls squeezing the ribs -- and the Choc stem's own ring
-encloses the boss in use. Print `keycap.stl` as it is.
+**The tube is closed on a 0.4 nozzle at boss 5.40, and the number was
+found by two failed prints.** At 4.90 the tip walls are 0.30 and
+slicing drops them (the six early caps are tip-less and still grip --
+the ribs do that); at 5.20 the tips printed but **floated,
+connected to nothing**, because the thin spot is not the tip's centre
+but the arm's corners, where a cross meets a circle at 0.37. The rule
+that fell out is now a margin -- `tube wall at the arm corners`,
+anything under ~0.44 is a slicing casualty -- and 5.40 clears it all
+round: 0.468 at the corners, 0.55 at the tips, with the mouth gone
+width-only (0.15) so its own corners clear too at 0.447. The price is
+the ring bore: 0.05 a side, virtually a press. It is an assembly-only
+joint (the ring travels with the cap), the boss's tip carries a 0.25
+lead-in, and the rib squeeze is untouched -- but **print one cap and
+seat it before printing six**; if it fights the ring, the walk-back
+is the tip-less 4.90 that six caps already validated.
 
 **Settled at 0.00, on two printed sweeps and then on the caps
 themselves** — six printed at 0.00 go onto the switches and fit really

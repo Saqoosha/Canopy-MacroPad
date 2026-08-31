@@ -295,11 +295,32 @@ def main():
         "cap ceiling above the housing, pressed": (
             P.CAP_CEIL_RELIEF + (P.STEM_TOP - P.CHOC_TRAVEL - P.HOUSING_TOP)
         ),
-        "cap boss inside the ring bore": (
-            (P.STEM_RING_ID - P.CAP_BOSS_DIA) / 2
-        ),
+
         "boss wall beside the bore": (
             (P.CAP_BOSS_DIA - (P.STEM_CROSS_L + P.STEM_LEN_CLEAR)) / 2
+        ),
+        # The tube's thin spot is where a cross meets a circle: the
+        # arm's corners, ~15.6 degrees off-axis. Two prints found this
+        # the hard way (0.30 tips sliced away; 0.45 tips floated on
+        # 0.37 corners); anything under ~0.44 here is a slicing
+        # casualty.
+        "tube wall at the arm corners": (
+            P.CAP_BOSS_DIA / 2 - (
+                ((P.STEM_CROSS_L + P.STEM_LEN_CLEAR) / 2) ** 2
+                + ((P.STEM_CROSS_W + P.STEM_CLEAR) / 2) ** 2) ** 0.5
+        ),
+        # The flats live where the wall is fat: the nearest bore
+        # feature to a 45-degree flat is the cross's concave corner.
+        "flat clear of the bore's corner": (
+            P.CAP_BOSS_FLATS / 2
+            - ((P.STEM_CROSS_L + P.STEM_LEN_CLEAR) / 2
+               + (P.STEM_CROSS_W + P.STEM_CLEAR) / 2) / 2 ** 0.5
+        ),
+        "mouth wall at the arm corners": (
+            P.CAP_BOSS_DIA / 2 - (
+                ((P.STEM_CROSS_L + P.STEM_LEN_CLEAR) / 2) ** 2
+                + ((P.STEM_CROSS_W + P.STEM_CLEAR + P.STEM_MOUTH) / 2) ** 2
+            ) ** 0.5
         ),
         "cap left above the bore": (
             P.CAP_CEIL_RELIEF + P.CAP_TOP_T - P.CAP_SOCKET_OVER
@@ -757,16 +778,22 @@ def main():
     # between STEM_RING_ID and HOUSING_MOUTH_DIA is 1.10 wide and no
     # diameter clears 0.25 at both ends -- so they are checked here with
     # the bound they can actually hold.
-    for label, got in (
+    for label, got, bound in (
         ("pad over the ring's inner edge",
-         (P.CAP_BEAR_DIA - P.STEM_RING_ID) / 2),
+         (P.CAP_BEAR_DIA - P.STEM_RING_ID) / 2, 0.20),
         ("pad inside the housing mouth",
-         (P.HOUSING_MOUTH_DIA - P.CAP_BEAR_DIA) / 2),
+         (P.HOUSING_MOUTH_DIA - P.CAP_BEAR_DIA) / 2, 0.20),
+        # Virtually a press, chosen: 5.40 is the only boss that closes
+        # the tube on a 0.4 nozzle, and the ring joint is static.
+        ("cap boss inside the ring bore",
+         (P.STEM_RING_ID - P.CAP_BOSS_DIA) / 2, 0.03),
+        ("flat clearance in the ring",
+         (P.STEM_RING_ID - P.CAP_BOSS_FLATS) / 2, 0.15),
     ):
-        good = got >= 0.20
+        good = got >= bound
         ok.append(good)
         print(f"  [{'ok ' if good else 'BAD'}] {label:<38} {got:8.3f}  "
-              f"(want 0.200)")
+              f"(want {bound:.3f})")
 
     # The bore is a cut inside a boss, and a cut that lands in air
     # removes nothing while every check above still passes. Measure the
@@ -777,7 +804,7 @@ def main():
     parts._socket_cut = real_cut
     w = P.STEM_CROSS_W + P.STEM_CLEAR
     ln = P.STEM_CROSS_L + P.STEM_LEN_CLEAR
-    mw, ml = w + P.STEM_MOUTH, ln + P.STEM_MOUTH
+    mw, ml = w + P.STEM_MOUTH, ln
     want = ((2 * w * ln - w * w) * (P.CAP_ENGAGE + P.CAP_SOCKET_OVER)
             + ((2 * mw * ml - mw * mw) - (2 * w * ln - w * w)) * 0.40)
     got = solid_cap - cap.volume

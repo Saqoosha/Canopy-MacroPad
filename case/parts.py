@@ -733,7 +733,9 @@ def _socket_cut(z_mouth, sign, clear):
     z0, z1 = sorted((z_mouth - sign * over, z_mouth + sign * depth))
     cut = _cross(w, length, z0, z1)
     m0, m1 = sorted((z_mouth - sign * over, z_mouth + sign * 0.40))
-    return cut + _cross(w + P.STEM_MOUTH, length + P.STEM_MOUTH, m0, m1)
+    # Width-only: a mouth on the length as well thinned the closed
+    # tube's arm corners below the nozzle for its first 0.40.
+    return cut + _cross(w + P.STEM_MOUTH, length, m0, m1)
 
 
 def dummy_cap():
@@ -752,7 +754,18 @@ def dummy_cap():
     inner = P.CAP_XY - 2 * P.CAP_WALL
     part -= _slab(inner, inner, P.CAP_CAVITY_R, z_skirt - 0.1, z_ceil)
     part += _tube(0, 0, z_seat, z_ceil, P.CAP_BEAR_DIA)
-    part += _tube(0, 0, z_seat - P.CAP_ENGAGE, z_seat, P.CAP_BOSS_DIA)
+    boss = _tube(0, 0, z_seat - P.CAP_ENGAGE, z_seat, P.CAP_BOSS_DIA)
+    # The boss is nearly a press in the ring; its leading edge gets a
+    # lead-in, chamfered on the lone tube where the selection cannot
+    # miss, and THEN four diagonal flats trim the contact down to the
+    # arcs near the arms -- order matters, the chamfer needs the
+    # unbroken circle edge.
+    lead = boss.edges().group_by(Axis.Z)[0]
+    boss = chamfer(lead, length=0.25)
+    boss = boss & (Rotation(0, 0, 45) * Pos(0, 0, z_seat - P.CAP_ENGAGE / 2)
+                   * Box(P.CAP_BOSS_FLATS, P.CAP_BOSS_FLATS,
+                         P.CAP_ENGAGE + 2.0))
+    part += boss
     part -= _socket_cut(z_seat - P.CAP_ENGAGE, +1, P.STEM_CLEAR)
     return part
 

@@ -597,7 +597,31 @@ CHOC_TRAVEL = 3.20        # Kailh CPG1353
 # cannot. So the bore is sunk CAP_SOCKET_OVER past that plane and the
 # cross never carries the press.
 CAP_BEAR_DIA = 6.00       # flat that lands on the ring, inside the mouth
-CAP_BOSS_DIA = 4.90       # into the ring bore (ID 5.50), cross does the aligning
+# 5.40, third try, because Saqoosha wants the cylinder -- "i want
+# cylinder" -- and this is the only diameter that delivers it on a
+# 0.4 nozzle. The history: at 4.90 the tip walls are 0.30 and slice
+# away (the six early caps are tip-less and still grip -- the ribs do
+# that); at 5.20 the tips printed but FLOATED, because the thin spot
+# is the arm's corners, where a cross meets a circle at 0.37. Closed
+# everywhere needs OD/2 >= |bore corner| + 0.45 = 5.37; 5.40 gives
+# 0.468 at the corners, 0.55 at the tips, one honest extrusion all
+# round. The price: 0.05 a side to the ring's 5.50 bore -- virtually
+# a press. It is an assembly-only joint (the ring travels with the
+# cap), the boss's tip is chamfered to start it, and the first
+# printed cap is the verdict on whether it seats; if it fights, this
+# number walks back before the other five print.
+CAP_BOSS_DIA = 5.40       # into the ring bore (ID 5.50); near-press
+# The first 5.40 cap went on -- "LOL, its super tight" -- and the
+# relief is not diameter (the closed tube cannot give any back) but
+# **contact**: four flats at the diagonal azimuths, where the bore is
+# 1.70 away and the wall has room to burn. The ring then touches only
+# eight arcs near the arms (~57% of the circumference) and the flats
+# clear it by 0.20 a side, so the press seats with about half the
+# fight and the tube stays closed. Printed and seated: "still tight
+# but ok" -- accepted. If a future filament fights harder, deepen the
+# flats (5.10 -> 5.00) before touching the diameter; the tube's
+# closure lives on the diameter and the press lives on the arcs.
+CAP_BOSS_FLATS = 5.10     # across the four diagonal flats
 CAP_ENGAGE = 3.00         # how much of the cross the bore holds
 CAP_SOCKET_OVER = 0.10
 CAP_CEIL_RELIEF = 0.50    # ceiling stepped up off the bearing pad
@@ -637,17 +661,24 @@ CAP_CEIL_RELIEF = 0.50    # ceiling stepped up off the bearing pad
 STEM_CLEAR = 0.00
 STEM_CLEAR_SWEEP = (0.00, 0.04, 0.07, 0.10)
 STEM_LEN_CLEAR = 0.30     # on the arm length; the flats are what grips
-# The 0.30 of boss wall this leaves beside each arm tip **does not
-# survive slicing at a 0.4 nozzle** -- Saqoosha's g-code preview shows
-# four flank-wall pillars and no tip walls, and the six validated caps
-# were printed exactly so. That is fine, and known: the grip is the
-# flank walls squeezing the ribs, the tips carry nothing, and the Choc
-# stem's own ring encloses the whole boss in use. If a slicer ever
-# does print the 0.30, the length clearance still clears (~0.15 after
-# shrink). The model keeps the walls because either printed outcome is
-# validated-or-clear; do not "fix" the thinness by shrinking this
-# clearance -- the length fit would go interference after shrink.
-STEM_MOUTH = 0.30         # a wider first 0.40 of bore, to start it
+# The tube wall beside each arm tip has its own printing history. At
+# CAP_BOSS_DIA 4.90 it was 0.30 and a 0.4 nozzle dropped it in slicing
+# -- the six caps that "fit really well" are tip-less, gripping by the
+# flank walls squeezing the ribs. A 0.2 nozzle printed the 0.30 tube
+# whole, but that nozzle has print-bed problems, so the boss grew to
+# 5.20 and the tip wall to 0.45: one fat extrusion, sliceable at 0.4.
+# With the walls now printing, the length clearance is load-bearing --
+# bore 4.30 prints ~4.15 against the 4.00 arm, ~0.15 clear -- which is
+# exactly why it must NOT be shrunk to thicken the wall further; the
+# boss diameter is the only safe knob, and it is spent (0.15 a side
+# left to the ring).
+# Width-only now, and smaller: the mouth used to widen the whole
+# cross by 0.30 and its own arm corners then thinned the closed tube
+# back below the nozzle for the first 0.40 -- floating slivers in
+# miniature. Widening only the width keeps the mouth wall at 0.447
+# (the length direction already carries STEM_LEN_CLEAR 0.30 of its
+# own and needs no lead).
+STEM_MOUTH = 0.15         # a width-only wider first 0.40, to start it
 
 # Outer shape: the wrk. MX Pure's envelope, so the swap changes nothing
 # but the plastic. Read off the product photo in `product.py` and not
