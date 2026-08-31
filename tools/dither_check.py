@@ -123,6 +123,37 @@ def render_for_src():
 
 PAINT, WRITE, RENDER = func_src("paint"), func_src("write_pixel"), render_for_src()
 
+
+def phase_advance_src():
+    """The lines that turn a frame delta into `_step_ms`, verbatim.
+
+    They live in the paint-tick block rather than in a function, so they
+    are found by walking to the `if now - last_pulse_at ...` statement and
+    taking the assignments before the `for`. Pulled out rather than
+    rewritten because the carry is the whole point: drop it and every
+    breath runs slow, which is a rate error that never corrects itself and
+    which no amount of reading the loop makes obvious.
+    """
+    for node in ast.walk(TREE):
+        if not isinstance(node, ast.If):
+            continue
+        src = ast.get_source_segment(SRC, node) or ""
+        if "last_pulse_at = now" not in src or "_phase_carry_ns" not in src:
+            continue
+        out = []
+        for stmt in node.body:
+            if isinstance(stmt, ast.For):
+                break
+            out.append(ast.get_source_segment(SRC, stmt))
+        joined = textwrap.dedent("\n".join(out))
+        for must in ("_phase_carry_ns", "_step_ms", "_phase_last_ns"):
+            assert must in joined, "phase advance no longer assigns " + must
+        return joined
+    raise AssertionError("the paint-tick block that advances the phase is gone")
+
+
+PHASE_SRC = phase_advance_src()
+
 def const(name):
     """Read a module-level constant out of the firmware, so nothing here
     restates a number the firmware owns."""
@@ -365,7 +396,10 @@ env = {"NUM_KEYS": 1, "DITHER": True, "brightness": 0.6,
        "dither_err": [0.0] * 3, "last_rgb": [None], "group_dirty": [False],
        "from_rgb": [0x00FF00], "to_rgb": [0x00FF00],
        "from_floor": [1.0], "to_floor": [1.0],
-       "pulse_started": [0], "period_ns": [2_000_000_000], "now": 0,
+       "phase_ms": [0], "period_ms": [2500], "_step_ms": 0, "now": 0,
+       # The loop inlines the finished-fade test now, so these have to be
+       # real even though `fade_progress` below is still stubbed.
+       "fade_started": [0], "crossfade_ns": 0,
        "fade_progress": lambda i, now: 1.0}
 rec = []
 class Grp:
@@ -484,7 +518,7 @@ def fade_to(step_ns, target, bright, cross=CROSS):
            "dither_err": [0.0] * 3, "last_rgb": [None], "group_dirty": [False],
            "from_rgb": [0x000000], "to_rgb": [target],
            "from_floor": [1.0], "to_floor": [1.0],
-           "pulse_started": [0], "period_ns": [2_500_000_000], "now": 0,
+           "phase_ms": [0], "period_ms": [2500], "_step_ms": 5, "now": 0,
            "crossfade_ns": cross, "fade_started": [0],
            "pixel_groups": [(Grp(), 0, 1)]}
     exec(CURVE_SRC, env)
@@ -521,5 +555,48 @@ print("    {} tick rates, all settling on round-to-nearest 0x{:06x} "
       "(channels {:.1f}/{:.1f}/{:.1f})".format(
           len(RATES), want,
           *[((TARGET >> sh) & 0xFF) * BRIGHT for sh, _ in CHANNELS]))
+
+print()
+print("--- 10. the breath keeps its period, frame rate notwithstanding ---")
+# `phase_ms` is advanced by a whole number of milliseconds each frame, so
+# without the carry every breath would run slow by the truncation -- about
+# 0.6% at a 7 ms frame, for ever, with nothing to notice it. The frame
+# periods below are deliberately not divisors of a millisecond.
+PERIOD_MS = 2500
+for frame_us, label in ((6_760, "148 Hz"), (5_882, "170 Hz"),
+                        (7_042, "142 Hz"), (5_208, "192 Hz")):
+    env = {"_phase_carry_ns": 0, "_phase_last_ns": 0, "now": 0,
+           "last_pulse_at": 0, "PULSE_STEP_NS": 0,
+           "phase_ms": [0], "period_ms": [PERIOD_MS], "NUM_KEYS": 1}
+    total_ms = 0
+    frames = 0
+    # run twenty breaths, so a per-frame truncation would show up twenty
+    # times over rather than hiding inside one period
+    while total_ms < PERIOD_MS * 20:
+        env["now"] += frame_us * 1000
+        exec(PHASE_SRC, env)
+        total_ms += env["_step_ms"]
+        frames += 1
+    wall_ms = env["now"] / 1_000_000.0
+    drift = (total_ms - wall_ms) / wall_ms
+    assert abs(drift) < 0.001, \
+        "the breath drifts {:+.3f}% at a {} frame ({} ms of phase over {:.0f} ms of wall)".format(
+            drift * 100, label, total_ms, wall_ms)
+    print("    {:>6} frame: {} frames, {} ms of phase over {:.0f} ms of wall, drift {:+.4f}%"
+          .format(label, frames, total_ms, wall_ms, drift * 100))
+# and the wrap has to land the phase back at its trough, not past it
+env = {"_phase_carry_ns": 0, "_phase_last_ns": 0, "now": 0, "last_pulse_at": 0,
+       "PULSE_STEP_NS": 0, "phase_ms": [0], "period_ms": [PERIOD_MS], "NUM_KEYS": 1}
+seen_hi = 0
+for _ in range(4000):
+    env["now"] += 6_760_000
+    exec(PHASE_SRC, env)
+    p = (env["phase_ms"][0] + env["_step_ms"])
+    if p >= PERIOD_MS:
+        p -= PERIOD_MS
+    env["phase_ms"][0] = p
+    seen_hi = max(seen_hi, p)
+assert 0 <= seen_hi < PERIOD_MS, "phase left its period: {}".format(seen_hi)
+print("    4000 frames: phase stayed in [0, {}), highest {}".format(PERIOD_MS, seen_hi))
 
 print("\nall checks passed")
