@@ -124,7 +124,21 @@ OUTER_CORNER_R = 7.995
 # what is left between them. A leak probe in build.py owns the hole
 # class now.
 CAVITY_CORNER_R = 2.70
-PCB_SLOP = 0.40
+# The **length** direction carries the big slop, and the first fix
+# went the wrong way -- "long side" meant the board's long dimension
+# and got read as the case's long walls, so the depth grew first and
+# Saqoosha caught it ("you edit wrong direction???"). The physics
+# agrees with him: a 139.60 board bends because its LENGTH is pinched
+# -- 0.20 at the pocket frame's left wall plus 0.20 at the right
+# wall, and a ~140 internal length loses ~0.3 to shrink, so the
+# printed fit was negative and forcing it in buckled the board
+# ("the pcb is a bit bent"). 0.80 leaves ~0.5 printed: a drop-in.
+# Length position is not precision -- the switches tie board to
+# plate, and the USB opening is cut from the board's own edge so it
+# moves with it. The depth keeps 0.40; its 21.59 span shrinks little
+# and drew no complaint.
+PCB_SLOP = 0.80
+PCB_SLOP_Y = 0.40
 
 # How much shorter the shell's standoffs are than the space they sit in.
 # Without it the stack adds up exactly and the boards hold the halves
@@ -146,7 +160,9 @@ COLUMN_SLACK = 0.40
 # "switch row to the board's front edge" (10.795). 1.27 of bay makes
 # left = front = back = 3.795 from cap edge to case edge; the fourth
 # side is the electronics'.
-END_BAY = SWITCH_Y - SWITCH_X[0]
+# The (PCB_SLOP_Y - PCB_SLOP)/2 term keeps the three-sides equality
+# alive now that depth and width carry different slops.
+END_BAY = SWITCH_Y - SWITCH_X[0] + (PCB_SLOP_Y - PCB_SLOP) / 2
 
 # Air under the board: socket plus the same 1.40 that opened the wire
 # lane on the wired pad. No STEMMA receptacle here, so SOCKET_DROP is
@@ -485,7 +501,7 @@ Z_USB_BOTTOM = Z_BOARD_BOTTOM - USB_H
 # 130 mm case, and the right wall has no room beside a full-depth board
 # that ends in a USB plug.
 CASE_W = WALL + END_BAY + PCB_SLOP + BOARD_W + WALL
-CASE_D = WALL + BOARD_D + PCB_SLOP + WALL
+CASE_D = WALL + BOARD_D + PCB_SLOP_Y + WALL
 
 # The left trim: the tongue and the plate's top half end here on the
 # left. With the slide leftward it only has to guarantee that home has

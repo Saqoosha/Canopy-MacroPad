@@ -101,10 +101,11 @@ def _usb_opening():
 
 def _board_pocket(z0, z1):
     """Walls that locate the board in plan, open at the USB end."""
-    s_ = P.PCB_SLOP / 2
+    sx_ = P.PCB_SLOP / 2
+    sy_ = P.PCB_SLOP_Y / 2
     ox, oy = P.BOARD_ORIGIN
-    bx0, bx1 = ox - s_, ox + P.BOARD_W + s_
-    by0, by1 = oy - s_, oy + P.BOARD_D + s_
+    bx0, bx1 = ox - sx_, ox + P.BOARD_W + sx_
+    by0, by1 = oy - sy_, oy + P.BOARD_D + sy_
     f = P.WALL
     # Frame around the board, then open the right wall for USB.
     frame = _block(bx0 - f, bx1 + f, by0 - f, by1 + f, z0, z1)
