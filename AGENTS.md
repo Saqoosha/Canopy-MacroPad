@@ -521,6 +521,21 @@ one, not necessarily the only one.
   swallowed its own failure at 1.20 and the bed-inset probe (0.35 for
   an expected ~1.2) was what confessed.
 
+- **The keyboard mount is the case outline pushed down to the desk at
+  the keyboard's tilt, and the tilt is a sine.** `mount.py` builds
+  `mount-raised` and `mount-flush` for a Nuphy Air75 v2.1 from three
+  desk measurements in `params.py` (`KB_D`, `KB_NEAR`, `KB_FAR`). The
+  keyboard is a **tilted rectangle** -- near bottom corner on the desk,
+  rear feet under the far end -- so the rise over the depth is
+  `asin`, every face is square to the plate, and the near height fixes
+  the slab thickness. Two wrong body shapes were drawn before that
+  sentence was asked for; ask it first. The case is located by pegs
+  into its foot recesses (pads off), never by walls; the peg diameter
+  is unsettled. `mount.py` has its own checks and its own figure and
+  is not run by `build.py`; run it after touching `KB_*`, `FOOT_*`,
+  `CASE_*` or `OUTER_CORNER_R`. The reasoning is `case/README.md`,
+  *The keyboard mount*.
+
 - **The dummy caps mount on a ring, not on a cross.**
   `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure
   set is in the post, and its mount is **read off `ref/choc-v2.step` by
