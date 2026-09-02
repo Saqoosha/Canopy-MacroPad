@@ -10,6 +10,7 @@ Print target: Bambu A1 mini, 0.4 nozzle, 0.2 layer, PLA Basic.
 """
 
 import importlib.util
+import math as _math
 import os
 import sys
 
@@ -731,8 +732,6 @@ TOKEN_GAP = 4.0
 # corner stands on the desk and whose far end the rear feet hold up --
 # so the rise over the depth is a sine, not a tangent, and every face is
 # square to the plate. The near height then fixes the slab's thickness.
-import math as _math
-
 KB_D = 133.2
 KB_NEAR = 13.0
 KB_FAR = 25.8

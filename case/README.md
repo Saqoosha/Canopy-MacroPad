@@ -424,7 +424,7 @@ top.
 `mount.py` builds two stands that perch the case behind a **Nuphy Air75
 v2.1**, at the keyboard's own tilt, and writes them to `out/choc/`:
 
-```
+```bash
 .venv/bin/python mount.py      # must say all checks passed; also draws mount.png
 ```
 

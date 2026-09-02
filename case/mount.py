@@ -22,7 +22,7 @@ from build123d import (Axis, Box, Cylinder, Pos, RectangleRounded, Rotation,
                        chamfer, extrude)
 
 import params as P
-from build import OUT, check, export_step_stable
+from build import OUT, _shared, check, export_step_stable
 from build123d import export_stl
 
 TILT = P.KB_TILT
@@ -41,6 +41,7 @@ def _desk_cut(shape):
 
 
 def _case_y0(over):
+    """Slab-local y of the case's near face: the keyboard's rear face, less the overhang."""
     return P.KB_D - over
 
 
@@ -78,6 +79,7 @@ def mount(raise_, over):
 
 # --- stand-ins -----------------------------------------------------------
 def keyboard():
+    """The Air75 as a slab, wider than anything here."""
     return _tilt(Pos(0, P.KB_D / 2, P.KB_T / 2) * Box(320.0, P.KB_D, P.KB_T))
 
 
@@ -102,18 +104,24 @@ def usb_plug(raise_, over):
 
 
 def _world(y, z):
+    """Slab-local (y, z) to world (y, z), the same rotation `_tilt` applies."""
     a = math.radians(TILT)
     return (y * math.cos(a) - z * math.sin(a), y * math.sin(a) + z * math.cos(a))
 
 
 def _vol(a, b):
-    try:
-        return (a & b).volume
-    except Exception:
-        return 0.0
+    """Shared volume, 0.0 for an empty intersection -- and only for that.
+
+    `build._shared` catches the one ValueError OCCT raises for "nothing
+    in common". Anything else propagates, because a probe that reads
+    0.0 on a failed boolean reads as "no collision" and the run ends in
+    `all checks passed` about a mount nobody checked.
+    """
+    return _shared(a, b)
 
 
 def checks(name, raise_, over, part):
+    """Every check for one mount; returns the list of booleans."""
     ok = []
     kb = keyboard()
     cs = case(raise_, over)
@@ -176,7 +184,7 @@ def checks(name, raise_, over, part):
     return ok
 
 
-def figure(variants):
+def figure(built):
     """out/<layout>/mount.png: the two mounts with the keyboard and case
     stand-ins, side and iso, so a change can be looked at."""
     import tempfile
@@ -190,14 +198,18 @@ def figure(variants):
 
     def tris_of(shape):
         with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
-            export_stl(shape, f.name, tolerance=0.02, angular_tolerance=0.2)
-            m = trimesh.load(f.name)
+            path = Path(f.name)
+        try:
+            export_stl(shape, str(path), tolerance=0.02, angular_tolerance=0.2)
+            m = trimesh.load(path)
+        finally:
+            path.unlink(missing_ok=True)
         return m.vertices[m.faces], m.face_normals
 
-    fig, axes = plt.subplots(len(variants), 2, figsize=(14, 4.2 * len(variants)),
+    fig, axes = plt.subplots(len(built), 2, figsize=(14, 4.2 * len(built)),
                              subplot_kw={"projection": "3d"})
-    for row, (name, (raise_, over)) in zip(axes, variants.items()):
-        parts = [(mount(raise_, over), (0.85, 0.33, 0.12)),
+    for row, (name, (raise_, over, part)) in zip(axes, built.items()):
+        parts = [(part, (0.85, 0.33, 0.12)),
                  (case(raise_, over), (0.17, 0.17, 0.16)),
                  (Pos(0, 0, 0) * keyboard(), (0.80, 0.78, 0.72))]
         for ax, (view, elev, azim) in zip(row, (("side", 0, 0), ("iso", 24, -55))):
@@ -232,6 +244,7 @@ def figure(variants):
 
 
 def main():
+    """Build both mounts once, export them, draw them, check them."""
     OUT.mkdir(parents=True, exist_ok=True)
     ok = []
     # The frame: +y must climb, or the whole thing is mirrored about the desk.
@@ -244,16 +257,17 @@ def main():
         "mount-raised": (P.KB_T, P.MOUNT_OVER),
         "mount-flush": (P.KB_T - P.CASE_H, 0.0),
     }
+    built = {name: (raise_, over, mount(raise_, over))
+             for name, (raise_, over) in variants.items()}
     print("\nexported")
-    for name, (raise_, over) in variants.items():
-        part = mount(raise_, over)
+    for name, (_, _, part) in built.items():
         export_stl(part, str(OUT / f"{name}.stl"), tolerance=0.005, angular_tolerance=0.1)
         export_step_stable(part, str(OUT / f"{name}.step"))
         print(f"  {name}")
-    figure(variants)
+    figure(built)
     print()
-    for name, (raise_, over) in variants.items():
-        ok += checks(name, raise_, over, mount(raise_, over))
+    for name, (raise_, over, part) in built.items():
+        ok += checks(name, raise_, over, part)
     print("\n" + ("all checks passed" if all(ok) else "SOMETHING IS WRONG"))
     return 0 if all(ok) else 1
 
