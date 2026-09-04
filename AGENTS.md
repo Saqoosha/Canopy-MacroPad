@@ -521,12 +521,14 @@ one, not necessarily the only one.
   swallowed its own failure at 1.20 and the bed-inset probe (0.35 for
   an expected ~1.2) was what confessed. **A bare `except Exception`
   around the boolean itself is the same fault one level down and it
-  takes every check with it**: `mount.py`'s `_vol` returned 0.0 for
-  any OCCT failure, so a part whose topology had gone bad read as
-  clearing everything and the run ended in `all checks passed`.
-  `build._shared` is the shape to copy -- it catches the one
-  `ValueError` raised for an empty intersection and nothing else, so
-  a real failure is a traceback rather than a green line.
+  would take every check with it**: `mount.py`'s `_vol` caught bare
+  `Exception` and returned 0.0, which every clearance check reads as
+  "nothing shared", so any OCCT failure would have come out as a
+  green line. **Nobody watched that happen** -- it was read off the
+  code by review, and no bad-topology part was ever put through it,
+  so this is a property of the code rather than a caught fault.
+  `build._shared` is the shape to copy: it catches the one
+  `ValueError` raised for an empty intersection and nothing else.
 
 - **The keyboard mount is the case outline pushed down to the desk at
   the keyboard's tilt, and the tilt is a sine.** `mount.py` builds
