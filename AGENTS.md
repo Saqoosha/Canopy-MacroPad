@@ -640,6 +640,18 @@ one, not necessarily the only one.
   compare the geometry rather than the bytes, and `git checkout --
   case/out/` when it matches.
 
+  **`mount.png` is on the stable side of that list, and reading it as
+  churn cost two reverts in one session.** Two runs of unchanged
+  source give byte-identical files, so a dirty `mount.png` means the
+  drawing really did change -- `git checkout --` on it puts a stale
+  figure back. It looked guilty for the same reason the shell does
+  and for a different cause: `figure()` was changed to render the
+  solid the export already built rather than build its own, and the
+  tessellation order moved with it. So the rule is not "PNGs churn"
+  but the one above it -- **rebuild twice and compare, then decide**
+  -- because which files are stable is a property of the code that
+  writes them and moves when that code does.
+
   **Run the whole sweep after every geometry fix, not at the end of a
   batch of them.** Saqoosha reads the viewer, not the diff, and a fix he
   cannot see is a fix he has to take on trust -- which during a
