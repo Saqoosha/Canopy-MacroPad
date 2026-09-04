@@ -760,3 +760,133 @@ MOUNT_OVER = 10.0
 # two samples, and neither bound of the range has been felt.
 MOUNT_PEG_DIA = 7.50
 MOUNT_PEG_H = FOOT_RECESS - 0.10
+
+# --- The second keyboard: Keychron K11 Max ------------------------------
+# **A different shape, and the shape is the whole lesson.** The Air75 is
+# a tilted rectangle; the K11 Max is a **wedge** -- its bottom is one
+# flat plane that lies on the desk, and only the top plate is tilted.
+# Read off Keychron's own `k11-Max-US-Knob-Version-Full-Model` STEP
+# rather than a tape measure: that bottom is a single 33,000 mm2 planar
+# face standing 3.33 degrees off the plate's normal, which is also the
+# feet-up typing angle Keychron publishes. So the front and rear faces
+# are square to the plate, exactly as on the Air75, and what differs is
+# where that rear face meets the desk.
+K11_TILT = 3.33           # feet up; the flip-down feet give 4.7 and 7.54
+K11_D = 117.65            # case depth, STEP z 12.00..129.65
+K11_W = 345.37            # case width
+K11_PLATE_REAR = 14.54    # top plate above the desk at the rear face
+
+# The USB-C port is on that rear face and it is what settles the mount's
+# height. Level plates would put the macropad's own case across the port
+# -- and a case cannot be relieved, only moved -- so the pad's bottom
+# has to clear the port's top edge, and the plate plane is the lowest
+# position that does. Heights are up the rear face from the desk; x is
+# from the keyboard's own centre, negative to the left.
+K11_PORT_LO = 7.19
+K11_PORT_HI = 13.19
+K11_PORT_X = -21.03       # the port's centre, off the STEP
+K11_PORT_W = 10.50        # the opening; the L-plug's shell is wider
+
+# The notch that lets the L-plug through the mount's front face. Sized
+# generously on purpose: the plug body has never been measured, the
+# notch is open at the top so it costs no support, and what it takes
+# away is cradle nobody stands on -- the locating pegs are at the ends.
+K11_NOTCH_W = 30.0
+# 17.0, not 18.0: the mount is 20.02 deep in plate-local, so 18 left 2.02
+# behind the pocket -- less than the 3.0 rear wall, standing as a thin fin
+# across the pocket's whole width. Nothing about the plug needed that last
+# millimetre; the check still clears a plug grown 4.0 in every direction.
+K11_NOTCH_D = 17.0
+# The floor stops 2.0 short of the desk rather than cutting through, so
+# the mount keeps an unbroken foot round its whole perimeter. Everything
+# above it is gone, and the check asks the notch to clear a plug grown
+# 4.0 in every direction -- margin sized for a body nobody has measured.
+K11_NOTCH_FLOOR = 2.0
+
+# **The plug is not the end of it: the cable leaves the L rightward and
+# runs back across the desk, through where the mount stands.** Measured
+# off the photo of the desk -- 97 to the right buys 27 of rearward, and
+# the mount is only 20.88 deep -- so it is inside the mount's band for
+# roughly the first 75 mm right of the port. A pocket at the port alone
+# would pinch it.
+#
+# The cable runs **straight right** along the keyboard's rear face, and
+# it does not touch the desk: it floats at about the middle of the
+# keyboard's base height, so its centre sits near K11_PLATE_REAR / 2.
+# That is worth more than it sounds. A relief cut down to the desk would
+# take the floor and the whole lower front wall with it; a slot at the
+# cable's own height leaves both, and the part keeps a closed section.
+#
+# Two wrong shapes came before this one, and the cable stand-in caught
+# both. A 10-deep step in the front face, drawn against a cable sloping
+# 27 rearward per 97 right: 330.9 mm3. Then a channel cut to the desk,
+# which cleared the cable but only because it removed everything.
+#
+# The slot is 3.0 to 11.5: the floor and 1.0 of wall stay under it, and
+# the top stops 0.045 under the cradle's own underside, which sits at
+# 14.54 - 3.0 cos(3.33) = 11.545 at the front face. Its span covers a
+# cable up to 8.5 across, against a cable nobody has measured.
+K11_CABLE_D = 14.0
+K11_CABLE_LO = 3.0
+K11_CABLE_H = 11.5
+
+# **There is no post at the right end, and there cannot be one.** The
+# cable leaves the port rightward and exits past the pad's right edge, so
+# nothing that ties the floor to the cradle through the front wall can
+# stand anywhere right of the port. A post with a hole cut for the cable
+# is the same solid as a slot running to the edge -- the two ideas draw
+# the same part.
+#
+# It was never needed either. What ties floor to cradle is the **rear**
+# wall, 3.0 thick and full height along the mount's whole length, and the
+# back of each rib behind the slot. The front wall's job is to butt
+# against the keyboard, and the strips left under and over the slot still
+# do that.
+K11_SLOT_OUT = 1.0        # how far past the pad's right edge the slot runs
+
+# **The keyboard's base is not centred on its keys, and the pad follows
+# the keys.** Six keys stand off on the right of the Alice cluster, and
+# they drag the whole field's extent back to the case's own centre --
+# 68 caps read off the STEP span x 9.52..345.49, mid 177.50 against a
+# case centre of 176.30, which says "centred" and is misleading. Drop
+# that right-hand block and the 62 keys anyone actually types on sit at
+# 158.37, **17.94 to the left**. That is where the pad goes.
+K11_PAD_DX = -17.94
+
+# How far the pad comes forward over the keyboard. Its underside rides
+# the plate plane, so any keycap under it is a collision, and the limit
+# is the closest a cap's rear-most point comes to the rear face across
+# the pad's width -- solved against the pad's real outline, corner arcs
+# included. A cap's bounding box in the STEP's own frame carries its
+# true rear-most point however the Alice layout rotates the cap, so
+# that limit is exact rather than conservative.
+#
+# **The aesthetic choice and the maximum turn out to be the same
+# place.** Centred on the case the limit is 3.50; moved left onto the
+# keys it is 6.47, and it stays 6.47 anywhere from -17.94 to -24.30, so
+# the offset the keys ask for already sits on the plateau. 0.50 comes
+# off for print shrink and for a keyboard that is never quite where it
+# was.
+#
+# The price is the front pegs: their centres land 1.03 behind the front
+# face, so the face cuts each to a D keeping 4.78 of its 7.50. That is
+# still a locator -- the full width survives at the centre line, so x
+# is held, and the rear pegs are whole circles and hold the pad against
+# sliding forward.
+K11_OVER = 5.97
+
+# The mount is a shell, not a block: 3.0 walls round the pad's outline,
+# ribs across it, and the cradle solid on top so it prints as a short
+# bridge over each bay with nothing overhanging.
+MOUNT_WALL = 3.0
+MOUNT_RIB_PITCH = 22.0
+MOUNT_RIB_W = 2.4
+
+# **The desk face is closed, and the reasons are all about printing it.**
+# Left open, the first layer of a 145 mm part is a 3.0 outline plus a few
+# rib ends -- a poor grip on the bed for something that long and only
+# 21 deep. A floor makes the first layer a face, closes the section so it
+# resists twisting rather than folding, and puts the mount on the desk on
+# an area instead of an edge. It costs about 4 cm3. The cable channel
+# still cuts through it, because the cable lies on the desk.
+MOUNT_FLOOR = 2.0
