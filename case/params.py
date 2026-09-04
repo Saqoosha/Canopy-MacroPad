@@ -745,11 +745,18 @@ KB_T = KB_NEAR / _math.cos(_math.radians(KB_TILT))                # 13.06
 # keyboard's rear strip and only its back on the mount; `flush` puts the
 # case's plate top on the keyboard's plate plane, so the two read as
 # one slab, and the case sits wholly on the mount.
+#
+# 10.0 was drawn against a rear strip nobody had measured, and the
+# printed raised mount is what measured it: the case clears the F-row
+# caps there. One print, so it is a value that works rather than the
+# edge of the range.
 MOUNT_OVER = 10.0
 
 # The case is located by pegs standing into its Ø8 x 0.5 foot recesses
-# (FOOT_XY), not by walls. Diameter is a guess until a coupon says
-# otherwise; the height leaves 0.10 so the case bottom, not the peg,
-# carries the load.
+# (FOOT_XY), not by walls; the height leaves 0.10 so the case bottom,
+# not the peg, carries the load. 7.50 into Ø8.00 went straight on and
+# located the case on the first print of both mounts, so the coupon
+# that was planned for it never had to happen -- but two assemblies is
+# two samples, and neither bound of the range has been felt.
 MOUNT_PEG_DIA = 7.50
 MOUNT_PEG_H = FOOT_RECESS - 0.10

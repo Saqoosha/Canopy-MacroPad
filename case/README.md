@@ -456,7 +456,9 @@ the desk. The two differ in two numbers:
   rests on the keyboard's rear strip and its back on the mount, which
   is only the 16 mm behind the keyboard. The case's plate stands 9.5
   above the keyboard's. 10 is a knob, up to the width of the plain
-  strip behind the F row, which was never measured.
+  strip behind the F row; the strip was never measured with a rule,
+  and the print measured it instead -- at 10 the case clears the
+  F-row caps.
 - **`mount-flush`** -- the case's plate top on the keyboard's plate
   plane (`KB_T` - `CASE_H`), so the two read as one continued slab and
   the whole case sits on the mount. The case bottom is 3.56 above the
@@ -467,9 +469,17 @@ pads come off, and Ø7.50 x 0.40 pegs (`MOUNT_PEG_DIA`, `MOUNT_PEG_H`)
 stand into the Ø8 x 0.5 recesses at `FOOT_XY` -- the rear two on the
 raised mount, whose front pair hangs over the keyboard, all four on the
 flush one. 0.40 leaves 0.10 so the case bottom carries the load rather
-than the peg tops. The diameter is a guess; a coupon has not settled
-it. Nothing in the x direction depends on the keyboard: the case is
-narrower than it, so centred is a choice rather than a fit.
+than the peg tops. Nothing in the x direction depends on the keyboard:
+the case is narrower than it, so centred is a choice rather than a
+fit.
+
+**Both mounts are printed and fit** -- Saqoosha's word on the first
+print of each, pegs and seating together, which is why the peg coupon
+that was planned never had to happen. Read it for what it is: two
+assemblies, one apiece. 7.50 into Ø8.00 is a value that works, not a
+range whose ends have been felt, and the same goes for `MOUNT_OVER`
+10.0 against the F-row caps. If either is ever reprinted and fights,
+that is a second sample rather than a contradiction.
 
 **Print with the desk face down.** It is the one flat face; the
 cradle is then a 5.5° top surface and nothing overhangs. The block is
