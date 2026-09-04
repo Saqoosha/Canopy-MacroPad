@@ -519,7 +519,35 @@ one, not necessarily the only one.
   top chamfer (`SHELL_TOP_CHAMFER` 1.20) is cut on the bare slab and
   doubles as first-layer relief; its try/except-wrapped predecessor
   swallowed its own failure at 1.20 and the bed-inset probe (0.35 for
-  an expected ~1.2) was what confessed.
+  an expected ~1.2) was what confessed. **A bare `except Exception`
+  around the boolean itself is the same fault one level down and it
+  would take every check with it**: `mount.py`'s `_vol` caught bare
+  `Exception` and returned 0.0, which every clearance check reads as
+  "nothing shared", so any OCCT failure would have come out as a
+  green line. **Nobody watched that happen** -- it was read off the
+  code by review, and no bad-topology part was ever put through it,
+  so this is a property of the code rather than a caught fault.
+  `build._shared` is the shape to copy: it catches the one
+  `ValueError` raised for an empty intersection and nothing else.
+
+- **The keyboard mount is the case outline pushed down to the desk at
+  the keyboard's tilt, and the tilt is a sine.** `mount.py` builds
+  `mount-raised` and `mount-flush` for a Nuphy Air75 v2.1 from three
+  desk measurements in `params.py` (`KB_D`, `KB_NEAR`, `KB_FAR`). The
+  keyboard is a **tilted rectangle** -- near bottom corner on the desk,
+  rear feet under the far end -- so the rise over the depth is
+  `asin`, every face is square to the plate, and the near height fixes
+  the slab thickness. Two wrong body shapes were drawn before that
+  sentence was asked for; ask it first. The case is located by pegs
+  into its foot recesses (pads off), never by walls. Both mounts are
+  **printed and fitting on the first print of each**, pegs and
+  seating, so `MOUNT_PEG_DIA` 7.50 into Ø8.00 and `MOUNT_OVER` 10.0
+  against the F-row caps are values that work rather than ranges
+  whose ends were felt -- one assembly apiece, and the planned peg
+  coupon never had to happen. `mount.py` has its own checks and
+  its own figure and is not run by `build.py`; run it after
+  touching `KB_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`. The
+  reasoning is `case/README.md`, *The keyboard mount*.
 
 - **The dummy caps mount on a ring, not on a cross.**
   `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure

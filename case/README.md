@@ -419,6 +419,89 @@ the pad and boss stand up out of it, the bore opens up, and there is no
 overhang anywhere in it. No supports, and the bed face is the visible
 top.
 
+## The keyboard mount
+
+`mount.py` builds two stands that perch the case behind a **Nuphy Air75
+v2.1**, at the keyboard's own tilt, and writes them to `out/choc/`:
+
+```bash
+.venv/bin/python mount.py      # must say all checks passed; also draws mount.png
+```
+
+**The keyboard is a tilted rectangle, and that decides the arithmetic.**
+Three numbers were measured on the desk with the feet as used: top
+plate 13.0 above the desk at the near edge, 25.8 at the far edge, body
+133.2 deep. The body is a slab whose near bottom corner stands on the
+desk and whose far end the rear feet hold up, so the 12.8 rise over the
+133.2 is a **sine** (`KB_TILT` 5.51°), not a tangent (5.49°), and every
+face of the slab is square to its plate. The near height then fixes the
+slab's thickness: `KB_T` = 13.0 / cos = 13.06. The first drawing of this
+had the body as a slab with slanted front and back faces, which put the
+mount's front on a lean the keyboard does not have; the first
+correction went the other way and leaned the faces *in*. Both were
+guesses standing in for one sentence from the person holding the
+keyboard.
+
+**Both mounts are the case's own plan outline pushed down to the
+desk.** Same 145.47 x 25.99, same R 7.995 corners, drawn in
+slab-local coordinates (x along the keyboard, y toward the far end, z
+off the plate), tilted about x by `KB_TILT`, and cut flat at z 0. The
+front is a plane at the keyboard's rear face, square to the plate, so
+the mount butts against the keyboard with no gap; its foot lands 1.24
+behind the keyboard's bottom corner, which is where that plane meets
+the desk. The two differ in two numbers:
+
+- **`mount-raised`** -- the case bottom on the keyboard's plate plane
+  (`KB_T`), slid `MOUNT_OVER` 10.0 toward the user. The case's front
+  rests on the keyboard's rear strip and its back on the mount, which
+  is only the 16 mm behind the keyboard. The case's plate stands 9.5
+  above the keyboard's. 10 is a knob, up to the width of the plain
+  strip behind the F row; the strip was never measured with a rule,
+  and the print measured it instead -- at 10 the case clears the
+  F-row caps.
+- **`mount-flush`** -- the case's plate top on the keyboard's plate
+  plane (`KB_T` - `CASE_H`), so the two read as one continued slab and
+  the whole case sits on the mount. The case bottom is 3.56 above the
+  keyboard's underside plane.
+
+**Location is pegs into the foot recesses, not walls.** The rubber
+pads come off, and Ø7.50 x 0.40 pegs (`MOUNT_PEG_DIA`, `MOUNT_PEG_H`)
+stand into the Ø8 x 0.5 recesses at `FOOT_XY` -- the rear two on the
+raised mount, whose front pair hangs over the keyboard, all four on the
+flush one. 0.40 leaves 0.10 so the case bottom carries the load rather
+than the peg tops. Nothing in the x direction depends on the keyboard:
+the case is narrower than it, so centred is a choice rather than a
+fit.
+
+**Both mounts are printed and fit** -- Saqoosha's word on the first
+print of each, pegs and seating together, which is why the peg coupon
+that was planned never had to happen. Read it for what it is: two
+assemblies, one apiece. 7.50 into Ø8.00 is a value that works, not a
+range whose ends have been felt, and the same goes for `MOUNT_OVER`
+10.0 against the F-row caps. If either is ever reprinted and fights,
+that is a second sample rather than a contradiction.
+
+**Print with the desk face down.** It is the one flat face; the
+cradle is then a 5.5° top surface and nothing overhangs. The block is
+modelled solid (61 cm³ raised, 66 flush) and the slicer's infill is the
+weight reduction. The desk edge gets `ELEPHANT_CHAMFER`.
+
+**What the checks watch** -- all in `mount.py`, against a keyboard
+stand-in (the slab, 320 wide), a case stand-in with its foot recesses,
+and a plug in the case's USB-C port: the desk face at z 0 and nothing
+below it; mount, case and keyboard pairwise at 0.000 with the pegs in
+their recesses; the pegs catching a case shifted 1.0 in each of ±x, ±y
+(3.9 mm³ raised, 7.9 flush); the case's plate top at its near edge
+against the arithmetic (34.295 raised, 25.800 flush); a probe just
+ahead of the front face lying wholly inside the keyboard, so the two
+faces touch; a probe under the overhang lying wholly inside the
+keyboard, so the raised case rests on it with no step; and a probe
+under the rest of the case lying wholly inside the mount, so the
+cradle is solid to the surface. Watched to fail: pegs moved 2.0 in y,
+9.926 / 19.853 mm³ against the case; tilt sign flipped, the keyboard's
+far corner reading 0.200 for 25.800 before the desk chamfer failed on a
+part that had none of its edges where it expected.
+
 ## Cable, per layout
 
 **The earlier device.** Both layouts here are gone from the source, and

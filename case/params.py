@@ -10,6 +10,7 @@ Print target: Bambu A1 mini, 0.4 nozzle, 0.2 layer, PLA Basic.
 """
 
 import importlib.util
+import math as _math
 import os
 import sys
 
@@ -722,3 +723,40 @@ TOKEN_W = 16.0
 TOKEN_D = 20.0
 TOKEN_T = 1.20
 TOKEN_GAP = 4.0
+
+
+# --- The keyboard the mount stands behind: Nuphy Air75 v2.1 -----------
+# Measured on the desk, feet as used: the top plate is 13.0 above the
+# desk at the near edge and 25.8 at the far edge, and the body is 133.2
+# deep. The body is a **tilted rectangle** -- a slab whose near bottom
+# corner stands on the desk and whose far end the rear feet hold up --
+# so the rise over the depth is a sine, not a tangent, and every face is
+# square to the plate. The near height then fixes the slab's thickness.
+KB_D = 133.2
+KB_NEAR = 13.0
+KB_FAR = 25.8
+KB_TILT = _math.degrees(_math.asin((KB_FAR - KB_NEAR) / KB_D))   # 5.51
+KB_T = KB_NEAR / _math.cos(_math.radians(KB_TILT))                # 13.06
+
+# Two mounts from one shape, both butted against the keyboard's rear
+# face with the case sitting at the keyboard's slope and its rubber pads
+# off. `raised` puts the case bottom on the keyboard's plate plane and
+# slides it MOUNT_OVER toward the user, so its front rests on the
+# keyboard's rear strip and only its back on the mount; `flush` puts the
+# case's plate top on the keyboard's plate plane, so the two read as
+# one slab, and the case sits wholly on the mount.
+#
+# 10.0 was drawn against a rear strip nobody had measured, and the
+# printed raised mount is what measured it: the case clears the F-row
+# caps there. One print, so it is a value that works rather than the
+# edge of the range.
+MOUNT_OVER = 10.0
+
+# The case is located by pegs standing into its Ø8 x 0.5 foot recesses
+# (FOOT_XY), not by walls; the height leaves 0.10 so the case bottom,
+# not the peg, carries the load. 7.50 into Ø8.00 went straight on and
+# located the case on the first print of both mounts, so the coupon
+# that was planned for it never had to happen -- but two assemblies is
+# two samples, and neither bound of the range has been felt.
+MOUNT_PEG_DIA = 7.50
+MOUNT_PEG_H = FOOT_RECESS - 0.10
