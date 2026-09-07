@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 """Mounts that perch the macropad behind a tilted keyboard.
 
+**One macropad, two desks, three mounts.** The pad moves between an
+Air75 at home and a K11 Max at the office, so its bottom plate has to
+fit every mount here at once: one set of foot recesses, one set of bores
+through them, and each mount's pegs sized to that. The rubber feet are
+never fitted -- the pad is always on a mount -- so the recesses are peg
+sockets rather than feet seats.
+
 Four shapes, two keyboards, one builder. Every mount is the case's own
 plan outline pushed down to the desk at the keyboard's tilt, its front
 face square to the plate and butted against the keyboard's rear face,
@@ -29,7 +36,7 @@ from build123d import (Axis, Box, Cylinder, Pos, RectangleRounded, Rotation,
                        chamfer, extrude)
 
 import params as P
-from build import OUT, _shared, check, export_step_stable
+from build import OUT, _probe, _shared, check, export_step_stable
 from build123d import export_stl
 
 TILT = P.KB_TILT       # the Air75's, kept as a module constant for its stand-ins
@@ -210,8 +217,8 @@ def case(raise_, over, dx=0.0, dy=0.0):
     slab = Pos(0, y0 + P.CASE_D / 2, raise_) * extrude(
         RectangleRounded(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R), amount=P.CASE_H)
     for x, y in P.FOOT_XY:
-        slab -= Pos(x, y0 + P.CASE_D / 2 + y, raise_ + P.FOOT_RECESS / 2 - 0.05) * Cylinder(
-            P.FOOT_DIA / 2, P.FOOT_RECESS + 0.1)
+        slab -= Pos(x, y0 + P.CASE_D / 2 + y, raise_ + P.BOTTOM_T / 2) * Cylinder(
+            P.FOOT_DIA / 2, P.BOTTOM_T + 0.2)
     return _tilt(Pos(dx, dy, 0) * slab)
 
 
@@ -419,8 +426,8 @@ def k11_case(dx=0.0, dy=0.0):
     slab = Pos(0, P.CASE_D / 2 - P.K11_OVER, 0) * extrude(
         RectangleRounded(P.CASE_W, P.CASE_D, P.OUTER_CORNER_R), amount=P.CASE_H)
     for x, y in P.FOOT_XY:
-        slab -= Pos(x, P.CASE_D / 2 - P.K11_OVER + y, P.FOOT_RECESS / 2 - 0.05) * Cylinder(
-            P.FOOT_DIA / 2, P.FOOT_RECESS + 0.1)
+        slab -= Pos(x, P.CASE_D / 2 - P.K11_OVER + y, P.BOTTOM_T / 2) * Cylinder(
+            P.FOOT_DIA / 2, P.BOTTOM_T + 0.2)
     # dx/dy shift the pad **along the plate**, inside the tilt. Shifting it
     # horizontally instead slides it into a cradle that rises at 3.33, and
     # the probe then measures the whole underside sinking rather than the
@@ -483,6 +490,26 @@ def k11_checks(part):
         ok.append(good)
         print(f"  [{'ok ' if good else 'BAD'}] {'k11: cradle under peg ' + str(i):<38} "
               f"{got:8.3f}  (want > {want*0.45:.3f} of {want:.3f})")
+
+    # The roof over the slot is the cradle thinned, and thinness is the
+    # one thing a boolean cannot report: the mount clears the cable at
+    # 0.000 whether that roof is 2.2 or 0.2. Measure it, at the front
+    # face, which is its thin end -- the plate climbs across the slot's
+    # depth, so the back of the roof is thicker than the front.
+    t = math.radians(P.K11_TILT)
+    rx = P.K11_PAD_DX + 20.0
+    y_face = P.K11_D - P.K11_CABLE_H * math.tan(t)
+    roof = _probe(part, rx, y_face + 1.2, P.K11_PLATE_REAR, 2.0, 1.6, 8.0)
+    got = 0.0 if roof is None else roof.size.Z
+    # **The floor is absolute, not a fraction of the parameter.** Written
+    # as `> K11_SLOT_ROOF * 0.8` it moved with the number it was
+    # guarding: dropping the roof to 0.6 dropped the threshold to 0.48
+    # and the run stayed green. 1.6 is four walls on a 0.4 nozzle, and
+    # the roof also has to be the thickness that was asked for.
+    good = got > 1.6 and abs(got - P.K11_SLOT_ROOF) < 0.35
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'roof over the cable slot':<38} "
+          f"{got:8.3f}  (want {P.K11_SLOT_ROOF:.2f}, floor 1.600)")
 
     # The slot has to run out of the right end, or the cable cannot leave.
     # A post there would have closed it -- and a post with a hole for the

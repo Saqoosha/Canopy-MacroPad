@@ -255,6 +255,18 @@ one, not necessarily the only one.
   a rib; the total said nothing. A sum hides the structure that names
   the cause, and `.solids()` is one call away.
 
+  **Two more faces of it, both found by an injection that stayed
+  green.** A probe *inside* a bore cannot see a counterbore, because
+  the ledge is material removed **outside** it -- putting the step back
+  left every reading at 0.000 while a 1.5-wide overhang printed over
+  air. The guard that works watches the wall beside the bore instead,
+  at several heights. And a threshold written as a fraction of the
+  thing it guards -- `roof > K11_SLOT_ROOF * 0.8` -- moves with it:
+  dropping the roof to 0.6 dropped the bar to 0.48 and the run stayed
+  green. **A check measuring its own arithmetic**, wearing a third
+  face. The floor has to be an absolute the geometry cannot move: 1.6,
+  four walls on a 0.4 nozzle.
+
   **The animal has an inverse: a probe whose sampling catches someone
   else's material cannot fail.** The latch's post-presence box was
   drawn 0.50 wide in y and two tab positions stand close enough to the
@@ -543,12 +555,6 @@ one, not necessarily the only one.
   bottom height at the rear face, and where that face meets the desk;
   everything keyboard-specific stops at the two thin callers.
 
-  The Air75's mounts are **printed and fitting on the first print of
-  each**, pegs and seating, so `MOUNT_PEG_DIA` 7.50 into Ø8.00 and
-  `MOUNT_OVER` 10.0 against the F-row caps are values that work rather
-  than ranges whose ends were felt -- one assembly apiece, and the
-  planned peg coupon never had to happen. The K11's is not printed yet.
-
   On the K11 the **USB-C plug picks the height and the cable shapes the
   front face**: level plates put the pad's own case across the port, and
   a case cannot be relieved. The pad follows the **keys'** centre, not
@@ -557,6 +563,23 @@ one, not necessarily the only one.
   and its own figure and is not run by `build.py`; run it after touching
   `KB_*`, `K11_*`, `MOUNT_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`.
   The reasoning is `case/README.md`, *The keyboard mount*.
+
+- **Every number the mounts have was settled by printing, and the model
+  lost each argument.** The pad is located by Ø4.50 x 2.30 pegs in
+  Ø5.00 bores straight through the plate -- one diameter, no
+  counterbore, no step -- because **any change of diameter is an
+  annular ledge printed over air** and it droops and strings into the
+  bore. The predecessors both failed that way: a blind hole trapped
+  stringing under a bridged ceiling where nothing reaches to clean, and
+  opening it through left the Ø8-to-Ø5 step. The rubber feet went with
+  the recess; a Ø5 bore cannot seat a Ø8 foot, and they were unused.
+  On the K11 the printed part also moved the plug pocket 7.0 off where
+  the STEP put the port, opened the cable slot's ceiling by 1.67 in two
+  goes, and widened the right-hand exit from 1.0 to 6.0. **The one CAD
+  number that was simply wrong was the rubber strips' height** -- 1.105
+  in Keychron's model against 1.70 measured -- and two independent
+  measurements agreeing (14.54 + 1.70 = 16.24 against a plate measured
+  at 16.30) is what proved the rest of the model right.
 
 - **Four ways a probe lied in one afternoon, and every one of them was
   the frame, not the geometry.** All four were caught only because

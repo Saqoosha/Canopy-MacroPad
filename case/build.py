@@ -7,6 +7,7 @@ decoration -- it is the only way to catch a parameter edit that quietly
 moved a hole.
 """
 
+import math
 import re
 import sys
 from pathlib import Path
@@ -159,6 +160,65 @@ def main():
     print(f"  [{'ok ' if bh <= P.Z_PLATE_BOTTOM else 'BAD'}] "
           f"{'bottom plate fits under the shell':<38} {bh:8.3f}  "
           f"(limit {P.Z_PLATE_BOTTOM:.3f})")
+
+    # The foot bores are one diameter straight through -- no step, so
+    # nothing in them overhangs. Two things to hold: that they really do
+    # go through (blind, they caught stringing under a bridged ceiling),
+    # and that no ledge has crept back in (a narrower section anywhere
+    # would print over air). Probe a square inscribed in the bore at
+    # three heights -- inscribed because a box merely narrower than Ø8
+    # pokes its corners into the wall and reports material in a bore that
+    # is wide open.
+    side = P.FOOT_DIA / math.sqrt(2) - 0.4
+    x, y = P.FOOT_XY[0]
+    worst = 0.0
+    for z in (0.3, P.BOTTOM_T / 2, P.BOTTOM_T - 0.15):
+        cap = _probe(built["bottom"], x, y, z, side, side, 0.2)
+        worst = max(worst, 0.0 if cap is None else cap.size.X)
+    good = worst < 1e-6
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'foot bore open, floor to plate top':<38} "
+          f"{worst:8.3f}  (want nothing at any height)")
+
+    # **And the wall beside it has to be there at every height**, which
+    # the probe above cannot say: it sits inside the bore, and a
+    # counterbore is material *removed outside* it. Put a step back in
+    # and that check stays green while a 1.5-wide ledge prints over air.
+    # This one rides just outside the bore instead, where the missing
+    # material would be.
+    r = P.FOOT_DIA / 2 + 1.0
+    thin = []
+    for z in (0.25, 1.0, P.BOTTOM_T - 0.3):
+        w = _probe(built["bottom"], x + r, y, z, 1.2, 1.2, 0.2)
+        thin.append(0.0 if w is None else w.size.X)
+    good = all(t > 1.15 for t in thin)
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'bore is one diameter, no ledge':<38} "
+          f"{[round(t, 2) for t in thin]}  (want 1.20 at every height)")
+
+    air = P.Z_BOARD_BOTTOM - P.BOTTOM_T
+    good = air > 1.0
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'air over the bore, plate to board':<38} "
+          f"{air:8.3f}  (want > 1.000)")
+    bore = None
+    for bx, by in P.FOOT_XY:
+        t = Pos(bx, by, P.BOTTOM_T / 2) * Cylinder(P.FOOT_DIA / 2, P.BOTTOM_T + 0.2)
+        bore = t if bore is None else bore + t
+    for lab, other in (("the board", mock.board()), ("the switches", mock.switches())):
+        v = _shared(bore, other)
+        ok.append(v < 1e-3)
+        print(f"  [{'ok ' if v < 1e-3 else 'BAD'}] {'foot bores vs ' + lab:<38} "
+              f"{v:8.3f} mm3")
+    cols = None
+    for cx, cy in list(P.PRESS_XY) + list(P.BACK_PRESS_XY):
+        dia = P.COLUMN_DIA if (cx, cy) in P.PRESS_XY else P.BACK_COLUMN_DIA
+        c = Pos(cx, cy, P.BOTTOM_T / 2) * Cylinder(dia / 2, P.BOTTOM_T)
+        cols = c if cols is None else cols + c
+    v = _shared(bore, cols)
+    ok.append(v < 1e-3)
+    print(f"  [{'ok ' if v < 1e-3 else 'BAD'}] {'foot bores vs the column feet':<38} "
+          f"{v:8.3f} mm3")
 
     margins = {
         # Receptacle sits in a 1.00 pocket cut into the plate top, so the
