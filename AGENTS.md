@@ -255,6 +255,18 @@ one, not necessarily the only one.
   a rib; the total said nothing. A sum hides the structure that names
   the cause, and `.solids()` is one call away.
 
+  **Two more faces of it, both found by an injection that stayed
+  green.** A probe *inside* a bore cannot see a counterbore, because
+  the ledge is material removed **outside** it -- putting the step back
+  left every reading at 0.000 while a 1.5-wide overhang printed over
+  air. The guard that works watches the wall beside the bore instead,
+  at several heights. And a threshold written as a fraction of the
+  thing it guards -- `roof > K11_SLOT_ROOF * 0.8` -- moves with it:
+  dropping the roof to 0.6 dropped the bar to 0.48 and the run stayed
+  green. **A check measuring its own arithmetic**, wearing a third
+  face. The floor has to be an absolute the geometry cannot move: 1.6,
+  four walls on a 0.4 nozzle.
+
   **The animal has an inverse: a probe whose sampling catches someone
   else's material cannot fail.** The latch's post-presence box was
   drawn 0.50 wide in y and two tab positions stand close enough to the
@@ -531,23 +543,104 @@ one, not necessarily the only one.
   `ValueError` raised for an empty intersection and nothing else.
 
 - **The keyboard mount is the case outline pushed down to the desk at
-  the keyboard's tilt, and the tilt is a sine.** `mount.py` builds
-  `mount-raised` and `mount-flush` for a Nuphy Air75 v2.1 from three
-  desk measurements in `params.py` (`KB_D`, `KB_NEAR`, `KB_FAR`). The
-  keyboard is a **tilted rectangle** -- near bottom corner on the desk,
-  rear feet under the far end -- so the rise over the depth is
-  `asin`, every face is square to the plate, and the near height fixes
-  the slab thickness. Two wrong body shapes were drawn before that
-  sentence was asked for; ask it first. The case is located by pegs
-  into its foot recesses (pads off), never by walls. Both mounts are
-  **printed and fitting on the first print of each**, pegs and
-  seating, so `MOUNT_PEG_DIA` 7.50 into Ø8.00 and `MOUNT_OVER` 10.0
-  against the F-row caps are values that work rather than ranges
-  whose ends were felt -- one assembly apiece, and the planned peg
-  coupon never had to happen. `mount.py` has its own checks and
-  its own figure and is not run by `build.py`; run it after
-  touching `KB_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`. The
-  reasoning is `case/README.md`, *The keyboard mount*.
+  the keyboard's tilt, and there are two keyboards with different
+  shapes.** `mount.py` builds `mount-raised` and `mount-flush` for a
+  Nuphy Air75 v2.1 and `mount-k11` for a Keychron K11 Max. The Air75 is
+  a **tilted rectangle** -- near bottom corner on the desk, rear feet
+  under the far end, so the rise over the depth is `asin`. The K11 Max
+  is a **wedge** -- bottom flat on the desk, only the plate tilted. Two
+  wrong Air75 body shapes were drawn before anyone asked which it was;
+  ask first, and for the K11 the answer came off Keychron's own STEP
+  rather than a tape measure. `_build` needs only the tilt, the pad's
+  bottom height at the rear face, and where that face meets the desk;
+  everything keyboard-specific stops at the two thin callers.
+
+  On the K11 the **USB-C plug picks the height and the cable shapes the
+  front face**: level plates put the pad's own case across the port, and
+  a case cannot be relieved. The pad follows the **keys'** centre, not
+  the base's -- six keys off to the right drag the field's extent onto
+  the case centre and hide a 17.94 offset. `mount.py` has its own checks
+  and its own figure and is not run by `build.py`; run it after touching
+  `KB_*`, `K11_*`, `MOUNT_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`.
+  The reasoning is `case/README.md`, *The keyboard mount*.
+
+- **A check that cannot count what it is guarding.** `_pegs` dropped a
+  peg whose *centre* fell too near the mount's front cut -- right for
+  the Air75, where 0.75 of a fin survives, and wrong for the K11, where
+  3.28 of 4.50 does. It threw away half that mount's locators for a
+  revision and **every check stayed green**: the pad still caught on the
+  remaining two, and the cradle probe reads the cradle, not the peg
+  standing on it. The rule is what survives the cut now, and a check
+  counts the pegs that are actually there.
+
+- **Every number the mounts have was settled by printing, and the model
+  lost each argument.** The pad is located by Ø4.50 x 2.30 pegs in
+  Ø5.00 bores straight through the plate -- one diameter, no
+  counterbore, no step -- because **any change of diameter is an
+  annular ledge printed over air** and it droops and strings into the
+  bore. The predecessors both failed that way: a blind hole trapped
+  stringing under a bridged ceiling where nothing reaches to clean, and
+  opening it through left the Ø8-to-Ø5 step. The rubber feet went with
+  the recess; a Ø5 bore cannot seat a Ø8 foot, and they were unused.
+  On the K11 the printed part also moved the plug pocket 7.0 off where
+  the STEP put the port, opened the cable slot's ceiling by 1.67 in two
+  goes, and widened the right-hand exit from 1.0 to 6.0. **The one CAD
+  number that was simply wrong was the rubber strips' height** -- 1.105
+  in Keychron's model against 1.70 measured -- and two independent
+  measurements agreeing (14.54 + 1.70 = 16.24 against a plate measured
+  at 16.30) is what proved the rest of the model right.
+
+- **Four ways a probe lied in one afternoon, and every one of them was
+  the frame, not the geometry.** All four were caught only because
+  something else went red first.
+
+  **A bounding box rotated is not the bounding box of the rotated
+  solid.** Dumping the K11's 808 solids and turning their boxes by 3.33°
+  inflated a 117 mm case by 6.8 mm in height, and every keycap filter
+  built on it found nothing. The STEP's own frame has the plate
+  horizontal; classify there and no rotation is needed.
+
+  **A probe that shifts the pad must shift it along the plate.** Moved
+  horizontally instead, the pad slides into a cradle that rises at 3.33°
+  and the probe measures its whole underside sinking -- 129.5 mm³ of the
+  wrong thing, against 3.9 for the same test in x. The peg checks read
+  identically in all four directions once it was fixed, which is what
+  says they are measuring the pegs.
+
+  **A stand-in's planes must pivot where the real faces meet.** The
+  K11's rear face was pivoted at plate height instead of at the desk,
+  leaning it 0.85 too far back; the interference check went red at
+  338.325 mm³ about a keyboard drawn wrong, not a mount built wrong.
+
+  **A probe reaching past a wall measures the cavity behind it.** The
+  front-post check read 26.9 of a 36 mm³ box and called a good post bad,
+  because 3.0 behind the face the shell is meant to be empty.
+
+- **A cut has a frame too, and it is not always the part's.**
+  `mount.py`'s cable slot was cut plate-parallel, so its floor climbed
+  0.815 across its own 14 mm depth and shaved a **horizontal** cable at
+  the back -- 1.744 mm³, invisible at the front where it was drawn. The
+  cable is horizontal and the mount is not, so the slot is built in
+  world coordinates. Ask which frame the thing being cleared lives in
+  before choosing the frame to cut in.
+
+- **Inset is not the same as inside.** The mount's hollow was the pad's
+  outline inset by the wall thickness -- but the pad's front edge stands
+  `over` forward of the mount's own front cut, so the cavity poked
+  straight through it and the part had no front wall at all. It has to
+  be held back behind the cut as well as inset from the outline.
+
+- **Sorting triangles is not depth, and saying so in a comment does not
+  fix it.** `render.py` replaced `Poly3DCollection`'s ordering with a
+  sort by the projection of each triangle's centroid, which is the
+  painter's algorithm and fails on exactly the shapes here: a hollow
+  mount's own walls pass in front of and behind each other, and no
+  ordering of whole triangles can express that -- faces inside a cavity
+  surface through the wall in front of them. `case/shade.py` is a small
+  numpy z-buffer (orthographic, one depth per pixel, 2x supersampled,
+  no display, deterministic) and `mount.py`'s figure uses it.
+  **`render.py` still has the old defect** and could adopt `shade`; that
+  would change every committed case PNG, so it is its own job.
 
 - **The dummy caps mount on a ring, not on a cross.**
   `out/choc/keycap.stl` is a blank 1U to press while the wrk. MX Pure

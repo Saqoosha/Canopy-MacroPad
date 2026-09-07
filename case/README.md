@@ -464,22 +464,46 @@ the desk. The two differ in two numbers:
   the whole case sits on the mount. The case bottom is 3.56 above the
   keyboard's underside plane.
 
-**Location is pegs into the foot recesses, not walls.** The rubber
-pads come off, and Ø7.50 x 0.40 pegs (`MOUNT_PEG_DIA`, `MOUNT_PEG_H`)
-stand into the Ø8 x 0.5 recesses at `FOOT_XY` -- the rear two on the
-raised mount, whose front pair hangs over the keyboard, all four on the
-flush one. 0.40 leaves 0.10 so the case bottom carries the load rather
-than the peg tops. Nothing in the x direction depends on the keyboard:
-the case is narrower than it, so centred is a choice rather than a
-fit.
+**Location is pegs through the plate, not walls, and the shape of that
+joint was settled entirely by printing it.** Ø4.50 x 2.30 pegs
+(`MOUNT_PEG_DIA`, `MOUNT_PEG_H`) stand in Ø5.00 bores that run **straight
+through** the bottom plate at `FOOT_XY`. One diameter, no counterbore, no
+step. Engagement is the plate's whole thickness less 0.10, so the pad's
+own bottom face lands on the cradle rather than a peg top on a bore end.
+Nothing in x depends on the keyboard: the pad is narrower than either, so
+its lateral position is a choice.
 
-**Both mounts are printed and fit** -- Saqoosha's word on the first
-print of each, pegs and seating together, which is why the peg coupon
-that was planned never had to happen. Read it for what it is: two
-assemblies, one apiece. 7.50 into Ø8.00 is a value that works, not a
-range whose ends have been felt, and the same goes for `MOUNT_OVER`
-10.0 against the F-row caps. If either is ever reprinted and fights,
-that is a second sample rather than a contradiction.
+**A peg keeps its place if enough of it survives the front cut**, which
+is measured rather than guessed from where its centre lands. The Air75's
+raised mount overhangs 10.0, its front pegs sit 3.0 forward of the face,
+and what would be left is a 0.75 fin -- so that pair is dropped and the
+rear two locate it. The K11 overhangs 5.97 and keeps 3.28 of each 4.50,
+so it has all four. A rule written on the centre instead threw the K11's
+front pair away for a revision, and every other check passed while it
+did: the pad still caught on two pegs, and the cradle probe reads the
+cradle rather than the peg standing on it. `mount.py` counts them now.
+
+*It began as the rubber feet's Ø8.00 x 0.50 recess with a Ø7.50 x 0.40
+peg in it -- printed, fitting, and holding by 0.40, which resists tilt
+and barely resists sliding. On a slope, sliding is how it comes off.*
+Two attempts to deepen it failed in PLA before the shape stopped
+changing. Blind at 1.20, the bore caught stringing under a ceiling
+bridged over air, in the one place nothing reaches in to clean. Opened
+through, the **step** was still there: Ø8.00 narrowing to Ø5.00 leaves a
+1.5-wide annular ledge printed over the void below it, and a ring of
+unsupported overhang droops into the bore. **Any change of diameter is
+that ledge**; the fix was to have no change of diameter.
+
+The peg's Ø4.50 is reasoned rather than swept. The one fit this project
+settled on printed parts is Ø7.50 into Ø8.00 -- 0.50 nominal, 0.35 after
+this machine's 0.15 hole shrink -- and the ratio does not transfer, but
+that **effective** clearance does: 0.50 nominal at Ø5.00 leaves the same
+0.35. Printed, it fits. `MOUNT_OVER` 10.0 against the Air75's F-row caps
+is likewise a value that works rather than a range whose ends were felt.
+
+**The rubber feet are retired.** A Ø5.00 bore through the plate cannot
+seat a Ø8.00 foot, and they were not being used at either desk -- the pad
+lives on a mount. One bottom plate serves every mount here.
 
 **Print with the desk face down.** It is the one flat face; the
 cradle is then a 5.5° top surface and nothing overhangs. The block is
@@ -501,6 +525,117 @@ cradle is solid to the surface. Watched to fail: pegs moved 2.0 in y,
 9.926 / 19.853 mm³ against the case; tilt sign flipped, the keyboard's
 far corner reading 0.200 for 25.800 before the desk chamfer failed on a
 part that had none of its edges where it expected.
+
+### The second keyboard: a Keychron K11 Max
+
+**It is a different solid, and that is the whole lesson.** The Air75 is
+a tilted rectangle; the K11 Max is a **wedge** -- its bottom is one flat
+plane lying on the desk, and only the top plate is tilted. Nothing was
+measured with a tape here: Keychron publish their CAD, and
+`k11-Max-US-Knob-Version-Full-Model.stp` says the bottom is a single
+33,000 mm² planar face standing 3.33° off the plate's normal, which is
+also the feet-up typing angle they publish. Front and rear faces are
+square to the plate exactly as on the Air75; what differs is where the
+rear face meets the desk. `_build` takes the two numbers that follow --
+the tilt, and how high the pad's bottom sits at that face -- and each
+keyboard has a thin function that works them out its own way.
+
+Measured off that STEP, in desk coordinates: 117.65 deep, 345.37 wide,
+top plate 14.54 above the desk at the rear face, USB-C port 7.19 to
+13.19 up that face and 21.03 left of the case's centre.
+
+**The plug picks the height.** Level plates would put the macropad's own
+case at 5.04 to 14.54 up the rear face, straight across the port -- and
+a case cannot be relieved, only moved. Raising it to the plate plane
+clears the port's top edge by 1.35, which makes the plate plane the
+lowest position that works rather than a matter of taste. The mount
+still crosses the port, and a mount *can* be cut.
+
+**The pad follows the keys, not the base.** Six keys stand off to the
+right of the Alice cluster and drag the field's extent back onto the
+case's own centre -- 68 caps span x 9.52..345.49, mid 177.50 against a
+case centre of 176.30, which reads as "centred" and is misleading. The
+62 keys anyone types on sit at 158.37, **17.94 left**, and that is where
+the pad goes. It also buys reach: the pad's underside rides the plate
+plane, so any cap under it is a collision, and the limit is 3.50 centred
+against 6.47 on the keys. The limit holds flat from -17.94 to -24.30, so
+the offset the keys ask for is already on the plateau. `K11_OVER` takes
+5.97 of the 6.47, and the 0.50 also keeps the front pegs whole -- their
+leading edge is at 3.25 - `K11_OVER`.
+
+**The cable, not the plug, shapes the front face -- and four printed
+rounds shaped it, not the model.** The L-plug needs a pocket, 30 x 17
+with its floor at 2.0, clearing a plug grown 4.0 every way. But the cable
+leaves that plug **straight right**, has to get out past the pad's right
+edge, and does **not** lie on the desk: it floats around the middle of
+the keyboard's base height. So the relief is a slot at the cable's own
+height, 14.0 back from the face, running from the pocket's left edge out
+through the right end. It takes an 8.0 cable.
+
+Every number in it moved once a printed mount met the real keyboard:
+
+- **The pocket sits 7.0 right of where the STEP put the port.** Whether
+  the model's plug solid is off or the L-plug's body is not centred on
+  the socket, the keyboard on the desk is what has to be cleared, so
+  `K11_PORT_X` carries the correction.
+- **The ceiling was hit, twice.** The slot was centred on the cable at
+  3.87..12.37, leaving 0.88 of plain material above it doing nothing --
+  taking that reached 13.05 and still caught. So the cradle itself thins
+  over the slot to `K11_SLOT_ROOF` 2.2, measured at the front face, which
+  is its thin end (the plate climbs 0.815 across the slot's 14 of depth).
+  Top is 14.04 now, 1.67 above where the first print failed. That roof
+  bridges 14 as about five walls on a 0.4 nozzle; the pad on it weighs
+  little and the rear wall carries the span's far edge.
+- **The right-hand exit was too small.** 1.0 past the pad's edge was
+  enough on paper; the cable carries further right before it leaves and
+  caught the end. 6.0 now. Nothing bears on the last few millimetres of
+  that wall.
+
+Two shapes were wrong before those, and the cable stand-in caught both
+without a print: a 10-deep step in the face, drawn against a cable
+sloping 27 rearward per 97 right, at 330.9 mm³; then a channel cut to the
+desk, which cleared the cable only by taking the floor with it.
+
+**There is no post at the right end, and there cannot be one.** Nothing
+that ties floor to cradle through the front wall can stand anywhere right
+of the port, because the cable exits there -- and a post with a hole cut
+for the cable is the same solid as a slot running to the edge. It was
+never needed: what ties floor to cradle is the rear wall, 3.0 thick and
+full height along the whole length, plus the back of each rib behind the
+slot.
+
+**The mount is a shell with a floor.** 3.0 walls on the pad's outline,
+ribs on 22.0, cradle solid on top, and the desk face **closed** -- 2.0 of
+floor. Open, the first layer of a 145 mm part is a 3.0 outline plus a few
+rib ends, a poor grip on the bed for something that long and 21 deep;
+closed, the first layer is 2793 mm², the section resists twisting, and it
+stands on an area rather than an edge. 22.5 cm³ against 48.6 solid. Print
+desk face down: the cradle bridges each bay and the slot, and nothing
+overhangs.
+
+**The keyboard sits 1.70 off the desk on rubber strips, and that is the
+only place the CAD is wrong.** The section reads 14.54 from the case's
+bottom to the plate at the rear face; the strips measure 1.70; the plate
+above the desk measures 16.30. 14.54 + 1.70 = 16.24 against that 16.30 --
+**two measurements that did not have to agree do**, which is what says
+the section is right and puts the whole difference in the feet. Keychron's
+own model has those strips at 1.105 and publishes 15.6 to match, so CAD
+and catalogue agree with each other and not with the desk. Every height
+here rides on `K11_FOOT_H`, the port's included.
+
+**What the K11's checks watch** -- against a wedge stand-in built from
+those measurements, a case stand-in with its bores, an L-plug and a
+cable: desk face at z 0 with nothing below; mount, case, keyboard, plug
+and cable pairwise at 0.000; the pocket clearing a plug grown 4.0 and the
+slot an 8.0 cable; the slot open at the right end so the cable can leave;
+the roof over it thick enough to print; the pocket removing material at
+all; the shell under 0.75 of solid; the pegs catching a case shifted 1.0
+**along the plate** in each of ±x, ±y; and cradle under every peg.
+Watched to fail: pocket removed, 421.6 mm³ against the plug; hollow
+disabled, 0.845; pegs moved 2.0, 9.926; `K11_OVER` at 14.0, the cradle
+gone from under two pegs; the slot stopped 10 short of the right end,
+265.1 against the cable and 63.9 in the exit probes; the roof at 0.6,
+0.718 against a floor of 1.6.
 
 ## Cable, per layout
 

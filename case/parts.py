@@ -305,6 +305,7 @@ def _slide_trim():
                   z0, top) - allowed
 
 
+
 def _bed_chamfer(solid, z, size):
     """Chamfer the outline that lands on the print bed.
 
@@ -441,8 +442,11 @@ def bottom():
     part -= _stadium((P.USB_CY, _zc), _tw, _th, P.USB_AXIS,
                      _ox + P.BOARD_W - P.USB_TAB_W - 1.0, P.CASE_W / 2 + 0.1)
 
+    # One Ø5.00 bore straight through, no step and no counterbore: any
+    # change of diameter leaves an annular ledge printed over air, and it
+    # droops and strings into the bore. See FOOT_DIA in params.
     for x, y in P.FOOT_XY:
-        part -= _tube(x, y, -0.1, P.FOOT_RECESS, P.FOOT_DIA)
+        part -= _tube(x, y, -0.1, P.BOTTOM_T + 0.1, P.FOOT_DIA)
 
     part -= _usb_opening()
     return part
