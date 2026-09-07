@@ -480,7 +480,7 @@ ELEPHANT_CHAMFER = 0.40
 # is the bore a mount's peg stands in.
 FOOT_DIA = 5.00
 
-# **The foot recess is a Ø8.00 hole straight through the plate**, and
+# **The foot recess is a Ø5.00 hole straight through the plate**, and
 # every step on the way here was the printer's.
 #
 # A peg standing in a 0.50 recess engages 0.50, resists tilt and barely

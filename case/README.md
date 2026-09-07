@@ -473,6 +473,16 @@ own bottom face lands on the cradle rather than a peg top on a bore end.
 Nothing in x depends on the keyboard: the pad is narrower than either, so
 its lateral position is a choice.
 
+**A peg keeps its place if enough of it survives the front cut**, which
+is measured rather than guessed from where its centre lands. The Air75's
+raised mount overhangs 10.0, its front pegs sit 3.0 forward of the face,
+and what would be left is a 0.75 fin -- so that pair is dropped and the
+rear two locate it. The K11 overhangs 5.97 and keeps 3.28 of each 4.50,
+so it has all four. A rule written on the centre instead threw the K11's
+front pair away for a revision, and every other check passed while it
+did: the pad still caught on two pegs, and the cradle probe reads the
+cradle rather than the peg standing on it. `mount.py` counts them now.
+
 *It began as the rubber feet's Ø8.00 x 0.50 recess with a Ø7.50 x 0.40
 peg in it -- printed, fitting, and holding by 0.40, which resists tilt
 and barely resists sliding. On a slope, sliding is how it comes off.*

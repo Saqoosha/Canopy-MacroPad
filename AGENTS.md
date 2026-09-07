@@ -564,6 +564,15 @@ one, not necessarily the only one.
   `KB_*`, `K11_*`, `MOUNT_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`.
   The reasoning is `case/README.md`, *The keyboard mount*.
 
+- **A check that cannot count what it is guarding.** `_pegs` dropped a
+  peg whose *centre* fell too near the mount's front cut -- right for
+  the Air75, where 0.75 of a fin survives, and wrong for the K11, where
+  3.28 of 4.50 does. It threw away half that mount's locators for a
+  revision and **every check stayed green**: the pad still caught on the
+  remaining two, and the cradle probe reads the cradle, not the peg
+  standing on it. The rule is what survives the cut now, and a check
+  counts the pegs that are actually there.
+
 - **Every number the mounts have was settled by printing, and the model
   lost each argument.** The pad is located by Ø4.50 x 2.30 pegs in
   Ø5.00 bores straight through the plate -- one diameter, no

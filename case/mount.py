@@ -63,14 +63,18 @@ def _pegs(over, near_h=None):
     """Pegs standing off the cradle into the pad's foot recesses.
 
     Plate-local, so the pad's centre is at y = CASE_D/2 - over and the
-    mount's front face is y = 0. A recess whose peg would be mostly out
-    over the keyboard gets no peg at all: what survives the front-face
-    cut there is a fin, not a locator.
+    mount's front face is y = 0. A peg keeps its place if **enough of it
+    survives that cut** -- measured, not guessed from where its centre
+    lands. The rule used to be `yc < dia/4`, written for the Air75's
+    raised mount where the front pegs sit 3.0 forward of the face and
+    what is left is a 0.75 fin; carried onto the K11 at `K11_OVER` 5.97
+    it threw away pegs keeping 3.28 of their 4.50, halving the locators
+    on the mount that needed them most.
     """
     out = None
     for x, y in P.FOOT_XY:
         yc = P.CASE_D / 2 - over + y
-        if yc < P.MOUNT_PEG_DIA / 4:
+        if yc + P.MOUNT_PEG_DIA / 2 < P.MOUNT_PEG_DIA * 0.6:
             continue
         peg = Pos(x, yc, P.MOUNT_PEG_H / 2) * Cylinder(
             P.MOUNT_PEG_DIA / 2, P.MOUNT_PEG_H)
@@ -477,6 +481,29 @@ def k11_checks(part):
         good = v > 0.05
         ok.append(good)
         print(f"  [{'ok ' if good else 'BAD'}] {'k11: pegs catch a case shifted ' + lab:<38} {v:8.3f}  (want > 0.05)")
+
+    # **How many pegs there actually are.** Every check above passes on a
+    # mount with two: the pad still catches, and the cradle probe reads
+    # the cradle, not the peg. The keep-rule quietly dropped the K11's
+    # front pair for a whole revision because nothing counted them.
+    want_pegs = sum(1 for _x, _y in P.FOOT_XY
+                    if (P.CASE_D / 2 - P.K11_OVER + _y) + P.MOUNT_PEG_DIA / 2
+                    >= P.MOUNT_PEG_DIA * 0.6)
+    t = math.radians(P.K11_TILT)
+    near_y = P.K11_D - P.K11_PLATE_REAR * math.tan(t)
+    seen = 0
+    for x, y in P.FOOT_XY:
+        yc = P.CASE_D / 2 - P.K11_OVER + y
+        band = Pos(P.K11_PAD_DX + x, near_y, P.K11_PLATE_REAR) * _tilt(
+            Pos(0, yc, P.MOUNT_PEG_H / 2) * Box(P.MOUNT_PEG_DIA + 1.0,
+                                                P.MOUNT_PEG_DIA + 1.0,
+                                                P.MOUNT_PEG_H * 0.6), P.K11_TILT)
+        if _vol(part, band) > 3.0:
+            seen += 1
+    good = seen == want_pegs == 4
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'k11: pegs actually standing':<38} "
+          f"{seen}/4  (want 4)")
 
     # The cradle must be there under each peg that survived the front cut.
     t = math.radians(P.K11_TILT)
