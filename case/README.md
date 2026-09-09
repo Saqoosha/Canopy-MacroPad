@@ -1012,7 +1012,12 @@ drop zone), drop it flat, slide left ~2 to home. **The screws are
 gone** -- removed once the printed case proved the latch -- so the
 underside closes with no counterbores, and home in x is held by seam
 friction and the pocket-end over-travel stop until the detent takes it
-over: a desk shove can in principle walk the lid rightward 2 mm and
+over. That stop is `SLIDE_STOP_GAP`, the channel's west end against the
+post's west face, ten of them: **0.00 drawn, and the printed plate
+lands flush**. It was a bare `0.30` in the cut and a literal `0.30` in
+the checks that agreed with no geometry, and the case ran 0.5 past
+flush while everything read green -- `build.py` slides the plate until
+it catches now, and reports the distance. The travel: a desk shove can in principle walk the lid rightward 2 mm and
 free it, carrying cannot (the hanging plate loads the wedges). At rest
 in either position nothing on one half touches the other; the
 transient right touch is the only face contact and it is how the hand

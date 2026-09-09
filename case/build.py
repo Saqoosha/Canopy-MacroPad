@@ -255,14 +255,14 @@ def main():
         # bearing is the slope pair itself and SLIDE_FIT is their
         # vertical offset by construction -- the capture probe below
         # is what verifies the solid agrees.
-        # The tab's only x neighbour is the pocket's own end -- the
-        # ledge runs along x, so the x-clearance class the +x nose kept
-        # losing to hole shrink has no members left. The 0.30 here is a
-        # deliberate over-travel: on the printed screwless case it
-        # measures ~0.1 and Saqoosha accepted it ("i can slide 0.1mm
-        # deeper but ok"); the detent will pin home exactly if it ever
-        # stops being ok.
-        "tab clear of the pocket's end": 0.30,
+        # The tab's only x neighbour is the pocket's own end, and that
+        # gap has left this table: it is the plate's **over-travel past
+        # home**, so small is the requirement and `margins`' blanket
+        # "> 0.25" is the opposite test. It sat here as a bare `0.30`
+        # agreeing with nothing, went on reporting 0.30 while the shape
+        # drifted, and the printed case ran 0.5 past flush with every
+        # check green. It is measured by sliding the plate now, further
+        # down.
         "entry clear of the corner radius": (
             (P.CASE_W / 2 - P.OUTER_CORNER_R)
             - (max(P.SLIDE_TAB_X) + P.SLIDE_TAB_L / 2
@@ -624,6 +624,27 @@ def main():
     ok.append(good)
     print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} ledges catch a "
           f"dropped plate {caught}/{want}, free below the fit {free:9.3f} mm3")
+
+    # **The over-travel, measured by sliding the plate.** The arithmetic
+    # guard above only repeats the constant; this brackets the stop in
+    # the solid -- clear just short of it, touching just past. A literal
+    # sat in its place for a whole revision and could not have gone red.
+    # **Sweep it, do not bracket it.** The first version asked whether
+    # the stop was where SLIDE_STOP_GAP says, and the cut is made from
+    # that same constant, so 0.30 and 0.00 both passed -- a check
+    # measuring its own arithmetic. This one slides the plate until it
+    # catches and reports the distance, which is a number the constant
+    # cannot talk it out of, against an absolute cap.
+    cap, travel = 0.15, None
+    for i in range(1, 13):
+        d = i * 0.05
+        if _shared(Pos(-d, 0, 0) * built["bottom"], built["shell"]) > 1e-3:
+            travel = d - 0.05
+            break
+    good = travel is not None and travel <= cap
+    ok.append(good)
+    print(f"  [{'ok ' if good else 'BAD'}] {'slide':<7} over-travel past home "
+          f"{'none' if travel is None else f'{travel:.2f}'}  (cap {cap:.2f})")
 
     # The assembly corridor: the plate at the deep end of the drop
     # window, coming down, and mid-slide, against the shell and the

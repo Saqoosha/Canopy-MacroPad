@@ -564,6 +564,24 @@ one, not necessarily the only one.
   `KB_*`, `K11_*`, `MOUNT_*`, `FOOT_*`, `CASE_*` or `OUTER_CORNER_R`.
   The reasoning is `case/README.md`, *The keyboard mount*.
 
+- **Three places held the same number and none of them agreed.** The
+  plate's over-travel past home lived as a bare `0.30` inside
+  `_slide_pockets`, as a *literal* `0.30` in `build.py`'s margins table
+  -- derived from nothing, so it reported 0.30 whatever the cut did --
+  and as "~0.1 printed" in this file, off an earlier shape. The printed
+  case ran 0.5 past flush with every check green. It is `SLIDE_STOP_GAP`
+  now, the cut reads it, and a boolean **sweeps the plate until it
+  catches** and reports the distance against an absolute cap.
+
+  The first version of that boolean was **tautological** and passed the
+  injection: it asked whether the stop was where the constant says, and
+  the cut is made from the same constant, so 0.30 and 0.00 both cleared
+  it. What it did say -- that the constant reaches the geometry -- is
+  the drift that actually happened, so it stayed; the sweep and the cap
+  were added beside it. Also worth the entry: it was sitting in
+  `margins`, whose blanket test is `> 0.25`, while **small is the
+  requirement**. A number in the wrong table is guarded backwards.
+
 - **A check that cannot count what it is guarding.** `_pegs` dropped a
   peg whose *centre* fell too near the mount's front cut -- right for
   the Air75, where 0.75 of a fin survives, and wrong for the K11, where
@@ -838,7 +856,9 @@ the placed switches). The screwless case is printed and working at
 Saqoosha's read is "good tight", no discrete カチッ (the ~2 of drag
 before the notch smears the click into friction), and accepted,
 because retention was the requirement and tight is retention. The
-pocket-end over-travel stop backs it up at ~0.1 printed. The first
+pocket-end over-travel stop backs it up, at `SLIDE_STOP_GAP` **0.00**
+and printed flush -- it read ~0.1 here for a whole revision while the
+part had drifted to 0.30 drawn and 0.5 in the hand. The first
 detent shape -- a 0.40
 bump raised on the ledge's 45° slope, sprung by the plate's own weight
 -- printed to nothing ("i dont think detent is working... theres no

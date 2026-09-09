@@ -353,6 +353,28 @@ SLIDE_ENTRY_HEAD = 0.60   # entry roof above the post top, for the drop
 SLIDE_POCKET_IN = 0.10    # inboard of the wall's inner face
 SLIDE_POCKET_OUT = 1.15   # outboard of the wall's inner face
 
+# **How far past home the plate can still travel**, and it is the
+# channel's west end against the post's west face -- ten of them, so it
+# is a real stop rather than one corner. It lived as a bare `- 0.30`
+# inside `_slide_pockets` with no name, and `AGENTS.md` recorded it as
+# "~0.1 printed" from an earlier shape; nothing measured it, so nobody
+# saw it move. The printed case runs 0.5 past flush, which shows on the
+# seam, and the detent's own +-0.30 of notch play sits inside this
+# rather than adding to it -- both are the same plate moving.
+#
+# **Zero, and it could go negative.** Negative is a nominal
+# interference that the print's own slack opens back up, and it is how
+# the last 0.2 would come out -- the drawn 0.30 measured 0.5 in the
+# hand, so this gap gains about 0.2 somewhere between the two. What
+# stops that being the answer today is that 0.2 is **one measurement**,
+# and if it is not slack -- a rock, a reading -- the plate stops that
+# far *short* of home instead. A case that will not close is worse than
+# a seam 0.2 out, and the offsets are the same size either way. So the
+# gap goes to the edge of what is defensible without a second sample,
+# the next print measures what is left, and two samples decide whether
+# this goes negative.
+SLIDE_STOP_GAP = 0.00
+
 # --- the detent ---------------------------------------------------------
 # What the screws used to do in x, done by shape -- second cut. The
 # first was a 0.40 bump raised on the ledge's 45-degree slope with the

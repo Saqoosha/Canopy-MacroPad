@@ -169,7 +169,7 @@ def _slide_pockets():
         # slide is leftward, the drop offset rightward.
         x1e = xt + P.SLIDE_TAB_L / 2 + P.SLIDE_ENTRY_MAX + 0.10
         x_e = xt - P.SLIDE_TAB_L / 2 + P.SLIDE_CAPTURE
-        x0 = xt - P.SLIDE_TAB_L / 2 - 0.30
+        x0 = xt - P.SLIDE_TAB_L / 2 - P.SLIDE_STOP_GAP
         z_top = P.Z_FLOOR + P.SLIDE_TAB_H + P.SLIDE_ENTRY_HEAD
         # The gallery's floor is where the eave's wedge lands, so it is
         # a wedge too: the cut box's bottom outer edge is chamfered at
