@@ -322,9 +322,11 @@ DITHER = _profile["dither"]
 #
 # What the eye is judging is the dither's *depth*, one level as a share
 # of the light there, against the rate its pattern happens to run at.
-# Error diffusion holds one value for 1/fraction frames, so a fraction of
-# 0.1 alternates at 20 Hz however fast the paint is -- the rate cannot be
-# bought out of this, because the fraction can always be smaller.
+# Error diffusion holds one value for 1/fraction frames, so at 200 Hz a
+# fraction of 0.1 alternates at 20 Hz. Painting faster raises that -- 400
+# Hz would give 40 Hz -- but then a fraction of 0.05 alternates at 20 Hz
+# instead. The rate cannot be bought out of this, because the fraction
+# can always be smaller.
 #
 #   depth   1 LSB on   at 100 Hz   at 20 Hz
 #   100%    value 1    calm        flickers

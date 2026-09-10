@@ -188,9 +188,10 @@ naming this exact fix.
   pipeline runs on. The schematic side is a different unit entirely: a
   live test placing `sch_PrimitiveComponent.create(dev, 100, 100, ...)`
   read back as `x: 100, y: 100`, and that's 1.00 inch each axis, not 100
-  mil. The two documents are 2.54x apart on identical-looking integer
-  coordinates. Mixing them — e.g. reusing a PCB-side mil value as a
-  schematic-side argument — places a part at roughly 1/2.54 of the
+  mil. The two documents are 10x apart on identical-looking integer
+  coordinates -- the same `100` is 0.1 inch on the PCB and 1.00 inch on
+  the schematic. Mixing them — e.g. reusing a PCB-side mil value as a
+  schematic-side argument — places a part at roughly 1/10 of the
   intended distance from origin, silently; nothing errors, the part just
   lands in the wrong place by a factor that isn't obviously wrong at a
   glance.
