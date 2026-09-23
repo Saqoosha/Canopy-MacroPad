@@ -5,10 +5,9 @@ from Python and every way that API has bitten. This file is the other
 half — what to do when the boards arrive from JLCPCB, in what order, and
 which of those steps prove less than they look like they prove.
 
-The root `README.md` and `AGENTS.md` describe the **QT Py** build's
-firmware and its bring-up console. This board does not run that firmware
-yet: `firmware/code.py` uses QT Py pin names and half its code is an I2C
-NeoKey that does not exist here.
+`firmware/` runs on this board and on the QT Py build from one source;
+the `pcb` profile in `firmware/code.py` is what this board gets. Two units
+have been brought up by the order below.
 
 ## The document regressed once, silently, and the boards did not
 
@@ -104,7 +103,20 @@ is as much in what each step cannot see as in what it checks.**
 7. **LED1 only.** It is the head of the chain (`GPIO25 -> LED1.DIN`);
    every later pixel is fed by the one before it, so no other LED can be
    tested alone.
+
+   **Orientation: the lead with the notch is GND**, and the bottom silk
+   has no outline, only a small dot beside **pad 1, VDD** -- the notch
+   goes on the corner diagonally opposite that dot. Lens into the opening,
+   all six the same way round (CPL: layer B, rotation 180). Held bottom
+   up with USB-C on the left and the sockets at the far edge, GND is far
+   right, DIN near right, DOUT far left, VDD near left. `PIXEL_PAD_SIGNALS`
+   and `PIXEL_SIGNAL_QUADRANT` in `params.py` are the source.
 8. **The rest, then the chase.** See "a chain diagnoses itself" below.
+   One look settles the whole chain before any chase: `C 0..5` with six
+   different colours (red, green, blue, white, yellow, cyan), held static.
+   Then press every key a few rounds and **count downs and ups per key**.
+   A key that never appears is one number in that table, while in a
+   scrolling log a key that is simply missing is easy to overlook.
 
 ## Three ways into the UF2 bootloader
 
@@ -127,7 +139,14 @@ does not exist until the board runs CircuitPython.
   ```
 
 There is no reset button on this board, so before flashing anything onto
-a bare board it is worth knowing which of these is available.
+a bare board it is worth knowing which of these is available. **A fresh
+board needs none of them**: with a blank flash the bootrom goes to
+BOOTSEL by itself, and the second unit showed `RPI-RP2` on its first
+plug-in with SW1 never fitted and nothing bridged.
+
+Which of SW1's columns is which, held bottom up: the column **nearer
+USB-C is GND**, the far one is `BOOT` (pad 1, at x 130.0 against 133.0 in
+the Gerber). The bridge does not care, as long as it crosses columns.
 
 ## Measured on the board
 
@@ -136,7 +155,8 @@ one.
 
 | Fact | Value |
 |---|---|
-| Board UID | `DF6590575F5D2026` |
+| Board UID | `DF6590575F5D2026`, unit 2 `DF6590575F7A2426` |
+| Firmware | CircuitPython 10.2.1, stock `raspberry_pi_pico` build; `neopixel.mpy` from the 10.x bundle (unit 2: bundle 20260923) |
 | CPU | 125 MHz — the PLL locked to the 12 MHz XOSC, so CircuitPython running at all proves U2 |
 | `CIRCUITPY` free | 7,308,288 bytes |
 | Die temperature, idle | ~31.8 °C |
@@ -224,6 +244,16 @@ it; the part was innocent.
 This only works because the part sits in a chain. An isolated LED offers
 no such evidence and has to be metered.
 
+**The hand-soldered joints are where the faults have been.** Both faults
+found so far were on DNP parts soldered by hand, not on anything JLCPCB
+assembled -- unit 1's LED4 above, and unit 2's hot-swap socket SK2: key 1
+never reported, not once across many rounds, while the other five were
+clean -- and reflowing the socket's two SMD pads fixed it. So a single
+key that is **completely** silent points at its socket's solder before
+the switch or the RP2040. The tweezer bridge from step 6 separates the
+two in one press, and swapping the switch into another socket settles
+the switch.
+
 Which is also what the **chase** phase of a pad test is for: light one
 pixel at a time, 0 through 5. It is the only test that *locates* a broken
 hop — everything downstream of a dead link stays dark, so the index where
@@ -241,6 +271,14 @@ someone noticed what they were actually reporting.
   same lines on a board with no LEDs on it at all. Only the person
   looking at the board can answer that one, so ask them what they saw
   rather than reporting the log as a result.
+- **A reader that stops on a press leaves the release queued.** A
+  script that exits the moment it sees `K 1 1` never reads the `K 1 0`
+  that follows, and the next run sees that release first -- one up more
+  than downs, which looks like a bounce. Unit 2's final count read 6
+  downs and 7 ups on key 1 right after such a run, and that is the
+  likeliest reading -- a bounce would add a down as well, because the
+  firmware reports edges only -- though the first event's timestamp was
+  not kept, so it is inferred rather than shown.
 - **Change-only logging cannot see a stuck input.** A KEY net shorted to
   GND on the board reads low from the very first sample and never
   produces an edge, so it is invisible in a log of transitions. Print the
@@ -300,10 +338,10 @@ requirement and one piece of paperwork.
 `firmware/` now runs on both boards from one source, selected by the
 `PROFILES` table at the top of `firmware/code.py` (and a deliberately
 smaller copy of it in `firmware/boot.py`, which cannot import `code.py`).
-That table and the comment above it are the explanation; `AGENTS.md`'s
-"Editing the firmware" section still describes the QT Py build alone and
-has not caught up.
+That table and the comment above it are the explanation, and `AGENTS.md`'s
+"Editing the firmware" section describes both boards.
 
-Verified on this board: `HELLO 3 6`, `PONG 3 6` on the data port, all six
-keys reporting edges through the protocol, both branches of `boot.py`'s
-drive gate, and no `ERR` of any kind.
+Verified on both units: `HELLO 3 6`, `PONG 3 6` on the data port, all six
+keys reporting edges through the protocol, all six pixels lit in their
+assigned colours, and no `ERR` of any kind. Both branches of `boot.py`'s
+drive gate were checked on the first unit.
